@@ -1,8 +1,15 @@
+# Data
+data/
+
+# Dropbox files
+*.ini
+
 # History files
 .Rhistory
 .Rapp.history
 
-# Session Data files
+# Session files
+*.Rproj
 .RData
 
 # User-specific files
@@ -19,6 +26,9 @@
 
 # RStudio files
 .Rproj.user/
+
+# outputs
+*.html
 
 # produced vignettes
 vignettes/*.html
