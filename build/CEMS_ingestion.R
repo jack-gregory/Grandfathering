@@ -2,7 +2,7 @@
 ## Grandfathering
 ## CEMS Ingestion
 ## Jack Gregory
-## 16 April 2020
+## 16 April 2021
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -67,7 +67,7 @@ source(fs::path(l.path$src, "sql_tbl_cems.R"))
 source(fs::path(l.path$src, "sql_tbl_xwalk.R"))
 
 
-## (1d) Connect to MySQL burbank_com database
+## (1c) Connect to MySQL burbank_com database
 con <- DBI::dbConnect(RMySQL::MySQL(), 
                       user="root", 
                       password="blackberries22-", 

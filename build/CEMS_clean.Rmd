@@ -159,9 +159,9 @@ The following table summarizes the imported columns in the data.
 | STATE || State abbreviation |
 | FAC_NAME || Facility/plant name |
 | ORISPL || Office of the Regulatory Information System PLant (ORISPL) code |
-| UNITID || `r text_colour(colour="red", text="Boiler identifier")` |
-| FAC_ID || `r text_colour(colour="red", text="Facility identifier")` |
-| UNIT_ID|| `r text_colour(colour="red", text="Unit???")` |
+| UNITID || Boiler identifier |
+| FAC_ID || CEMS-specific facility identifier |
+| UNIT_ID|| CEMS-specific boiler identifier |
 | DATE || Operation date |
 | HOUR || Operation hour |
 | OP_TIME | hours | Operation time during the particular date and hour |
