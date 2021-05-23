@@ -79,13 +79,13 @@ l.lit <- df.lit %>%
 ## (3) FUNCTIONS ----------------------------------------------------------------------------------
 
 ## (3a) Create lit_to_bib generic
-lit_to_bib <- function(df) {
+lit_to_bib <- function(df, file) {
   UseMethod("lit_to_bib")
 }
 
 
 ## (3b) Create lit_to_bid.Paper method
-lit_to_bib.Paper <- function(df) {
+lit_to_bib.Paper <- function(df, file) {
   
   ## Data consistency checks
   stopifnot(
@@ -115,8 +115,10 @@ lit_to_bib.Paper <- function(df) {
     ) %>%
     tidyr::separate(NUMBER, into=c("VOL","NUM","PAGE"), sep=": ") %>%
     dplyr::mutate(
-      PP = ifelse(is.na(PAGE), NUM, PAGE),
-      NUM = ifelse(is.na(PAGE), "", NUM)
+      PP = case_when(is.na(PAGE) & stringr::str_detect(NUM, "-") ~ NUM, 
+                     is.na(PAGE) ~ "",
+                     TRUE ~ PAGE),
+      NUM = ifelse(is.na(PAGE) & stringr::str_detect(NUM, "-"), "", NUM)
     ) %>%
     dplyr::arrange(TAG, YEAR, TITLE) %>%
     dplyr::group_by(TAG, YEAR) %>%
@@ -147,12 +149,12 @@ lit_to_bib.Paper <- function(df) {
                     \tpages\t\t= {<PP>}
                     }\n
                     ", .open="<", .close=">") %>%
-    readr::write_lines(file.covid, append=TRUE)
+    readr::write_lines(file, append=TRUE)
 }
 
 
 ## (3c) Create lit_to_bid.WorkingPaper method
-lit_to_bib.WorkingPaper <- function(df) {
+lit_to_bib.WorkingPaper <- function(df, file) {
   
   ## Data consistency checks
   stopifnot(
@@ -215,7 +217,7 @@ lit_to_bib.WorkingPaper <- function(df) {
                     \tnumber\t= {<NUM>}
                     }\n
                     ", .open="<", .close=">") %>%
-    readr::write_lines(file.covid, append=TRUE)
+    readr::write_lines(file, append=TRUE)
 }
 
 
