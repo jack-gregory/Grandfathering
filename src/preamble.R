@@ -40,15 +40,16 @@ library(fs)
 if (!("here" %in% installed.packages())) install.packages("here")
 library(here)
 
-## DBI
+## MySQL
 ## Interfacing with MySQL
-#install.packages("DBI")
+install.packages(setdiff(c("DBI","RMySQL"), rownames(installed.packages())))
 library(DBI)
-
-## RMySql
-## Interfacing with MySQL
-#install.packages("RMySql")
 library(RMySQL)
+
+## readxl
+## Reading/writing xls & xlsx file data
+if (!("here" %in% installed.packages())) install.packages("here")
+library(readxl)
 
 
 ## (2b) Data Wrangling
