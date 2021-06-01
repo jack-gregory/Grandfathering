@@ -156,23 +156,26 @@ dbDisconnect(con)
 
 ## Import grandfathering dataset and check ORISPL & UNIT matches
 df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv")) %>%
-  mutate_at(vars(plant_name, utility_name, plt_county), str_to_upper) %>%
-  fill(plant_name, utility_name, plt_county, .direction="downup") %>%
+  select(plant_code, boiler_id, year, plant_name, plt_county) %>%
+  filter(year>=1995) %>%
+  mutate_at(vars(plant_name, plt_county), str_to_upper) %>%
+  group_by(plant_code, boiler_id) %>%
+  fill(plant_name, plt_county, .direction="downup") %>%
+  ungroup() %>%
   distinct(ORISPL = plant_code, 
            BOILER = boiler_id, 
            PLANT_NAME = plant_name, 
-           UTILITY_NAME = utility_name, 
            COUNTY = plt_county) %>%
   arrange(ORISPL, BOILER) %>%
   mutate(BOILER = as.character(BOILER)) %>%
   full_join(df.cems_yr %>% distinct(ORISPL, CEMS_UNIT = UNIT) %>% mutate(BOILER = CEMS_UNIT),
             by=c("ORISPL","BOILER")) %>%
-  mutate(MATCH = BOILER==CEMS_UNIT | (is.na(BOILER) & is.na(CEMS_UNIT)),
-         MATCH = ifelse(is.na(MATCH), FALSE, MATCH)) %>%
-  left_join(df.xwalk %>% select(-ID, -starts_with("EPA")) %>% rename(ORISPL = CAMD_PLANT_ID, CEMS_UNIT = CAMD_UNIT_ID), 
-            by=c("ORISPL","CEMS_UNIT")) #%>%
-  #group_by(MATCH) %>%
-  #group_split()
+  mutate(MATCH_CEMS = BOILER==CEMS_UNIT | (is.na(BOILER) & is.na(CEMS_UNIT)),
+         MATCH_CEMS = ifelse(is.na(MATCH_CEMS), FALSE, MATCH_CEMS)) #%>%
+  # left_join(df.xwalk %>% select(-ID, -starts_with("EPA"), -MATCH) %>% rename(ORISPL = CAMD_PLANT_ID, BOILER = CAMD_UNIT_ID), 
+  #           by=c("ORISPL","BOILER")) %>%
+  # group_by(MATCH) %>%
+  # group_split()
 
 
 ## (3b) Save dataframe as csv
