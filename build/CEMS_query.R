@@ -118,9 +118,6 @@ itr_year <- function(yr) {
 df.cems_yr <- purrr::map_dfr(l.yrs, itr_year) %>%
   arrange(ORISPL, UNIT, YEAR)
 
-## Disconnect from MySQL
-dbDisconnect(con)
-
 
 ## (2d) Save dataframe as csv
 readr::write_csv(df.cems_yr, here::here("data/cems_yr.csv"))
@@ -128,21 +125,58 @@ readr::write_csv(df.cems_yr, here::here("data/cems_yr.csv"))
 
 # (3) UNIT MATCHES --------------------------------------------------------------------------------
 
-## (3a) Import grandfathering dataset and check ORISPL & UNIT matches
+## (3a) Simple matches
+# ## Import grandfathering dataset and check ORISPL & UNIT matches
+# df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv")) %>%
+#   distinct(ORISPL = plant_code, BOILER = boiler_id) %>%
+#   arrange(ORISPL, BOILER) %>%
+#   mutate(BOILER = as.character(BOILER)) %>%
+#   full_join(df.cems_yr %>% distinct(ORISPL, UNIT) %>% mutate(BOILER = UNIT),
+#             by=c("ORISPL","BOILER")) %>%
+#   mutate(MATCH = BOILER==UNIT | (is.na(BOILER) & is.na(UNIT)),
+#          MATCH = ifelse(is.na(MATCH), FALSE, MATCH)) #%>%
+#   #group_by(MATCH) %>%
+#   #group_split()
+# 
+# ## Save dataframe as csv
+# readr::write_csv(df.gf, here::here("data/gf_matches.csv"))
+
+
+## (3b) Full matches
+## Access MySQL crosswalk
+res <- DBI::dbSendQuery(con, "
+    select distinct *
+    from            epa.xwalk
+  ;")
+df.xwalk <- DBI::dbFetch(res, n=-1)
+DBI::dbClearResult(res)
+
+## Disconnect from MySQL
+dbDisconnect(con)
+
+## Import grandfathering dataset and check ORISPL & UNIT matches
 df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv")) %>%
-  distinct(ORISPL = plant_code, BOILER = boiler_id) %>%
+  mutate_at(vars(plant_name, utility_name, plt_county), str_to_upper) %>%
+  fill(plant_name, utility_name, plt_county, .direction="downup") %>%
+  distinct(ORISPL = plant_code, 
+           BOILER = boiler_id, 
+           PLANT_NAME = plant_name, 
+           UTILITY_NAME = utility_name, 
+           COUNTY = plt_county) %>%
   arrange(ORISPL, BOILER) %>%
   mutate(BOILER = as.character(BOILER)) %>%
-  full_join(df.cems_yr %>% distinct(ORISPL, UNIT) %>% mutate(BOILER = UNIT),
+  full_join(df.cems_yr %>% distinct(ORISPL, CEMS_UNIT = UNIT) %>% mutate(BOILER = CEMS_UNIT),
             by=c("ORISPL","BOILER")) %>%
-  mutate(MATCH = BOILER==UNIT | (is.na(BOILER) & is.na(UNIT)),
-         MATCH = ifelse(is.na(MATCH), FALSE, MATCH)) #%>%
+  mutate(MATCH = BOILER==CEMS_UNIT | (is.na(BOILER) & is.na(CEMS_UNIT)),
+         MATCH = ifelse(is.na(MATCH), FALSE, MATCH)) %>%
+  left_join(df.xwalk %>% select(-ID, -starts_with("EPA")) %>% rename(ORISPL = CAMD_PLANT_ID, CEMS_UNIT = CAMD_UNIT_ID), 
+            by=c("ORISPL","CEMS_UNIT")) #%>%
   #group_by(MATCH) %>%
   #group_split()
 
 
 ## (3b) Save dataframe as csv
-readr::write_csv(df.gf, here::here("data/gf_matches.csv"))
+readr::write_csv(df.gf, here::here("data/gf_matches_full.csv"))
 
 
 ### END CODE ###
