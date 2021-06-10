@@ -155,7 +155,7 @@ DBI::dbClearResult(res)
 dbDisconnect(con)
 
 ## Import grandfathering dataset and check ORISPL & UNIT matches
-df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv")) %>%
+df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv"), guess_max=50000) %>%
   select(plant_code, boiler_id, year, plant_name, plt_county) %>%
   filter(year>=1995) %>%
   mutate_at(vars(plant_name, plt_county), str_to_upper) %>%
@@ -167,19 +167,42 @@ df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv")) %>%
            PLANT_NAME = plant_name, 
            COUNTY = plt_county) %>%
   arrange(ORISPL, BOILER) %>%
-  mutate(BOILER = as.character(BOILER)) %>%
-  full_join(df.cems_yr %>% distinct(ORISPL, CEMS_UNIT = UNIT) %>% mutate(BOILER = CEMS_UNIT),
+  group_by(ORISPL, BOILER, COUNTY) %>%
+  summarise_all(last) %>%
+  ungroup() %>%
+  mutate(BOILER = as.character(BOILER),
+         SOURCE = "GF") %>%
+  full_join(df.cems_yr %>% distinct(ORISPL, BOILER = UNIT) %>% mutate(SOURCE = "CEMS"),
             by=c("ORISPL","BOILER")) %>%
-  mutate(MATCH_CEMS = BOILER==CEMS_UNIT | (is.na(BOILER) & is.na(CEMS_UNIT)),
-         MATCH_CEMS = ifelse(is.na(MATCH_CEMS), FALSE, MATCH_CEMS)) #%>%
-  # left_join(df.xwalk %>% select(-ID, -starts_with("EPA"), -MATCH) %>% rename(ORISPL = CAMD_PLANT_ID, BOILER = CAMD_UNIT_ID), 
-  #           by=c("ORISPL","BOILER")) %>%
+  mutate(MATCH = (!is.na(SOURCE.x) & !is.na(SOURCE.y))) %>%
+  left_join(df.xwalk %>% 
+              select(-ID, -starts_with("EPA")) %>% 
+              rename(ORISPL = CAMD_PLANT_ID, BOILER = CAMD_UNIT_ID),
+            by=c("ORISPL","BOILER")) %>%
+  arrange(ORISPL, BOILER) #%>%
   # group_by(MATCH) %>%
   # group_split()
 
 
 ## (3b) Save dataframe as csv
 readr::write_csv(df.gf, here::here("data/gf_matches_full.csv"))
+
+
+
+## Check matches between CEMS and xwalk ...
+# df.test <- df.cems_yr %>% 
+#   distinct(ORISPL, UNIT) %>% 
+#   mutate(SOURCE = "CEMS") %>%
+#   left_join(df.xwalk %>% 
+#               select(-ID, -starts_with("EPA")) %>% 
+#               rename(ORISPL = CAMD_PLANT_ID, UNIT = CAMD_UNIT_ID) %>%
+#               mutate(SOURCE = "XWALK"),
+#             by=c("ORISPL","UNIT")) %>%
+#   mutate(MATCH = (!is.na(SOURCE.x) & !is.na(SOURCE.y))) %>%
+#   relocate(SOURCE.y, MATCH, .after=SOURCE.x)
+  
+
+
 
 
 ### END CODE ###
