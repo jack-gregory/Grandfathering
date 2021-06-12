@@ -1,0 +1,232 @@
+---
+title: "EIA-423 Data"
+author: "Jack Gregory"
+date: "6 June 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    fig_caption: yes
+    highlight: textmate
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+source(here::here("src/preamble.R"))
+source(here("src/def_paths.R"))
+source(here("src/text_colour.R"))
+
+## ... Files
+l.file <- list(
+  gf = path(l.path$data, "out_regression_data_SB.csv"),
+  eia423_00 = path(l.path$data, "eia/f4232000.xls"),
+  eia423_01 = path(l.path$data, "eia/f4232001.xls")
+)
+```
+
+
+# Objective
+
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It describes Energy Information Administration (EIA) Form 423 data.  The data is an unbalanced panel of plant by fuel delivery.  `r text_colour(colour="red", text="It contains the following variables for fossil fuel plants across the US at the hourly level")`:
+
+- plant identifiers, including Office of the Regulatory Information System PLant (ORISPL) codes;
+- `r text_colour(colour="red", text="...")`
+
+The EIA-423 data along with additional information can be found at the following links:
+
+- [Description](https://www.eia.gov/Survey)
+- [Data](https://www.eia.gov/electricity/data/eia423)
+
+Further information of plant identifiers can be found using the EPA-EIA Crosswalk:
+
+- [Description](https://www.epa.gov/airmarkets/power-sector-data-crosswalk)
+- [GitHub](https://github.com/USEPA/camd-eia-crosswalk)
+
+`r text_colour(colour="red", text="The remainder of this workbook is organised as follows.  First, we import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  Finally, we export the data to a csv file.")`
+
+
+# Import
+
+## EIA-423
+
+<!-- First, we define a function that extracts the csv from a zip file, imports the extracted csv using readr, standardizes its content, and deletes the extracted csv. -->
+
+<!-- ``` {r data-CEMS-function} -->
+
+<!-- import_data <- function(zip) { -->
+
+<!--   ## Assertions -->
+<!--   stopifnot( -->
+<!--     is_file(zip), -->
+<!--     path_ext(zip)=="zip" -->
+<!--   ) -->
+
+<!--   ## Determine contents of the zip -->
+<!--   df.zip <- zip::zip_list(zip) -->
+
+<!--   ## Create a character vector of the csv files -->
+<!--   csv <- df.zip %>% -->
+<!--     filter(str_detect(filename, "\\.csv")) %>% -->
+<!--     pull(filename) -->
+
+<!--   ## Unzip the csv files -->
+<!--   zip::unzip(zip,  -->
+<!--              files=csv, -->
+<!--              junkpaths=TRUE) -->
+
+<!--   ## Import data -->
+<!--   df <- read_csv(csv, guess_max=2*10^5) %>% -->
+<!--     mutate(FILE = fs::path_ext_remove(csv)) %>% -->
+<!--     select(FILE, STATE,  -->
+<!--            FAC_NAME = FACILITY_NAME, -->
+<!--            ORISPL = ORISPL_CODE, -->
+<!--            UNITID, FAC_ID, UNIT_ID, -->
+<!--            DATE = OP_DATE, -->
+<!--            HOUR = OP_HOUR, -->
+<!--            OP_TIME = OP_TIME, -->
+<!--            GEN = `GLOAD (MW)`, -->
+<!--            HEAT_INPUT = `HEAT_INPUT (mmBtu)`, -->
+<!--            CO2_MASS = `CO2_MASS (tons)`, -->
+<!--            SO2_MASS = `SO2_MASS (lbs)`, -->
+<!--            NOX_MASS = `NOX_MASS (lbs)`)  -->
+
+<!--   ## Remove extracted csv files -->
+<!--   fs::file_delete(csv) -->
+
+<!--   return(df) -->
+<!-- } -->
+
+<!-- ``` -->
+
+We then import a list of zip files from the <..Grandfathering/data/epa> directory, and iterate over each file to build the dataset.
+
+```{r data-eia423}
+
+df.eia423_00 <- read_excel(l.file$eia423_00) %>%
+  distinct(ORISPL = PLT_CODE) %>%
+  arrange(ORISPL) %>%
+  mutate(ORISPL = as.numeric(ORISPL),
+         SOURCE = "EIA",
+         YR = 2000)
+
+df.eia423_01 <- read_excel(l.file$eia423_01) %>%
+  distinct(ORISPL = PLT_CODE) %>%
+  arrange(ORISPL) %>%
+  mutate(ORISPL = as.numeric(ORISPL),
+         SOURCE = "EIA",
+         YR = 2001)
+
+df.eia423 <- full_join(df.eia423_00, df.eia423_01, by=c("ORISPL","SOURCE")) %>%
+  unite(col=YR, starts_with("YR"), sep="; ") %>%
+  mutate(YR = str_replace(YR, "(|; )NA(|; )", "")) %>%
+  arrange(ORISPL)
+
+  
+# ## Create list of zip files
+# l.zip <- here() %>%
+#   fs::dir_ls(regexp="\\.zip$") %>%
+#   as.list()
+# 
+# ## Iterate over zip files to import data
+# df.cems <- map_dfr(l.zip, import_data)
+```
+
+The following table summarizes the imported columns in the data.
+
+<!-- | **Column** | **Unit** | **Description** | -->
+<!-- |------------|----------|-----------------| -->
+<!-- | File || Source filename | -->
+<!-- | STATE || State abbreviation | -->
+<!-- | FAC_NAME || Facility/plant name | -->
+<!-- | ORISPL || Office of the Regulatory Information System PLant (ORISPL) code | -->
+<!-- | UNITID || Boiler identifier | -->
+<!-- | FAC_ID || CEMS-specific facility identifier | -->
+<!-- | UNIT_ID|| CEMS-specific boiler identifier | -->
+<!-- | DATE || Operation date | -->
+<!-- | HOUR || Operation hour | -->
+<!-- | OP_TIME | hours | Operation time during the particular date and hour | -->
+<!-- | GEN | MW | Generation load | -->
+<!-- | HEAT_INPUT | mmBtu | Heat content consumed | -->
+<!-- | CO2_MASS | tons | Carbon dioxide expelled | -->
+<!-- | SO2_MASS | lbs | Sulfur dioxide expelled | -->
+<!-- | NOX_MASS | lbs | Nitrogen oxides expelled | -->
+
+
+## Grandfathered Plants
+
+```{r data-gf}
+
+df.gf <- read_csv(l.file$gf, guess_max=50000) %>%
+  distinct(ORISPL = plant_code) %>%
+  filter(!is.na(ORISPL)) %>%
+  arrange(ORISPL) %>%
+  mutate(SOURCE = "GF")
+```
+
+
+## EPA-EIA Crosswalk
+
+```{r data-xwalk}
+
+## Connect to MySQL burbank_com database
+con <- DBI::dbConnect(RMySQL::MySQL(), 
+                      user="root", 
+                      password="blackberries22-", 
+                      dbname="epa", 
+                      host="localhost")
+
+## Query MySQL crosswalk
+res <- DBI::dbSendQuery(con, "
+    select distinct *
+    from            epa.xwalk
+  ;")
+df.xwalk <- DBI::dbFetch(res, n=-1)
+DBI::dbClearResult(res)
+
+## Disconnect from MySQL
+dbDisconnect(con)
+
+## Collapse dataset to plant-level (i.e. ORISPL)
+df.xwalk_orispl <- df.xwalk %>%
+  group_by(CAMD_PLANT_ID) %>%
+  summarise(CAMD_STATE = first(CAMD_STATE), 
+            CAMD_FACILITY_NAME = first(CAMD_FACILITY_NAME),
+            CAMD_CAPACITY = sum(CAMD_CAPACITY, na.rm=TRUE),
+            CAMD_FUEL_TYPE = paste(sort(unique(CAMD_FUEL_TYPE)), collapse="; "),
+            EIA_STATE = first(EIA_STATE),
+            EIA_PLANT_ID = first(EIA_PLANT_ID),
+            EIA_PLANT_NAME = first(EIA_PLANT_NAME),
+            EIA_CAPACITY = sum(EIA_CAPACITY, na.rm=TRUE),
+            EIA_UNIT_TYPE = paste(sort(unique(EIA_UNIT_TYPE)), collapse="; "),
+            EIA_FUEL_TYPE = paste(sort(unique(EIA_FUEL_TYPE)), collapse="; ")) %>%
+  rename(ORISPL = CAMD_PLANT_ID)
+```
+
+
+
+
+# Tests
+
+```{r gf-eia423}
+
+df.test <- df.gf %>%
+  left_join(df.eia423, by=c("ORISPL")) %>%
+  mutate(MATCH = (!is.na(SOURCE.x) & !is.na(SOURCE.y))) %>%
+  left_join(df.xwalk_orispl, by=c("ORISPL"))
+```
+
