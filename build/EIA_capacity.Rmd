@@ -1,0 +1,275 @@
+---
+title: "EIA Capacity Data"
+author: "Jack Gregory"
+date: "8 July 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    fig_caption: yes
+    highlight: textmate
+    keep_md: true
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+source(here::here("src/preamble.R"))
+source(here("src/def_paths.R"))
+source(here("src/text_colour.R"))
+
+if (!("geofacet" %in% installed.packages())) install.packages("geofacet")
+library(geofacet)
+
+## ... Files
+l.file <- list(
+  raw = path(l.path$data, "eia/existcapacity_annual.xlsx"),
+  clean = path(l.path$data, "eia_capacity.csv")
+)
+
+## ... URLs
+l.url <- list(
+  data = "https://www.eia.gov/electricity/data/state/existcapacity_annual.xlsx"
+)
+```
+
+
+# Objective
+
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It downloads and cleans annual capacity by state and fuel source from the Energy Information Administration (EIA).  Specifically, it utilises the "Existing Nameplate and Net Summer Capacity by Energy Source, Producer Type and State" table based on annual data reported in form EIA-860.  The data is a balanced panel by state, fuel source and producer type with the following variables:
+
+- Facility number;
+- Nameplate capacity [MW]; and,
+- Summer capacity [MW].
+
+The data along with additional information can be found at the following links:
+
+- [State Data](https://www.eia.gov/electricity/data/state)
+- [XLSX](https://www.eia.gov/electricity/data/state/existcapacity_annual.xlsx)
+
+`r text_colour(colour="red", text="The remainder of this workbook is organised as follows.  First, we import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  Finally, we export the data to a csv file.")`
+
+
+# Download
+
+We first download the latest version of the existing capacity dataset, located here:
+
+- `r l.url$data`
+
+And save it to Dropbox here:
+
+- `r l.file$raw`
+
+```{r download}
+
+download.file(l.url$data, l.file$raw, mode="wb")
+```
+
+
+# Import
+
+## Data
+
+Next, we import the xlsx file into R.
+
+``` {r import}
+
+df.cap <- read_excel(l.file$raw, skip=1, guess_max=35000)
+```
+
+## Dictionary
+
+The following table summarizes the variables in the imported dataset.
+
+| **Variable** | **Unit** | **Description** |
+|--------------|----------|-----------------|
+| Year | | Data year from 1990 to 2019 |
+| State Code | | State two letter code including {AK, HI, PR, US} |
+| Producer Type | | Owner type categorical variable with seven independent types and totals as {Combined Heat and Power, Commercial Power; Combined Heat and Power, Electric Power; Combined Heat and Power, Industrial Power; Commercial Power; Electric Generators, Electric Utilities; Electric Generators, Independent Power Producers; Industrial Power; Total Electric Power Industry} |
+| Fuel Source | | Fuel type categorical variable with 14 independent types and totals as {Coal, Geothermal, Hydroelectric, Natural Gas, Nuclear, Other, Other Biomass, Other Gases, Petroleum, Pumped Storage, Solar Thermal and Photovoltaic, Wind, Wood and Wood Derived Fuels, All Sources} |
+| Generators | | Number of generating units from 2011 onwards |
+| Facilities | | Number of power plants |
+| Nameplate Capacity (Megawatts) | MW | Nameplate capacity |
+| Summer Capacity (Megawatts) | MW | Summer capacity |
+
+
+# Clean
+
+We clean the dataset and, in particular, redefine the fuel source categories:
+
+- "Hydroelectric" and "Pumped Storage" $\longrightarrow$ Hydro;
+- "Natural Gas" and "Other Gases" $\longrightarrow$ Natural Gas;
+- "Wood and Wood Derived Fuels" and "Other Biomass" $\longrightarrow$ Biomass; and,
+- "Solar Thermal and Photovoltaic" $\longrightarrow$ Solar.
+
+`r text_colour(colour="red", text="These reconstituted categories should be checked to ensure that they are consistent with the original categories.")`
+
+```{r clean}
+
+df.cap_cln <- df.cap %>%
+  ## Rename all variables
+  rename(YEAR = Year,
+         STATE = `State Code`,
+         PRODUCER = `Producer Type`,
+         FUEL = `Fuel Source`,
+         GENERATOR = Generators,
+         FACILITY = Facilities,
+         NAMEPLATE_CAP = `Nameplate Capacity (Megawatts)`,
+         SUMMER_CAP = `Summer Capacity (Megawatts)`) %>%
+  
+  ## Filter on STATE, PRODUCER & FUEL
+  filter(!(STATE %in% c("AK","HI","PR","US"))) %>%
+  filter(PRODUCER=="Total Electric Power Industry") %>%
+  filter(FUEL!="All Sources") %>%
+  
+  ## Clean specific variables
+  mutate_at(vars(YEAR, SUMMER_CAP), as.numeric) %>%
+  mutate(FUEL = case_when(
+    FUEL %in% c("Hydroelectric","Pumped Storage") ~ "Hydro",
+    FUEL %in% c("Natural Gas","Other Gases") ~ "Natural Gas",
+    FUEL %in% c("Wood and Wood Derived Fuels","Other Biomass") ~ "Biomass",
+    FUEL=="Solar Thermal and Photovoltaic" ~ "Solar",
+    TRUE ~ FUEL)) %>%
+  group_by(STATE, FUEL, YEAR) %>%
+  summarise_at(vars(GENERATOR, FACILITY, NAMEPLATE_CAP, SUMMER_CAP), sum, na.rm=TRUE) %>%
+  
+  ## Finalize dataframe
+  select(STATE, FUEL, YEAR, GENERATOR, FACILITY, NAMEPLATE_CAP, SUMMER_CAP) %>%
+  arrange(STATE, FUEL, YEAR)
+```
+
+
+# Analysis
+
+```{r theme}
+
+theme_eia <- function() {
+  theme_classic() +
+  theme(strip.background = element_rect(fill="grey85", color=NA),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_line(colour="grey85", size=0.3),
+        panel.grid.minor.y = element_line(colour="grey85", size=0.3),
+        axis.line.x = element_line(size=0.4),
+        axis.ticks.x = element_line(size=0.4),
+        legend.position = "right",
+        plot.caption = element_text(hjust=0))
+}
+```
+
+```{r analysis-us}
+
+map2(list(expr(GENERATOR), expr(FACILITY), expr(NAMEPLATE_CAP), expr(SUMMER_CAP)),
+     list("Number of generators","Number of facilities","Namplate capacity","Summer capacity"),
+     ~{
+      df.cap_cln %>%
+        group_by(FUEL, YEAR) %>%
+        summarise(VAR = sum(!!.x, na.rm=TRUE)/10^3, .groups="drop") %>%
+        ggplot() +
+          geom_line(aes(x=YEAR, y=VAR, color=FUEL), size=0.8) +
+          # scale_color_viridis_d() +
+          labs(title=paste(.y, "by fuel type", sep=" "),
+               y=switch(.y,
+                        "Number of generators" = "Number of generators ['000]",
+                        "Number of facilities" = "Number of facilities ['000]",
+                        "Nameplate capacity" = "Capacity [GW]",
+                        "Summer capacity" = "Capacity [GW]"),
+               x="Year",
+               color="") +
+          theme_eia()
+     }
+)
+```
+
+```{r analysis-state, fig.height=14, fig.width=18}
+
+map2(list(expr(NAMEPLATE_CAP), expr(SUMMER_CAP)),
+     list("Namplate capacity","Summer capacity"),
+     ~{
+      df.cap_cln %>%
+        filter(FUEL!="Other") %>%
+        mutate(FUEL = case_when(FUEL %in% c("Biomass","Geothermal","Hydro") ~ "Renewable",
+                                FUEL %in% c("Solar","Wind") ~ "Variable Renewable",
+                                TRUE ~ FUEL)) %>%
+        group_by(STATE, FUEL, YEAR) %>%
+        summarise(VAR = sum(!!.x, na.rm=TRUE)/10^3, .groups="drop") %>%
+        ggplot() +
+          geom_line(aes(x=YEAR, y=VAR, color=FUEL), size=0.5) +
+          scale_color_viridis_d(option="inferno", end=0.9) +
+          facet_geo(~ STATE, grid="us_state_contiguous_grid1") +
+          labs(title=paste(.y, "by fuel type and state", sep=" "),
+               y=paste(.y, "[GW]", sep=" "),
+               x="Year",
+               color="") +
+          theme_eia() +
+          guides(color = guide_legend(override.aes=list(size=2)))
+     }
+)
+```
+
+```{r analysis-state-relative, fig.height=10, fig.width=14}
+
+map2(list(expr(NAMEPLATE_CAP), expr(SUMMER_CAP)),
+     list("Namplate capacity","Summer capacity"),
+     ~{
+      df.cap_cln %>%
+        filter(FUEL!="Other") %>%
+        mutate(FUEL = case_when(FUEL %in% c("Biomass","Geothermal","Hydro") ~ "Renewable",
+                                FUEL %in% c("Solar","Wind") ~ "Variable Renewable",
+                                TRUE ~ FUEL)) %>%
+        group_by(STATE, FUEL, YEAR) %>%
+        summarise(VAR = sum(!!.x, na.rm=TRUE)/10^3, .groups="drop") %>%
+        ggplot() +
+          geom_line(aes(x=YEAR, y=VAR, color=FUEL), size=0.7) +
+          scale_color_viridis_d(option="inferno", end=0.9) +
+          facet_geo(~ STATE, grid="us_state_contiguous_grid1", scales="free_y") +
+          labs(title=paste(.y, "by fuel type and state", sep=" "),
+               y=paste(.y, "[GW]", sep=" "),
+               x="Year",
+               color="") +
+          theme_eia() +
+          theme(axis.text.y = element_blank()) +
+          guides(color = guide_legend(override.aes=list(size=2)))
+     }
+)
+```
+
+
+# Export
+
+## Data
+This section exports the cleaned indicator data to a csv file:
+
+```{r data-export}
+
+write_csv(df.cap_cln, file=l.file$clean)
+```
+
+## Dictionary
+
+The following table describes the columns in the exported dataset.
+
+| **Variable** | **Unit** | **Description** |
+|--------------|----------|-----------------|
+| STATE | | State two letter code |
+| FUEL | | Fuel type categorical variable with ten types as {Biomass, Coal, Hydro, Natural Gas, Nuclear, Other, Petroleum, Solar, Wind, Geothermal} |
+| YEAR | | Data year from 1990 to 2019 |
+| GENERATOR | | Number of generating units from 2011 onwards |
+| FACILITY | | Number of power plants |
+| NAMEPLATE_CAP | MW | Nameplate capacity |
+| SUMMER_CAP | MW | Summer capacity |
+
