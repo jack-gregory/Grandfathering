@@ -29,11 +29,13 @@ knitr::opts_chunk$set(
 ## Initiate 
 ## ... Packages
 source(here::here("src/preamble.R"))
-source(here("src/def_paths.R"))
-source(here("src/text_colour.R"))
 
 if (!("geofacet" %in% installed.packages())) install.packages("geofacet")
 library(geofacet)
+
+## Functions
+source(here("src/def_paths.R"))
+source(here("src/text_colour.R"))
 
 ## ... Files
 l.file <- list(

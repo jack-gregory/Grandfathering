@@ -11,6 +11,18 @@
 ## Emissions Monitoring System (CEMS) data.  It transfers zipped csv files to the local MySQL epa 
 ## database.  It populates the cems table with data from the EPA and updates the filelog table.
 
+## NB - The EPA-EIA Crosswalk should not necessarily be used as the storage vehicle for repeating
+##      CEMS characteristics.  Instead, the MySQL database should be redesigned with three tables:
+##        (1) CEMS timeseries (which already exists and does not require additional work)
+##        (2) CEMS characteristics (which exists, but merged with the xwalk)
+##        (3) EPA-EIA xwalk (which exists, but merged with CEMS characteristics)
+##      The GitHub documentation for the xwalk notes that there may be multiple generators 
+##      associated with one boiler or vice versa.  The authors recommend that data users trying to 
+##      match information from both data sets first decide whether to collapse on boilers or 
+##      generators within the crosswalk to avoid double counting after matching the two data sets.
+##      Thus, a typical workflow would full_join CEMS timeseries and characteristics, and then 
+##      left_join either or both of the GF and EPA xwalks depending on the task.
+
 
 # VERSION HISTORY ---------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
