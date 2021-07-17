@@ -180,7 +180,7 @@ The post-1998 formats are structured similarly and, thus, will be considered tog
 |--------------|----------|-----------------|
 | UTILITY_ID / utility_id / Utility Number || EIA utility code represented by a unique six-digit number assigned to each respondent.  Note that “99999” is not a utility ID; it instead represents an adjustment factor. |
 | UTILITY_NAME / Utility Name || The name of the electric utility as designated by the respondent. |
-| YEAR | | EIA-861 report year. |
+| YEAR | | Survey year. |
 | STATE_CODE / State || State code represented by a unique two-letter abbreviation. |
 | service_type / Service Type || The provider type designating electric service types in set {Bundled, Energy, Delivery}. |
 | DATA_TYPE / data_type / Data Type || Indicator for observed or imputed data in set {O,I} |
@@ -192,7 +192,7 @@ The post-1998 formats are structured similarly and, thus, will be considered tog
 
 ## Data
 
-Next, we import the ultimate customers data from the zip archives into R.
+Next, we import the "Ultimate Customers" data from the zip archives into R.
 
 `r text_colour(colour="red", text='NB -- For the moment, we import only the original datasets.  However, it may be worth revisiting the reformatted versions as a robustness check or even a replacement dataset.  This may be relevant as they contain a complete Customers timeseries as well as different observations numbers to the original datasets.  It may also be worth considering importing all data into a combined dataset and identifying source on reformatting or not.')`
 

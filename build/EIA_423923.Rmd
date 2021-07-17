@@ -1,0 +1,703 @@
+---
+title: "EIA-423 & EIA-923 Data"
+author: "Jack Gregory"
+date: "14 July 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    fig_caption: yes
+    highlight: textmate
+    keep_md: true
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+source(here::here("src/preamble.R"))
+
+install.packages(setdiff(c("httr","rvest","zip","geofacet","writexl"), 
+                         rownames(installed.packages())))
+library(httr)
+library(rvest)
+library(zip)
+library(geofacet)
+library(writexl)
+
+## ... Functions
+source(here("src/def_paths.R"))
+source(here("src/text_colour.R"))
+
+## ... Files
+l.file <- list(
+  clean = path(l.path$data, "eia_fuel.xlsx")
+)
+
+## ... URLs
+l.url <- list(
+  eia_423 = "https://www.eia.gov/electricity/data/eia423/",
+  eia_923 = "https://www.eia.gov/electricity/data/eia923/"
+)
+```
+
+
+# Objective
+
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It describes Energy Information Administration (EIA) Form 423 and Form 923 data.  
+
+EIA-423 collected monthly fuel receipts for plants with a fossil-fueled nameplate generating capacity of 50 or more megawatts.  Beginning in 2008, the EIA-923 superseded the EIA-423.  Its Schedule 2 collects the plant level fuel receipts and cost data previously collected on the FERC and EIA Forms 423.
+
+The data is an unbalanced panel of plant by fuel delivery.  The data are available from 1972 onwards and represent a balanced panel by utility with the following variables:
+
+- plant identifiers, including Office of the Regulatory Information System PLant (ORISPL) codes;
+- plant location;
+- delivery months and years;
+- origin state and mine type for coal only;
+- contract type;
+- fuel type and quantity;
+- BTU, sulfur and ash contents; and,
+- cost
+
+The EIA-423 and EIA-923 data along with additional information can be found at the following links:
+
+- [Description](https://www.eia.gov/Survey)
+- [EIA-423](https://www.eia.gov/electricity/data/eia423)
+- [EIA-923](https://www.eia.gov/electricity/data/eia923)
+
+Further information of plant identifiers can be found using the EPA-EIA Crosswalk:
+
+- [Description](https://www.epa.gov/airmarkets/power-sector-data-crosswalk)
+- [GitHub](https://github.com/USEPA/camd-eia-crosswalk)
+
+The remainder of this workbook is organized as follows.  First, we download and import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  Finally, we export the data to a csv file.
+
+
+# Download
+
+We first download the set of publicly available xls files and zip archives storing the data to Dropbox here:
+
+- `r path(l.path$data, "eia/f423923")`
+
+Note that the following code only runs if the number of online files exceeds the number previously downloaded.
+
+```{r download-zip-fn, include=FALSE}
+
+## Define download function
+download_file <- function(url) {
+
+  ## Assertions
+  if (!exists("l.path")) {
+    stop("List l.path does not exist.")
+  }
+  stopifnot(
+    stringr::str_detect(url, "https://www.eia.gov/electricity/data/eia(423|923)/"),
+    fs::path_ext(url) %in% c("xls","zip")
+  )
+
+  ## Define destination file name
+  if (stringr::str_detect(url, "423[0-9]{4}\\.(xls|zip)")) {
+    file <- url %>%
+      stringr::str_extract("423[0-9]{4}\\.(xls|zip)") %>%
+      stringr::str_replace("^423","f423_")
+  } else {
+    file <- url %>%
+      stringr::str_extract("f923_[0-9]{4}\\.(xls|zip)")
+  }
+
+  cat(file, "\n", sep="")
+
+  ## Define destination
+  file <- path(l.path$data, "eia/f423923", file)
+
+  ## Download file
+  httr::RETRY("GET", url=url, times=5) %>%
+    content("raw") %>%
+    writeBin(file)
+  # download.file(url, file, mode="wb", quiet=TRUE)
+  
+  ## Zip file, if necessary
+  if (fs::path_ext(file)=="xls") {
+    zip::zip(zipfile=fs::path_ext_set(file, "zip"), 
+             files=file,
+             mode="cherry-pick")
+    fs::file_delete(file)
+  }
+}
+```
+
+```{r download}
+
+## Scrape list of EIA-423 files
+l.url_423 <- l.url$eia_423 %>%
+  httr::RETRY("GET", url=., times=5) %>%
+  read_html() %>%
+  rvest::html_nodes("a") %>%
+  rvest::html_attr("href") %>%
+  as_tibble() %>%
+  filter(str_detect(value, "\\.(xls|zip)$")) %>%
+  mutate(year = str_extract(value, "\\d{4}(?=\\.)") %>% as.numeric(),
+         type = str_extract(value, "(?<=\\.)[a-z]{3}$")) %>%
+  filter(year<2008) %>%
+  filter(year<=1992 
+         | (year>1992 & year<=2001 & type=="zip") 
+         | (year>2001 & type=="xls")) %>%
+  pull(value) %>%
+  as.list() %>%
+  map(~xml2::url_absolute(.x, l.url$eia_423))
+
+## Scrape list of EIA-923 files
+l.url_923 <- l.url$eia_923 %>%
+  httr::RETRY("GET", url=., times=5) %>%
+  read_html() %>%
+  rvest::html_nodes("a") %>%
+  rvest::html_attr("href") %>%
+  as_tibble() %>%
+  filter(str_detect(value, "\\.zip$")) %>%
+  mutate(year = str_extract(value, "\\d{4}(?=\\.)") %>% as.numeric()) %>%
+  filter(year>=2008 & year<=2019) %>%
+  pull(value) %>%
+  as.list() %>%
+  map(~xml2::url_absolute(.x, l.url$eia_923))
+
+## Combine lists
+l.url_dl <- append(l.url_423, l.url_923)
+
+## Perform download, if necessary
+if (length(l.url_dl)>length(fs::dir_ls(path(l.path$data, "eia/f423923"), regexp="\\.(xls|zip)$"))) {
+  walk(l.url_dl, download_file)
+}
+```
+
+
+# Import
+
+Next, we import the data.  This process is made more challenging due to the changes in EIA-423 and EIA-923 reporting format experienced throughout their existence.  The Notes subsection briefly describes these changes, while the Data subsection performs the import and cleaning.
+
+## Notes
+
+Throughout the existence of the Fuel Receipts and Costs survey, there have been a set of consistent variables.  Over time, these have been supplemented with additional descriptors.  The complete set of variables is presented in the table below.
+
+| **Variable** | **Unit** | **Description** |
+|--------------|----------|-----------------|
+| Year / YEAR || Survey year. |
+| Month / MONTH || Survey month. |
+| Facility Code / Plant Id || ORISPL code as a unique two- to five-digit number. |
+| Facility Name / Plant Name || Plant name. |
+| Facility State / Plant State || Plant state code represented by a unique two-letter abbreviation. |
+| Purchase Type / FUEL_GROUP || Fuel type in set {Coal=1, Oil=2, Natural Gas=3}. |
+| Fuel type Code / ENERGY_SOURCE || Specific fuel type code. |
+| Coal Mine type / Coalmine Type || Coal mine type in set {S = Surface, U = Underground} |
+| Coal Mine State / Coalmine State || Coalmine state code represented by a unique two-letter abbreviation. |
+| Coal Mine County / Coalmine County || Coalmine FIPS county code as a unique single- to three-digit number. |
+| Coalmine Msha Id || MSHA ID. |
+| Coalmine Name || Coalmine name. |
+| Supplier / SUPPLIER || Fuel supplier name. |
+| Quantity Rec'd / QUANTITY | Coal=tons / Gas=Mcf / Oil=bbl | Mass or volume of fuel received. |
+| Btu content / Average Heat Content | Coal={Btu/lbs,MMBtu/tons} / Gas={Btu/cf,MMBtu/Mcf} / Oil={Btu/gal,MMBtu/bbl} | Heat content of fuel received by quantity unit. |
+| Sulfur content / Average Sulfur Content | percent weight | Sulfur value of coal fuel received. |
+| Ash content / Average Ash Content | percent weight | Ash value of coal fuel received. |
+| Average Mercury Content | percent weight | Mercury value of coal fuel received. |
+| FUEL_COST | \$USC/MMBtu | Cost per heat content for fuel received. |
+| Primary Transportation Mode || Primary mode of transportation. |
+| Secondary Transportation Mode || Secondary mode of transportation. |
+| Operator Name || Operator name. |
+| Operator Id || Operator ID. |
+| REGULATED || Operator type in set {REG, URL}. |
+
+Between 1972 and 2001, we must convert the various heat content ratios from Btu/unit to MMBtu/unit.  For coal, the conversion factor is:
+
+$\frac{MMBtu}{ton} = \frac{1,000,000 Btu}{2,000 lbs} = 500 \frac{Btu}{lbs}$
+
+For natural gas, the conversion factor is:
+
+$\frac{MMBtu}{Mcf} = \frac{1,000,000 Btu}{1,000 cf} = 1,000 \frac{Btu}{cf}$
+
+For oil, the conversion factor is:
+
+For natural gas, the conversion factor is:
+
+$\frac{MMBtu}{bbl} = \frac{1,000,000 Btu}{42 gal} \approx 23,809.5238 \frac{Btu}{42 gal}$
+
+```{r conversion, include=FALSE}
+
+l.conv <- list(
+  coal = 500,
+  oil = 10^6/42,
+  gas = 10^3
+)
+```
+
+```{r states, include=FALSE}
+
+df.state <- tribble(
+  ~STATE, ~FIPS,
+  'AL', 1,
+  'AK', 2,
+  'AZ', 4,
+  'AR', 5,
+  'CA', 6,
+  'CO', 8,
+  'CT', 9,
+  'DE', 10,
+  'DC', 11,
+  'FL', 12,
+  'GA', 13,
+  'HI', 15,
+  'ID', 16,
+  'IL', 17,
+  'IN', 18,
+  'IA', 19,
+  'KS', 20,
+  'KY', 21,
+  'LA', 22,
+  'ME', 23,
+  'MD', 24,
+  'MA', 25,
+  'MI', 26,
+  'MN', 27,
+  'MS', 28,
+  'MO', 29,
+  'MT', 30,
+  'NE', 31,
+  'NV', 32,
+  'NH', 33,
+  'NJ', 34,
+  'NM', 35,
+  'NY', 36, 
+  'NC', 37,
+  'ND', 38,
+  'OH', 39,
+  'OK', 40,
+  'OR', 41,
+  'PA', 42,
+  'RI', 44,
+  'SC', 45,
+  'SD', 46,
+  'TN', 47,
+  'TX', 48,
+  'UT', 49,
+  'VT', 50,
+  'VA', 51,
+  'WA', 53,
+  'WV', 54,
+  'WI', 55,
+  'WY', 56
+)
+```
+
+
+## Data
+
+Next, we import the "Fuel Receipts and Costs" data from the xls files and zip archives into R.
+
+`r text_colour(colour="red", text="NB - This section is incomplete.  Many of the variables identified above are currently sacrificed.  The data is much more rich than what we end up importing and cleaning for this exercise.")`
+
+```{r wrangle-fn, include=FALSE}
+
+## Define function
+wrangle <- function(df) {
+  
+  ## Assertions
+  if (!exists("l.conv")) {
+    stop("The list l.conv does not exist.")
+  }
+  if (!exists("df.state")) {
+    stop("The dataframe df.state does not exist.")
+  }
+  
+  UseMethod("wrangle")
+}
+
+## Define YEAR method (1972-1989)
+wrangle.YEAR <- function(df) {
+  df %>%
+    select(UTILITY_ID,
+           ORISPL = FACILITY_CODE,
+           YR = YEAR,
+           MTH = MONTH,
+           FUEL_TYPE = FUEL_CATEG,
+           FUEL_CODE = FUEL_TYPE_CODE,
+           QUANTITY = QUANTITY_RECEIVED,
+           HEAT = BTU_CONTENT,
+           COST = FUEL_COST) %>%
+    mutate(FUEL = case_when(FUEL_TYPE==1 ~ "Coal",
+                            FUEL_TYPE==2 ~ "Oil",
+                            FUEL_TYPE==3 ~ "Gas"),
+           HEAT = case_when(FUEL_TYPE==1 ~ HEAT/l.conv$coal,
+                            FUEL_TYPE==2 ~ HEAT/l.conv$oil,
+                            FUEL_TYPE==3 ~ HEAT/l.conv$gas),
+           COST = COST/10^2) %>%
+    select(UTILITY_ID, ORISPL, YR, MTH, FUEL, FUEL_CODE, QUANTITY, HEAT, COST)
+}
+
+## Define COCODE method (1990-2001)
+wrangle.COCODE <- function(df) {
+  df %>%
+    select(UTILITY_ID = CO_CODE,
+           ORISPL = PLT_CODE,
+           FIPS = PLT_ST,
+           YR = YEAR,
+           MTH = MONTH,
+           FUEL_TYPE = GENER_FUEL,
+           FUEL_CODE = SPECF_FUEL,
+           QUANTITY,
+           HEAT = BTU,
+           COST) %>%
+    mutate_at(vars(UTILITY_ID, ORISPL, FIPS, MTH), as.numeric) %>%
+    left_join(df.state, by=c("FIPS")) %>%
+    mutate(YR = ifelse(str_length(YR)==2, paste0("19", YR), YR),
+           YR = as.numeric(YR),
+           FUEL = case_when(FUEL_TYPE==1 ~ "Coal",
+                            FUEL_TYPE==2 ~ "Oil",
+                            FUEL_TYPE==3 ~ "Gas"),
+           HEAT = case_when(FUEL_TYPE==1 ~ HEAT/l.conv$coal,
+                            FUEL_TYPE==2 ~ HEAT/l.conv$oil,
+                            FUEL_TYPE==3 ~ HEAT/l.conv$gas),
+           COST = COST/10^2) %>%
+    select(UTILITY_ID, ORISPL, STATE, YR, MTH, FUEL, FUEL_CODE, QUANTITY, HEAT, COST)
+}
+
+## Define SURVEY method (2002-2007)
+wrangle.SURVEY <- function(df) {
+  df %>%
+    select(UTILITY_ID = CO_CODE,
+           UTILITY_NAME = CO_NAME,
+           ORISPL = PLT_CODE,
+           NAME = PLT_NAME,
+           STATE = `PLST ST`,
+           YR = YEAR,
+           MTH = MONTH,
+           FUEL = GENERFUEL,
+           FUEL_CODE = SPECF_FUEL,
+           QUANTITY,
+           HEAT = BTUCONTENT,
+           COST) %>%
+    mutate(FUEL = case_when(FUEL=="Petroleum" ~ "Oil", 
+                            FUEL=="Natural Gas" ~ "Gas",
+                            TRUE ~ FUEL),
+           COST = COST/10^2)
+}
+
+## Define X1 method (2008-present)
+wrangle.current <- function(df) {
+  if (ncol(df)==27) {
+    df <- df %>%
+      select(UTILITY_ID = ...23,
+             UTILITY_NAME = ...22,
+             ORISPL = ...3,
+             NAME = ...4,
+             STATE = ...5,
+             YR = ...1,
+             MTH = ...2,
+             FUEL = ...9,
+             FUEL_CODE = ...8,
+             QUANTITY = ...16,
+             HEAT = ...17,
+             COST = ...20)
+  } else if (ncol(df)>=28) {
+    df <- df %>%
+      select(UTILITY_ID = ...24,
+             UTILITY_NAME = ...23,
+             ORISPL = ...3,
+             NAME = ...4,
+             STATE = ...5,
+             YR = ...1,
+             MTH = ...2,
+             FUEL = ...9,
+             FUEL_CODE = ...8,
+             QUANTITY = ...16,
+             HEAT = ...17,
+             COST = ...21)
+  } else {
+    stop("The function could not identify the table from its number of columns.")
+  }
+  df %>%
+    filter(!(is.na(MTH) | str_to_upper(MTH)=="MONTH")) %>%
+    mutate_at(vars(UTILITY_ID, ORISPL, YR, MTH, QUANTITY, HEAT, COST), as.numeric) %>%
+    mutate(FUEL = case_when(FUEL=="Petroleum" ~ "Oil", 
+                            FUEL=="Natural Gas" ~ "Gas",
+                            TRUE ~ FUEL),
+           COST = COST/10^2)
+}
+```
+
+```{r extract-fn, include=FALSE}
+
+extract_zip <- function(zip, file, sheet) {
+  
+  ## Assertions
+  if (!exists("l.path")) {
+    stop("Function requires l.path list in the global environment.")
+  }
+  stopifnot(
+    fs::is_file(zip),
+    fs::path_ext(zip)=="zip",
+    fs::path_ext(file) %>% str_to_lower() %in% c("xls","xlsx"),
+    is.logical(sheet)
+  )
+  
+  cat(fs::path_file(zip), "\n", sep="")
+  
+  ## IMPORT DATA
+  ## Unzip data
+  unzip(zip, files=file, exdir=path(l.path$data, "eia/f423923"))
+  
+  ## Import data
+  if (!sheet) {
+    df <- readxl::read_excel(path(l.path$data, "eia/f423923", file), guess_max=10^5)
+  } else {
+    sheet <- readxl::excel_sheets(path(l.path$data, "eia/f423923", file)) %>%
+      purrr::keep(str_detect(., "Page 5"))
+    df <- readxl::read_excel(path(l.path$data, "eia/f423923", file), sheet=sheet, 
+                             col_names=FALSE, guess_max=10^5)
+  }
+  
+  ## Delete unzipped data
+  file %>%
+    fs::path_split() %>%
+    purrr::flatten() %>%
+    .[[1]] %>%
+    fs::path(l.path$data, "eia/f423923", .) %>%
+    fs::file_delete()
+
+  ## CLEAN DATA
+  ## Set df type
+  type <- names(df)[[1]] %>%
+    stringr::str_to_upper() %>%
+    stringr::str_replace_all(c("\\."="", "_"="")) %>%
+    stringr::str_extract("^[A-Z]*")
+  if (type=="") type <- "current"
+  df <- structure(df, class=c(type, class(df)))
+  
+  ## Wrangle data based on type; produce error if cleaning fn does not exist
+  df <- tryCatch(
+    wrangle(df),
+    error = function(e) {
+      stop(glue("Cleaning function does not currently run or exist for the last imported year.
+                 wrangle.{type} {e}"))
+    }
+  )
+  return(df)
+}
+```
+
+``` {r import}
+
+## Build zip list
+l.zip <- fs::dir_ls(path(l.path$data, "eia/f423923"), regexp="f(4|9)23_\\d{4}\\.zip$")
+
+## Build zip & file dataframe
+df.zip <- l.zip %>%
+  map_dfr(~utils::unzip(.x, list=TRUE) %>% mutate(Zip = .x)) %>%
+  rename_with(.fn=str_to_upper) %>%
+  mutate(S2 = case_when(str_detect(NAME, "[efF]423.*\\d{4}\\.xls") ~ 1,
+                        str_detect(NAME, "eia923December2008\\.xls") ~ 1,
+                        str_detect(NAME, "EIA923( SCHEDULES |_Schedules_)2_3_4_5.*\\.(xls|XLS|xlsx)") ~ 1,
+                        TRUE ~ 0),
+         YR = str_extract(NAME, "(19|20)\\d{2}") %>% as.numeric(),
+         SHEET = ifelse(YR>=2008, TRUE, FALSE)) %>%
+  filter(S2==1)
+
+## Import dataset
+if (length(l.zip)!=nrow(df.zip)) {
+  stop("Number of data files does not match the number of zip archives.")
+}
+df.fuel <- pmap_dfr(df.zip %>% select(ZIP, NAME, SHEET),
+                     ~extract_zip(..1, ..2, ..3))
+```
+
+
+# Clean
+
+At present, we perform the following to clean the dataset:
+
+- Fill `STATE`, `UTILITY_NAME`, and `NAME` variables;
+- Drop non-contiguous states; and,
+- Calculate a `COST_UNIT` variable defined as the cost per respective fuel unit.
+
+```{r clean}
+
+## Clean fuel data
+df.fuel_cln <- df.fuel %>%
+  
+  ## Fill STATE, UTILITY_NAME & NAME
+  arrange(ORISPL, FUEL, YR) %>%
+  group_by(ORISPL, FUEL) %>%
+  fill(STATE, UTILITY_NAME, NAME, .direction="updown") %>%
+  ungroup() %>%
+  
+  ## Drop unnecessary obs
+  filter(!(STATE %in% c("AK","HI"))) %>%
+  
+  ## Expand energy and cost vars
+  rename(COST_ENRG = COST) %>%
+  mutate(ENERGY = QUANTITY * HEAT,
+         COST_UNIT = COST_ENRG * HEAT) %>%
+  
+  ## Finalize dataframe
+  select(ORISPL, NAME, STATE, YR, MTH, FUEL, FUEL_CODE, QUANTITY, ENERGY, HEAT, 
+         COST_ENRG, COST_UNIT, UTILITY_ID, UTILITY_NAME)
+```
+
+We then perform the following three aggregations:
+
+- Coal plant-year weighted average price panel;
+- Coal state-year weighted average price panel, which is similar to Table 7.17 in the [EIA Electric Power Annual](https://www.eia.gov/electricity/annual); and,
+- Gas state-year weighted average gas price panel, which is similar to Table 7.20 in the [EIA Electric Power Annual](https://www.eia.gov/electricity/annual).
+
+## Coal by plant-year
+
+```{r agg-coal-plant}
+
+df.coal_plt <- df.fuel_cln %>%
+
+  ## Filter on fuel type
+  filter(FUEL=="Coal") %>%
+  
+  ## Aggregate over ORISPL & YR
+  group_by(ORISPL, STATE, YR) %>%
+  summarise(PURCHASES = n(),
+            COST_ENRG = sum(ENERGY*COST_ENRG, na.rm=TRUE)/sum(ENERGY, na.rm=TRUE),
+            COST_UNIT = sum(QUANTITY*COST_UNIT, na.rm=TRUE)/sum(QUANTITY, na.rm=TRUE),
+            QUANTITY = sum(QUANTITY, na.rm=TRUE),
+            ENERGY = sum(ENERGY, na.rm=TRUE),
+            HEAT = mean(HEAT, na.rm=TRUE),
+            .groups="drop") %>%
+  
+  ## Finalize dataframe
+  relocate(starts_with("COST"), .after=HEAT)
+```
+
+## Fuel by state-year
+
+`r text_colour(colour="red", text="Since the STATE variable was not associated with plant location until 1990, there are many plants which lack a state assignment.  This results in around 40,000 missing state-observations, approxmately 2.5% of the sample.  This is a non-trivial loss, and we should attempt to remedy it by using additional EIA-923 data or the Grandfathering dataset.  Nevertheless in the short run, the vast majority of the lost data occurs prior to 1985, which mitigates any major effects for our analyses.")`
+
+```{r agg-fuel-state}
+
+df.fuel_st <- df.fuel_cln %>%
+
+  ## Filter on fuel type and STATE NAs
+  filter(FUEL %in% c("Coal","Gas")) %>%
+  filter(!is.na(STATE)) %>%
+
+  ## Aggregate over STATE, FUEL & YR
+  group_by(FUEL, STATE, YR) %>%
+  summarise(PURCHASES = n(),
+            COST_ENRG = sum(ENERGY*COST_ENRG, na.rm=TRUE)/sum(ENERGY, na.rm=TRUE),
+            COST_UNIT = sum(QUANTITY*COST_UNIT, na.rm=TRUE)/sum(QUANTITY, na.rm=TRUE),
+            QUANTITY = sum(QUANTITY, na.rm=TRUE),
+            ENERGY = sum(ENERGY, na.rm=TRUE),
+            HEAT = mean(HEAT, na.rm=TRUE),
+            .groups="drop") %>%
+  
+  ## Finalize dataframe
+  relocate(starts_with("COST"), .after=HEAT)
+```
+
+
+# Analysis
+
+`r text_colour(colour="red", text="I envisage this section as a comparison of EIA-423 and EIA-923 to other data sources.  For example, there are a number of Bloomberg timeseries, as well as a number of timeseries for various coal regions and gas hubs provided by the EIA itself.  These both lack the depth and breadth of the EIA-423 and EIA-923, but it would be a useful sanity check to assess whether our aggregations are representative of wider fuel price indices.")`
+
+
+```{r theme, include=FALSE}
+
+theme_eia <- function() {
+  theme_classic() +
+  theme(strip.background = element_rect(fill="grey85", color=NA),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_line(colour="grey85", size=0.3),
+        panel.grid.minor.y = element_line(colour="grey85", size=0.3),
+        axis.line.x = element_line(size=0.4),
+        axis.ticks.x = element_line(size=0.4),
+        legend.position = "right",
+        plot.caption = element_text(hjust=0))
+}
+```
+
+```{r analysis-state, fig.height=10, fig.width=14}
+
+pmap(list(
+      list(expr(COST_ENRG),expr(COST_UNIT)),
+      list("Cost per energy unit","Cost per physical unit"),
+      list("Cost per MMBtu [$USD/MMBtu]","Cost per unit [$USD/ton or $USD/Mcf]")
+      ),
+     ~ggplot(df.fuel_st) +
+        geom_line(aes(x=YR, y=!!..1, color=FUEL), size=0.5) +
+        scale_color_viridis_d(option="inferno", begin=0.1, end=0.55) +
+        facet_geo(~ STATE, grid="us_state_contiguous_grid1") +
+        labs(title=paste(..2, "by fuel and state", sep=" "),
+             y=..3,
+             x="Year",
+             color="") +
+        theme_eia() +
+        guides(color = guide_legend(override.aes=list(size=2)))
+     )
+```
+
+```{r analysis-state-relative, fig.height=10, fig.width=14}
+
+pmap(list(
+      list(expr(COST_ENRG),expr(COST_UNIT)),
+      list("Cost per energy unit","Cost per physical unit"),
+      list("Cost per MMBtu [$USD/MMBtu]","Cost per unit [$USD/ton or $USD/Mcf]")
+      ),
+     ~ggplot(df.fuel_st) +
+        geom_line(aes(x=YR, y=!!..1, color=FUEL), size=0.5) +
+        scale_color_viridis_d(option="inferno", begin=0.1, end=0.55) +
+        facet_geo(~ STATE, grid="us_state_contiguous_grid1", scales="free_y") +
+        labs(title=paste(..2, "by fuel and state", sep=" "),
+             y=..3,
+             x="Year",
+             color="") +
+        theme_eia() +
+        theme(axis.text.y = element_blank()) +
+        guides(color = guide_legend(override.aes=list(size=2)))
+     )
+```
+
+
+# Export
+
+## Data
+This section exports the cleaned fuel data to a xlsx file:
+
+```{r export}
+
+list(`Coal by Plant` = df.coal_plt,
+     `Fuel by State` = df.fuel_st) %>%
+  writexl::write_xlsx(path=l.file$clean)
+```
+
+## Dictionary
+
+The following table describes the columns in the exported dataset.
+
+| **Variable** | **Table** | **Unit** | **Description** |
+|--------------|-----------|----------|-----------------|
+| ORISPL | Coal by plant || ORISPL code as a unique two- to five-digit integer. |
+| FUEL | Fuel by State || Fuel type in set {Coal, Gas}. |
+| YR | Both || Data year from 1972 to 2018. |
+| MTH | Both || Data month as a one- or two-digit integer. |
+| PURCHASES | Both || Number of annual fuel purchases by plant or state, respectively. |
+| QUANTITY | Both | Coal=tons / Gas=Mcf | Total mass or volume of annual fuel received, by plant or state, respectively. |
+| ENERGY | Both| MMBtu | Total energy of annual fuel received, by plant or state, respectively. |
+| HEAT | Both | Coal=MMBtu/tons / Gas=MMBtu/Mcf | Mean heat content of fuel received by plant or state, respectively. |
+| COST_ENRG | Both | $USD/MMBtu | Cost per energy unit as a weighted average of annual total energy received by plant or state, respectively. |
+| COST_UNIT | Both | Coal=\$USD/ton / Gas=\$USD/Mcf | Cost per physical unit as a weighted average of annual total quantity received by plant or state, respectively. |
+
