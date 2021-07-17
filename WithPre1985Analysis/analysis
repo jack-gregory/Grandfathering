@@ -1,0 +1,10 @@
+
+library(tidyr)
+library(dplyr)
+library(readxl)
+library(padr) # to create missing years
+Retirements_Before_1986 <- read_excel("G:/Meine Ablage/research/gf/Retirements_Before_1986.xlsx")
+#View(Retirements_Before_1986)
+
+retirements<-Retirements_Before_1986 %>%
+  mutate(ID=paste(Plt_Name,Unit_ID))
