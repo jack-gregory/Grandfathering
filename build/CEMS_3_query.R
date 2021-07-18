@@ -125,37 +125,21 @@ readr::write_csv(df.cems_yr, here::here("data/cems_yr.csv"))
 
 # (3) UNIT MATCHES --------------------------------------------------------------------------------
 
-## (3a) Simple matches
-# ## Import grandfathering dataset and check ORISPL & UNIT matches
-# df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv")) %>%
-#   distinct(ORISPL = plant_code, BOILER = boiler_id) %>%
-#   arrange(ORISPL, BOILER) %>%
-#   mutate(BOILER = as.character(BOILER)) %>%
-#   full_join(df.cems_yr %>% distinct(ORISPL, UNIT) %>% mutate(BOILER = UNIT),
-#             by=c("ORISPL","BOILER")) %>%
-#   mutate(MATCH = BOILER==UNIT | (is.na(BOILER) & is.na(UNIT)),
-#          MATCH = ifelse(is.na(MATCH), FALSE, MATCH)) #%>%
-#   #group_by(MATCH) %>%
-#   #group_split()
-# 
-# ## Save dataframe as csv
-# readr::write_csv(df.gf, here::here("data/gf_matches.csv"))
-
-
-## (3b) Full matches
-## Access MySQL crosswalk
+## (3a) Access MySQL crosswalk
 res <- DBI::dbSendQuery(con, "
     select distinct *
     from            epa.xwalk
   ;")
-df.xwalk <- DBI::dbFetch(res, n=-1)
+df.xwalk_epa_eia <- DBI::dbFetch(res, n=-1)
 DBI::dbClearResult(res)
 
 ## Disconnect from MySQL
 dbDisconnect(con)
 
+
+## (3b) Join GF & CEMS units
 ## Import grandfathering dataset and check ORISPL & UNIT matches
-df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv"), guess_max=50000) %>%
+df.gf <- read_csv(path(l.path$data, "gf_original/in_regression_vars_BP.csv"), guess_max=50000) %>%
   select(plant_code, boiler_id, year, plant_name, plt_county) %>%
   filter(year>=1995) %>%
   mutate_at(vars(plant_name, plt_county), str_to_upper) %>%
@@ -184,25 +168,44 @@ df.gf <- read_csv(path(l.path$data, "in_regression_vars_BP.csv"), guess_max=5000
   # group_split()
 
 
-## (3b) Save dataframe as csv
+## (3c) Save dataframe as csv
 readr::write_csv(df.gf, here::here("data/gf_matches_full.csv"))
 
 
-
-## Check matches between CEMS and xwalk ...
-# df.test <- df.cems_yr %>% 
-#   distinct(ORISPL, UNIT) %>% 
-#   mutate(SOURCE = "CEMS") %>%
-#   left_join(df.xwalk %>% 
-#               select(-ID, -starts_with("EPA")) %>% 
-#               rename(ORISPL = CAMD_PLANT_ID, UNIT = CAMD_UNIT_ID) %>%
-#               mutate(SOURCE = "XWALK"),
-#             by=c("ORISPL","UNIT")) %>%
-#   mutate(MATCH = (!is.na(SOURCE.x) & !is.na(SOURCE.y))) %>%
-#   relocate(SOURCE.y, MATCH, .after=SOURCE.x)
-  
+## (3d) Import GF-CEMS xwalk
+## NB - This step was assisted by a manual matching exercise
+df.xwalk_gf_cems <- readr::read_csv(here::here("data/gf_cems_xwalk.csv"))
 
 
+## ------------------------------------------------------------------------------------------------
+
+library(haven)
+
+## Create GF-CEMS xwalk for Stata
+df.xwalk <- df.xwalk_epa_eia %>%
+  rename(ORISPL = CAMD_PLANT_ID,
+         CEMS_UNIT = CAMD_UNIT_ID) %>%
+  group_by(ORISPL, CEMS_UNIT) %>%
+  summarise(CAMD_CAPACITY = sum(CAMD_CAPACITY, na.rm=TRUE),
+            EIA_CAPACITY = sum(EIA_CAPACITY, na.rm=TRUE),
+            .groups="drop") %>%
+  ungroup() %>%
+  right_join(df.xwalk_gf_cems, by=c("ORISPL","CEMS_UNIT")) %>%
+  relocate(GF_BOILER, .after=ORISPL)
+
+haven::write_dta(df.xwalk, 
+                 here::here("data/gf_cems_xwalk.dta"),
+                 version=15)
+
+## Create yearly CEMS data for Stata
+df.cems_yr <- readr::read_csv(here::here("data/cems_yr.csv")) %>%
+  inner_join(df.xwalk_gf_cems %>% rename(UNIT = CEMS_UNIT),
+             by=c("ORISPL","UNIT")) %>%
+  relocate(GF_BOILER, .after=UNIT)
+
+haven::write_dta(df.cems_yr, 
+                 here::here("data/cems_yr.dta"),
+                 version=15)
 
 
 ### END CODE ###

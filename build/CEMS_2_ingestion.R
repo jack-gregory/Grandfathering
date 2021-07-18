@@ -16,12 +16,22 @@
 ##        (1) CEMS timeseries (which already exists and does not require additional work)
 ##        (2) CEMS characteristics (which exists, but merged with the xwalk)
 ##        (3) EPA-EIA xwalk (which exists, but merged with CEMS characteristics)
+##        (4) GF-CEMS xwalk?
 ##      The GitHub documentation for the xwalk notes that there may be multiple generators 
 ##      associated with one boiler or vice versa.  The authors recommend that data users trying to 
 ##      match information from both data sets first decide whether to collapse on boilers or 
 ##      generators within the crosswalk to avoid double counting after matching the two data sets.
 ##      Thus, a typical workflow would full_join CEMS timeseries and characteristics, and then 
 ##      left_join either or both of the GF and EPA xwalks depending on the task.
+##      
+##      The xwalk_write() performs an inner_join() of the ORISPL_CODE & UNITID variables from CEMS
+##      with the CAMD_PLANT_ID & CAMD_UNIT_ID variables from the xwalk.  As such, there is the 
+##      possibility that units in CEMS were not transferred to the MySQL epa.xwalk table.  In all
+##      likelihood, the code should have been written with a right_join(), so as to ensure all
+##      CEMS units were present in the xwalk / "characteristics" table.
+##      
+##      The CEMS characteristics table should include the following (as defined in the CEMS raw 
+##      data): STATE, FACILITY_NAME, ORISPL_CODE, UNITID, OP_DATE, FAC_ID, UNIT_ID.
 
 
 # VERSION HISTORY ---------------------------------------------------------------------------------

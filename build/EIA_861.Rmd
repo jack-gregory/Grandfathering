@@ -53,7 +53,7 @@ l.url <- list(
 
 # Objective
 
-This workbook forms a part of the data cleaning process related to the Grandfathering project.  It downloads and cleans annual sales by utility from the Energy Information Administration (EIA).  Specifically, it utilises the "Sales to Ultimate Customers" table reported in form EIA-860.  The data are available from 1990 onwards and represent a balanced panel by utility with the following variables:
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It downloads and cleans annual sales by utility from the Energy Information Administration (EIA).  Specifically, it utilises the "Sales to Ultimate Customers" table reported in form EIA-861.  The data are available from 1990 onwards and represent a balanced panel by utility with the following variables:
 
 - Utility name and number;
 - Balancing authority and state;
