@@ -1,5 +1,5 @@
 # Data
-data/
+data/*/
 
 # Dropbox files
 *.ini
