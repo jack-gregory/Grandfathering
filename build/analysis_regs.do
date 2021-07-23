@@ -26,14 +26,13 @@ est clear
 
 ** Definitions
 global wd "C:\Users\Jack\Dropbox\Grandfathering"
-global date "20210531"
+global date "20210719"
 
 ** Import grandfathering data
-use "$wd\data\regressions_ready_data.dta", clear
+use "$wd\data\gf_original\regressions_ready_data.dta", clear
 drop if plant_code==.
 drop if year<1985
 drop if year==2006
-drop ID
 
 ** Remove duplicates across all variables
 unab vlist : _all
@@ -51,6 +50,7 @@ tab dup
 drop if dup>1
 drop dup
 
+/*
 ** Merge with yearly CEMS data
 preserve
 	import delimited "$wd\data\cems_yr.csv", clear
@@ -65,6 +65,7 @@ restore
 
 *drop if year<1997
 merge 1:1 plant_code boiler_id year using `cems', nogen //keep(match)
+*/
 
 /*
 bysort plant_code boiler_id grand_NSR_const: gen id = _n
@@ -79,7 +80,7 @@ drop id
 *rename hr_load ops
 *rename sulfur_content_tot ems
 
-foreach out of varlist survive hr_load {
+foreach out of varlist survive /*hr_load*/ {
 *foreach out of varlist survive hr_load hr_cems gload co2_mass nox_mass so2_mass {
 	foreach gf in "" "_const" {
 
@@ -123,38 +124,37 @@ foreach out of varlist survive hr_load {
 		estadd local state ""
 		estadd local owner ""
 
+		** Owner Type
+		eststo: reg `out' i.grand_NSR`gf'##i.so2_nonattain applic_reg`gf' ///
+			i.ARP_subject c.sulfur_content_tot c.ARPprice_sp#c.sulfur_content_tot ///
+			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.ut_type, vce(robust)
+		estadd local boiler "X"
+		estadd local econ "X"
+		estadd local owner "X"
+		estadd local year ""
+		estadd local state ""
+		
 		** Year FEs
 		eststo: reg `out' i.grand_NSR`gf'##i.so2_nonattain applic_reg`gf' ///
 			i.ARP_subject c.sulfur_content_tot c.ARPprice_sp#c.sulfur_content_tot ///
-			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.year, vce(robust)
+			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.ut_type i.states, vce(robust)
 		estadd local boiler "X"
 		estadd local econ "X"
-		estadd local year "X"
-		estadd local state ""
-		estadd local owner ""
+		estadd local owner "X"
+		estadd local state "X"
+		estadd local year ""
 
 		** State FEs
 		eststo: reg `out' i.grand_NSR`gf'##i.so2_nonattain applic_reg`gf' ///
 			i.ARP_subject c.sulfur_content_tot c.ARPprice_sp#c.sulfur_content_tot ///
-			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.year i.states, ///
+			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.ut_type i.year i.states, ///
 			vce(robust)
 		estadd local boiler "X"
 		estadd local econ "X"
-		estadd local year "X"
-		estadd local state "X"
-		estadd local owner ""
-		
-		** Owner Type
-		eststo: reg `out' i.grand_NSR`gf'##i.so2_nonattain applic_reg`gf' ///
-			i.ARP_subject c.sulfur_content_tot c.ARPprice_sp#c.sulfur_content_tot ///
-			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.ut_type i.year ///
-			i.states, vce(robust)
-		estadd local boiler "X"
-		estadd local econ "X"
-		estadd local year "X"
-		estadd local state "X"
 		estadd local owner "X"
-
+		estadd local state "X"
+		estadd local year "X"
+		
 		** Reg table
 		/*#delim ;
 		esttab using "$wd/out/$date/tbl.`out'_grand_NSR`gf'.tex", replace
@@ -190,6 +190,82 @@ foreach out of varlist survive hr_load {
 	}
 }
 
+
+
+** -----------------------------------------------------------------------------
+
+foreach out of varlist survive /*hr_load*/ {
+	foreach gf in "" "_const" {
+
+		est clear
+		
+		** Base
+		eststo: reg `out' i.grand_NSR`gf', vce(robust)
+		estadd local boiler ""
+		estadd local econ ""
+		estadd local year ""
+		estadd local state ""
+		estadd local owner ""
+
+		** Boiler Characteristics
+		eststo: reg `out' i.grand_NSR`gf' ///
+			age i.grand_NSR`gf'##c.max_boi_nameplate, vce(robust)
+		estadd local boiler "X"
+		estadd local econ ""
+		estadd local year ""
+		estadd local state ""
+		estadd local owner ""
+
+		** Economic Characteristics
+		eststo: reg `out' i.grand_NSR`gf' ///
+			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth, vce(robust)
+		estadd local boiler "X"
+		estadd local econ "X"
+		estadd local year ""
+		estadd local state ""
+		estadd local owner ""
+
+		** Owner Type
+		eststo: reg `out' i.grand_NSR`gf' ///
+			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.ut_type, vce(robust)
+		estadd local boiler "X"
+		estadd local econ "X"
+		estadd local owner "X"
+		estadd local state ""
+		estadd local year ""
+		
+		** State FEs
+		eststo: reg `out' i.grand_NSR`gf' ///
+			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.ut_type i.states, ///
+			vce(robust)
+		estadd local boiler "X"
+		estadd local econ "X"
+		estadd local owner "X"
+		estadd local state "X"
+		estadd local year ""
+		
+		** Year FEs
+		eststo: reg `out' i.grand_NSR`gf' ///
+			age i.grand_NSR`gf'##c.max_boi_nameplate d_growth i.ut_type i.states ///
+			i.year, vce(robust)
+		estadd local boiler "X"
+		estadd local econ "X"
+		estadd local owner "X"
+		estadd local state "X"
+		estadd local year "X"
+
+		** Reg table
+		#delim ;
+		esttab using "$wd/out/$date/tbl.`out'_grand_NSR`gf'_noreg.tex", replace
+			nodep noomit nobase
+			keep(1.grand_NSR`gf')
+			coef(1.grand_NSR`gf' "GF")
+			t scalars(boiler econ year state owner) r2 ar2  
+			/*compress*/
+		;
+		#delim cr
+	}
+}
 
 
 

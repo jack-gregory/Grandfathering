@@ -90,7 +90,7 @@ The remainder of this workbook is organized as follows.  First, we download and 
 
 We first download the set of publicly available xls files and zip archives storing the data to Dropbox here:
 
-- `r path(l.path$data, "eia/f423923")`
+- `r path(l.path$data, "eia/f923")`
 
 Note that the following code only runs if the number of online files exceeds the number previously downloaded.
 
@@ -121,7 +121,7 @@ download_file <- function(url) {
   cat(file, "\n", sep="")
 
   ## Define destination
-  file <- path(l.path$data, "eia/f423923", file)
+  file <- path(l.path$data, "eia/f923", file)
 
   ## Download file
   httr::RETRY("GET", url=url, times=5) %>%
@@ -177,7 +177,8 @@ l.url_923 <- l.url$eia_923 %>%
 l.url_dl <- append(l.url_423, l.url_923)
 
 ## Perform download, if necessary
-if (length(l.url_dl)>length(fs::dir_ls(path(l.path$data, "eia/f423923"), regexp="\\.(xls|zip)$"))) {
+nfiles <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="(423|923)_")
+if (length(l.url_dl)>length(nfiles)) {
   walk(l.url_dl, download_file)
 }
 ```
@@ -454,15 +455,15 @@ extract_zip <- function(zip, file, sheet) {
   
   ## IMPORT DATA
   ## Unzip data
-  unzip(zip, files=file, exdir=path(l.path$data, "eia/f423923"))
+  unzip(zip, files=file, exdir=path(l.path$data, "eia/f923"))
   
   ## Import data
   if (!sheet) {
-    df <- readxl::read_excel(path(l.path$data, "eia/f423923", file), guess_max=10^5)
+    df <- readxl::read_excel(path(l.path$data, "eia/f923", file), guess_max=10^5)
   } else {
-    sheet <- readxl::excel_sheets(path(l.path$data, "eia/f423923", file)) %>%
+    sheet <- readxl::excel_sheets(path(l.path$data, "eia/f923", file)) %>%
       purrr::keep(str_detect(., "Page 5"))
-    df <- readxl::read_excel(path(l.path$data, "eia/f423923", file), sheet=sheet, 
+    df <- readxl::read_excel(path(l.path$data, "eia/f923", file), sheet=sheet, 
                              col_names=FALSE, guess_max=10^5)
   }
   
@@ -471,7 +472,7 @@ extract_zip <- function(zip, file, sheet) {
     fs::path_split() %>%
     purrr::flatten() %>%
     .[[1]] %>%
-    fs::path(l.path$data, "eia/f423923", .) %>%
+    fs::path(l.path$data, "eia/f923", .) %>%
     fs::file_delete()
 
   ## CLEAN DATA
@@ -498,7 +499,7 @@ extract_zip <- function(zip, file, sheet) {
 ``` {r import}
 
 ## Build zip list
-l.zip <- fs::dir_ls(path(l.path$data, "eia/f423923"), regexp="f(4|9)23_\\d{4}\\.zip$")
+l.zip <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="f(4|9)23_\\d{4}\\.zip$")
 
 ## Build zip & file dataframe
 df.zip <- l.zip %>%
