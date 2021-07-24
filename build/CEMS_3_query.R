@@ -42,6 +42,9 @@
 ## ... Packages
 source(fs::path(here::here(), "src/preamble.R"))
 
+if (!("haven" %in% installed.packages())) install.packages("haven")
+library(haven)
+
 ## ... Paths
 source(fs::path(here::here(), "src/def_paths.R"))
 l.path <- append(l.path, list(cems = "E:/My Data/EPA/CEMS"))
@@ -64,7 +67,8 @@ con <- DBI::dbConnect(RMySQL::MySQL(),
                       host="localhost")
 
 
-# (2) QUERY CEMS ----------------------------------------------------------------------------------
+# (2) QUERY CEMS -- YEARS -------------------------------------------------------------------------
+## This section prepares CEMS yearly data.
 
 ## (2a) Create list of years
 l.yrs <- seq(1995, 2021) %>%
@@ -124,19 +128,17 @@ readr::write_csv(df.cems_yr, here::here("data/cems_yr.csv"))
 
 
 # (3) UNIT MATCHES --------------------------------------------------------------------------------
+## This section produces a table for manual matching and then reimports the finalized matching.
 
-# ## (3a) Access MySQL crosswalk
-# res <- DBI::dbSendQuery(con, "
-#     select distinct *
-#     from            epa.xwalk
-#   ;")
-# df.xwalk_epa_eia <- DBI::dbFetch(res, n=-1)
-# DBI::dbClearResult(res)
-# 
-# ## Disconnect from MySQL
-# dbDisconnect(con)
-# 
-# 
+## (3a) Access MySQL crosswalk
+res <- DBI::dbSendQuery(con, "
+    select distinct *
+    from            epa.xwalk
+  ;")
+df.xwalk_epa_eia <- DBI::dbFetch(res, n=-1)
+DBI::dbClearResult(res)
+
+
 # ## (3b) Join GF & CEMS units
 # ## Import grandfathering dataset and check ORISPL & UNIT matches
 # df.gf <- read_csv(path(l.path$data, "gf_original/in_regression_vars_BP.csv"), guess_max=50000) %>%
@@ -177,11 +179,8 @@ readr::write_csv(df.cems_yr, here::here("data/cems_yr.csv"))
 df.xwalk_gf_cems <- readr::read_csv(here::here("data/gf_cems_xwalk.csv"))
 
 
-## ------------------------------------------------------------------------------------------------
-
-library(haven)
-
-## Create GF-CEMS xwalk for Stata
+## (3e) Create GF-CEMS xwalk for Stata
+## Prepare xwalk dataframe
 df.xwalk <- df.xwalk_epa_eia %>%
   rename(ORISPL = CAMD_PLANT_ID,
          CEMS_UNIT = CAMD_UNIT_ID) %>%
@@ -193,20 +192,150 @@ df.xwalk <- df.xwalk_epa_eia %>%
   right_join(df.xwalk_gf_cems, by=c("ORISPL","CEMS_UNIT")) %>%
   relocate(GF_BOILER, .after=ORISPL)
 
+## Save dta
 haven::write_dta(df.xwalk, 
                  here::here("data/gf_cems_xwalk.dta"),
                  version=14.2)
 
-## Create yearly CEMS data for Stata
+
+## (3f) Re-create yearly CEMS data for Stata
+## Merge dataframes, including the df.cems_yr built in step (2)
 df.cems_yr <- readr::read_csv(here::here("data/cems_yr.csv")) %>%
   inner_join(df.xwalk_gf_cems %>% rename(UNIT = CEMS_UNIT),
              by=c("ORISPL","UNIT")) %>%
   relocate(GF_BOILER, .after=UNIT)
 
+## Save dta
 haven::write_dta(df.cems_yr, 
                  here::here("data/cems_yr.dta"),
                  version=14.2)
 
+
+# (4) QUERY CEMS -- HOURS -------------------------------------------------------------------------
+## This section prepares CEMS hourly data.
+
+## (4a) Create list of years
+l.hrs <- seq(0, 23) %>%
+  as.list()
+
+
+## (4b) Create hour iteration function
+itr_hour <- function(hr) {
+  
+  ## Assertions
+  if (!exists("df.xwalk_gf_cems")) {
+    stop("Dataframe df.xwalk_gf_cems does not exist.")
+  }
+  stopifnot(
+    is.integer(hr),
+    hr>=0 & hr<=23
+  )
+  
+  ## Send query
+  cat("\nHour = ", hr, " ...\n  Send query\n", sep="")
+  res <- glue::glue_sql("
+    select 		ORISPL,
+  			      UNIT,
+  			      hour(DATETIME) as HOUR,
+  			      DATETIME,
+              DURATION,
+  		        GLOAD,
+  		        SLOAD,
+        			CO2_MASS,
+        			SO2_MASS,
+        			NOX_MASS
+    from		  epa.cems
+    where     hour(DATETIME)={hr}
+              and year(DATETIME)<=2017
+    ;", .con=con) %>% 
+    DBI::SQL() %>% 
+    {DBI::dbSendQuery(con, .)}
+  
+  ## Fetch query
+  cat("  Fetch query\n")
+  df <- DBI::dbFetch(res, n=-1)
+  DBI::dbClearResult(res)
+  
+  ## Clean query
+  cat("  Clean query\n")
+  df <- df %>%
+    inner_join(df.xwalk_gf_cems %>% rename(UNIT = CEMS_UNIT), by=c("ORISPL","UNIT")) %>%
+    relocate(GF_BOILER, .after=UNIT)
+  
+  ## Save query
+  cat("  Save query\n")
+  hr_label <- ifelse(str_length(hr)==1, paste0("0", hr), hr)
+  saveRDS(df, fs::path(here::here(), glue::glue("data/epa/cems_hr{hr_label}.rds")))
+  write.csv(df, fs::path(here::here(), glue::glue("data/epa/cems_hr{hr_label}.csv")))
+  return(df)
+}
+
+
+## (4c) Query yearly data
+## Send queries - hourly files only
+purrr::walk(l.hrs, itr_hour)
+
+## Send queries - hourly files and aggregate file 
+# df.cems_hr <- purrr::map_dfr(l.hrs, itr_hour) %>%
+#   arrange(ORISPL, UNIT, DATETIME)
+
+## Disconnect from MySQL
+dbDisconnect(con)
+
+
+# ## (4d) Save dataframe as rds & csv
+# saveRDS(df.cems_hr, here::here("data/cems_hr.rds"))
+# readr::write_csv(df.cems_hr, here::here("data/cems_hr.csv"))
+
+
+## APPENDIX -- NETGEN -----------------------------------------------------------------------------
+## This appendix prepares the net-gross generation ratio using EIA-923 data for the net 
+## component and CEMS data for the gross.
+
+## Query hourly data for one year
+## NB - Later versions could aggregate the query to the year-month level, if they could be joined
+##      with the GF-CEMS xwalk.
+res <- glue::glue_sql("
+    select 		ORISPL,
+  			      UNIT,
+  			      year(DATETIME) as YEAR,
+  			      DATETIME,
+              DURATION,
+  		        GLOAD,
+        			HEAT,
+        			CO2_MASS,
+        			SO2_MASS,
+        			NOX_MASS
+    from		  epa.cems
+    where     year(DATETIME)=2010
+    ;", .con=con) %>% 
+  DBI::SQL() %>% 
+  {DBI::dbSendQuery(con, .)}
+df <- DBI::dbFetch(res, n=-1)
+DBI::dbClearResult(res)
+
+## Filter on GF boilers
+df <- df %>%
+  inner_join(df.xwalk_gf_cems %>% rename(UNIT = CEMS_UNIT), by=c("ORISPL","UNIT")) %>%
+  relocate(GF_BOILER, .after=UNIT)
+
+## Import EIA net generation data
+df.netgen <- read_csv(path(l.path$data, "eia_netgen.csv")) %>%
+  inner_join(df.xwalk_gf_cems %>% distinct(ORISPL), by=c("ORISPL")) %>%
+  filter(YR==2010)
+
+## Check net-gross monthly generation ratio
+## NB - There appears to be quite a few instances where the ratio is either greater than one
+##      or equal to zero.  These are likely a result of poor matching between boilers within
+##      plants and should be checked.
+df.cems_mth <- df %>%
+  rename(YR = YEAR) %>%
+  mutate(MTH = month(DATETIME)) %>%
+  group_by(ORISPL, YR, MTH) %>%
+  summarise_at(vars(GLOAD, SLOAD), sum, na.rm=TRUE) %>%
+  left_join(df.netgen %>% select(ORISPL, YR, MTH, NETGEN), by=c("ORISPL","YR","MTH")) %>%
+  mutate(RATIO = NETGEN/GLOAD)
+  
 
 ### END CODE ###
 
