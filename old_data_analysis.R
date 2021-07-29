@@ -1,4 +1,8 @@
 #Prepare long dataset on power plant closures
+# We prepare the dataset by merging two dataset 
+# 1) the data on retirements that was hand-picked from a report attached to a proceeding
+# 2) retirements data created by processing our all_years_all_plants_and_features.xlsx file (EIA-based data)
+#
 
 #old_retir<-read.csv(file.choose(),  header = TRUE)
 
@@ -66,7 +70,9 @@ plants_new<-inner_join(plants_new_aux, plants_new, by="ID")%>%
   arrange(ID, yr) %>%
   select(-last_year)
 
-
+#############################################
+#Join the two datasets
+#############################################
 retire_all<-rbind(plants_new,retirements_old)
 retire_all$inservice_y<-destring(retire_all$inservice_y)
 
