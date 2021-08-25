@@ -1,7 +1,8 @@
 ---
 title: "EIA-423 & EIA-923 Data"
+subtitle: "Monthly plant & state fuel prices | Mine & county sulfur contents"
 author: "Jack Gregory"
-date: "14 July 2021"
+date: "24 August 2021"
 output:
   bookdown::html_document2:
     toc: yes
@@ -9,6 +10,10 @@ output:
     toc_float: yes
     fig_caption: yes
     highlight: textmate
+    keep_md: true
+  pdf_document:
+    latex_engine: pdflatex
+    highlight: haddock
     keep_md: true
 ---
 ___
@@ -30,11 +35,12 @@ knitr::opts_chunk$set(
 ## ... Packages
 source(here::here("src/preamble.R"))
 
-install.packages(setdiff(c("httr","rvest","zip","geofacet","writexl"), 
+install.packages(setdiff(c("httr","rvest","zip","sf","geofacet","writexl"), 
                          rownames(installed.packages())))
 library(httr)
 library(rvest)
 library(zip)
+library(sf)
 library(geofacet)
 library(writexl)
 
@@ -44,7 +50,11 @@ source(here("src/text_colour.R"))
 
 ## ... Files
 l.file <- list(
-  clean = path(l.path$data, "eia_fuel.xlsx")
+  fips = path(l.path$data, "cb/all-geocodes-v2020.xlsx"),
+  state = path(l.path$data, "eia/shp/USA_States_Generalized.shp"),
+  county = path(l.path$data, "eia/shp/USA_Counties_(Generalized).shp"),
+  cln_fuel = path(l.path$data, "eia_fuel.xlsx"),
+  cln_sulfur = path(l.path$data, "eia_sulfur.csv")
 )
 
 ## ... URLs
@@ -52,6 +62,29 @@ l.url <- list(
   eia_423 = "https://www.eia.gov/electricity/data/eia423/",
   eia_923 = "https://www.eia.gov/electricity/data/eia923/"
 )
+```
+
+```{r theme, include=FALSE}
+
+theme_eia <- function() {
+  theme_classic() +
+  theme(strip.background = element_rect(fill="grey85", color=NA),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_line(colour="grey85", size=0.3),
+        panel.grid.minor.y = element_line(colour="grey85", size=0.3),
+        axis.line.x = element_line(size=0.4),
+        axis.ticks.x = element_line(size=0.4),
+        legend.position = "right",
+        plot.caption = element_text(hjust=0))
+}
+
+theme_maps <- function() {
+  theme_void() +
+  theme(legend.position = "right",
+        legend.text = element_text(size=7),
+        plot.caption = element_text(hjust=0))
+} 
 ```
 
 
@@ -83,7 +116,7 @@ Further information of plant identifiers can be found using the EPA-EIA Crosswal
 - [Description](https://www.epa.gov/airmarkets/power-sector-data-crosswalk)
 - [GitHub](https://github.com/USEPA/camd-eia-crosswalk)
 
-The remainder of this workbook is organized as follows.  First, we download and import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  Finally, we export the data to a csv file.
+The remainder of this workbook is organized as follows.  First, we download and import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  We then extract, perform data quality analyses, and export cleaned fuel prices and sulfur content data.
 
 
 # Download
@@ -300,6 +333,17 @@ df.state <- tribble(
 )
 ```
 
+```{r counties, include=FALSE}
+
+df.county <- readxl::read_excel(l.file$fips, skip=4) %>%
+  filter(`Summary Level`=="050") %>%
+  select(FIPS_STATE = `State Code (FIPS)`,
+         FIPS_COUNTY = `County Code (FIPS)`) %>%
+  mutate_all(as.numeric) %>%
+  left_join(df.state, by=c("FIPS_STATE"="FIPS")) %>%
+  filter(!is.na(STATE)) %>%
+  relocate(STATE)
+```
 
 ## Data
 
@@ -330,11 +374,17 @@ wrangle.YEAR <- function(df) {
            ORISPL = FACILITY_CODE,
            YR = YEAR,
            MTH = MONTH,
+           CM_FIPS_STATE = COALMINE_FST,
+           CM_FIPS_COUNTY = COALMINE_COUNTY,
            FUEL_TYPE = FUEL_CATEG,
            FUEL_CODE = FUEL_TYPE_CODE,
            QUANTITY = QUANTITY_RECEIVED,
            HEAT = BTU_CONTENT,
+           SULFUR = SULFUR_CONTENT,
            COST = FUEL_COST) %>%
+    mutate_at(vars(UTILITY_ID, ORISPL, YR, MTH, CM_FIPS_STATE, CM_FIPS_COUNTY, 
+                   QUANTITY, HEAT, SULFUR, COST), 
+              as.numeric) %>%
     mutate(FUEL = case_when(FUEL_TYPE==1 ~ "Coal",
                             FUEL_TYPE==2 ~ "Oil",
                             FUEL_TYPE==3 ~ "Gas"),
@@ -342,7 +392,8 @@ wrangle.YEAR <- function(df) {
                             FUEL_TYPE==2 ~ HEAT/l.conv$oil,
                             FUEL_TYPE==3 ~ HEAT/l.conv$gas),
            COST = COST/10^2) %>%
-    select(UTILITY_ID, ORISPL, YR, MTH, FUEL, FUEL_CODE, QUANTITY, HEAT, COST)
+    select(UTILITY_ID, ORISPL, YR, MTH, CM_FIPS_STATE, CM_FIPS_COUNTY, 
+           FUEL, FUEL_CODE, QUANTITY, HEAT, SULFUR, COST)
 }
 
 ## Define COCODE method (1990-2001)
@@ -353,12 +404,16 @@ wrangle.COCODE <- function(df) {
            FIPS = PLT_ST,
            YR = YEAR,
            MTH = MONTH,
+           CM_FIPS_STATE = ORIG_ST,
+           CM_FIPS_COUNTY = COUNTY,
            FUEL_TYPE = GENER_FUEL,
            FUEL_CODE = SPECF_FUEL,
            QUANTITY,
            HEAT = BTU,
-           COST) %>%
-    mutate_at(vars(UTILITY_ID, ORISPL, FIPS, MTH), as.numeric) %>%
+           SULFUR, COST) %>%
+    mutate_at(vars(UTILITY_ID, ORISPL, FIPS, MTH, CM_FIPS_STATE, CM_FIPS_COUNTY, 
+                   QUANTITY, HEAT, SULFUR, COST), 
+              as.numeric) %>%
     left_join(df.state, by=c("FIPS")) %>%
     mutate(YR = ifelse(str_length(YR)==2, paste0("19", YR), YR),
            YR = as.numeric(YR),
@@ -369,7 +424,8 @@ wrangle.COCODE <- function(df) {
                             FUEL_TYPE==2 ~ HEAT/l.conv$oil,
                             FUEL_TYPE==3 ~ HEAT/l.conv$gas),
            COST = COST/10^2) %>%
-    select(UTILITY_ID, ORISPL, STATE, YR, MTH, FUEL, FUEL_CODE, QUANTITY, HEAT, COST)
+    select(UTILITY_ID, ORISPL, FIPS, STATE, YR, MTH, CM_FIPS_STATE, CM_FIPS_COUNTY, 
+           FUEL, FUEL_CODE, QUANTITY, HEAT, SULFUR, COST)
 }
 
 ## Define SURVEY method (2002-2007)
@@ -382,15 +438,23 @@ wrangle.SURVEY <- function(df) {
            STATE = `PLST ST`,
            YR = YEAR,
            MTH = MONTH,
+           CM_STATE = `ORIG ST`,
+           CM_FIPS_COUNTY = COUNTY,
            FUEL = GENERFUEL,
            FUEL_CODE = SPECF_FUEL,
            QUANTITY,
            HEAT = BTUCONTENT,
-           COST) %>%
+           SULFUR, COST) %>%
+    mutate_at(vars(UTILITY_ID, ORISPL, YR, MTH, CM_FIPS_COUNTY, QUANTITY, HEAT, SULFUR, COST), 
+              as.numeric) %>%
+    left_join(df.state, by=c("STATE")) %>%
+    left_join(df.state %>% rename(CM_FIPS_STATE = FIPS), by=c("CM_STATE" = "STATE")) %>%
     mutate(FUEL = case_when(FUEL=="Petroleum" ~ "Oil", 
                             FUEL=="Natural Gas" ~ "Gas",
                             TRUE ~ FUEL),
-           COST = COST/10^2)
+           COST = COST/10^2) %>%
+    select(UTILITY_ID, UTILITY_NAME, ORISPL, NAME, FIPS, STATE, YR, MTH, CM_FIPS_STATE, 
+           CM_FIPS_COUNTY, FUEL, FUEL_CODE, QUANTITY, HEAT, SULFUR, COST)
 }
 
 ## Define X1 method (2008-present)
@@ -404,10 +468,14 @@ wrangle.current <- function(df) {
              STATE = ...5,
              YR = ...1,
              MTH = ...2,
+             CM_STATE = ...11,
+             CM_FIPS_COUNTY = ...12,
+             CM_MSHAID = ...13,
              FUEL = ...9,
              FUEL_CODE = ...8,
              QUANTITY = ...16,
              HEAT = ...17,
+             SULFUR = ...18,
              COST = ...20)
   } else if (ncol(df)>=28) {
     df <- df %>%
@@ -418,21 +486,31 @@ wrangle.current <- function(df) {
              STATE = ...5,
              YR = ...1,
              MTH = ...2,
+             CM_STATE = ...11,
+             CM_FIPS_COUNTY = ...12,
+             CM_MSHAID = ...13,
              FUEL = ...9,
              FUEL_CODE = ...8,
              QUANTITY = ...16,
              HEAT = ...17,
+             SULFUR = ...18,
              COST = ...21)
   } else {
     stop("The function could not identify the table from its number of columns.")
   }
   df %>%
     filter(!(is.na(MTH) | str_to_upper(MTH)=="MONTH")) %>%
-    mutate_at(vars(UTILITY_ID, ORISPL, YR, MTH, QUANTITY, HEAT, COST), as.numeric) %>%
+    mutate_at(vars(UTILITY_ID, ORISPL, YR, MTH, CM_FIPS_COUNTY, CM_MSHAID, 
+                   QUANTITY, HEAT, SULFUR, COST), 
+              as.numeric) %>%
+    left_join(df.state, by=c("STATE")) %>%
+    left_join(df.state %>% rename(CM_FIPS_STATE = FIPS), by=c("CM_STATE" = "STATE")) %>%
     mutate(FUEL = case_when(FUEL=="Petroleum" ~ "Oil", 
                             FUEL=="Natural Gas" ~ "Gas",
                             TRUE ~ FUEL),
-           COST = COST/10^2)
+           COST = COST/10^2) %>%
+    select(UTILITY_ID, UTILITY_NAME, ORISPL, NAME, FIPS, STATE, YR, MTH, CM_FIPS_STATE, 
+           CM_FIPS_COUNTY, CM_MSHAID, FUEL, FUEL_CODE, QUANTITY, HEAT, SULFUR, COST)
 }
 ```
 
@@ -527,8 +605,9 @@ df.fuel <- pmap_dfr(df.zip %>% select(ZIP, NAME, SHEET),
 At present, we perform the following to clean the dataset:
 
 - Fill `STATE`, `UTILITY_NAME`, and `NAME` variables;
-- Drop non-contiguous states; and,
-- Calculate a `COST_UNIT` variable defined as the cost per respective fuel unit.
+- Drop non-contiguous states;
+- Calculate a `COST_UNIT` variable defined as the cost per respective fuel unit; and,
+- Clean `CM_FIPS_COUNT` and `CM_MSHAID`, where the latter must not be greater than seven digits.
 
 ```{r clean}
 
@@ -538,7 +617,7 @@ df.fuel_cln <- df.fuel %>%
   ## Fill STATE, UTILITY_NAME & NAME
   arrange(ORISPL, FUEL, YR) %>%
   group_by(ORISPL, FUEL) %>%
-  fill(STATE, UTILITY_NAME, NAME, .direction="updown") %>%
+  fill(FIPS, STATE, UTILITY_NAME, NAME, .direction="updown") %>%
   ungroup() %>%
   
   ## Drop unnecessary obs
@@ -549,9 +628,21 @@ df.fuel_cln <- df.fuel %>%
   mutate(ENERGY = QUANTITY * HEAT,
          COST_UNIT = COST_ENRG * HEAT) %>%
   
+  ## Clean CM_FIPS_COUNTY
+  left_join(df.county %>% 
+              mutate(CM_FIPS_COUNTY = FIPS_COUNTY) %>% 
+              select(CM_FIPS_STATE = FIPS_STATE, CM_FIPS_COUNTY, FIPS_COUNTY), 
+            by=c("CM_FIPS_STATE","CM_FIPS_COUNTY")) %>%
+  select(-CM_FIPS_COUNTY) %>%
+  rename(CM_FIPS_COUNTY = FIPS_COUNTY) %>%
+  
+  ## Clean CM_MSHAID
+  mutate(CM_MSHAID = ifelse(str_length(CM_MSHAID)<=7, CM_MSHAID, NA)) %>%
+  
   ## Finalize dataframe
-  select(ORISPL, NAME, STATE, YR, MTH, FUEL, FUEL_CODE, QUANTITY, ENERGY, HEAT, 
-         COST_ENRG, COST_UNIT, UTILITY_ID, UTILITY_NAME)
+  select(ORISPL, NAME, FIPS, STATE, YR, MTH, CM_FIPS_STATE, CM_FIPS_COUNTY, CM_MSHAID,
+         FUEL, FUEL_CODE, QUANTITY, ENERGY, HEAT, SULFUR, COST_ENRG, COST_UNIT, 
+         UTILITY_ID, UTILITY_NAME)
 ```
 
 We then perform the following three aggregations:
@@ -560,9 +651,20 @@ We then perform the following three aggregations:
 - Coal state-year weighted average price panel, which is similar to Table 7.17 in the [EIA Electric Power Annual](https://www.eia.gov/electricity/annual); and,
 - Gas state-year weighted average gas price panel, which is similar to Table 7.20 in the [EIA Electric Power Annual](https://www.eia.gov/electricity/annual).
 
-## Coal by plant-year
 
-```{r agg-coal-plant}
+# Fuel Prices
+
+This section performs the analysis and data export for fuel prices, specifically: coal by plant-year and fuel by state-year.
+
+## Analysis
+
+We first collapse the fuel price data for coal by plant-year and fuel by state-year.  Then, we plot the data across states in order to inspect it visually.  Finally, we perform a comparative analysis with other coal and natural gas price timeseries.
+
+### Coal by plant-year
+
+We prepare a collapsed dataset containing coal by plant-year fuel prices.
+
+```{r coal-price-agg-plant}
 
 df.coal_plt <- df.fuel_cln %>%
 
@@ -583,11 +685,13 @@ df.coal_plt <- df.fuel_cln %>%
   relocate(starts_with("COST"), .after=HEAT)
 ```
 
-## Fuel by state-year
+### Fuel by state-year
+
+We prepare a collapsed dataset containing only coal and natural gas by state-year fuel prices.
 
 `r text_colour(colour="red", text="Since the STATE variable was not associated with plant location until 1990, there are many plants which lack a state assignment.  This results in around 40,000 missing state-observations, approxmately 2.5% of the sample.  This is a non-trivial loss, and we should attempt to remedy it by using additional EIA-923 data or the Grandfathering dataset.  Nevertheless in the short run, the vast majority of the lost data occurs prior to 1985, which mitigates any major effects for our analyses.")`
 
-```{r agg-fuel-state}
+```{r fuel-price-agg-state}
 
 df.fuel_st <- df.fuel_cln %>%
 
@@ -610,28 +714,9 @@ df.fuel_st <- df.fuel_cln %>%
 ```
 
 
-# Analysis
+### State plots
 
-`r text_colour(colour="red", text="I envisage this section as a comparison of EIA-423 and EIA-923 to other data sources.  For example, there are a number of Bloomberg timeseries, as well as a number of timeseries for various coal regions and gas hubs provided by the EIA itself.  These both lack the depth and breadth of the EIA-423 and EIA-923, but it would be a useful sanity check to assess whether our aggregations are representative of wider fuel price indices.")`
-
-
-```{r theme, include=FALSE}
-
-theme_eia <- function() {
-  theme_classic() +
-  theme(strip.background = element_rect(fill="grey85", color=NA),
-        axis.line.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        panel.grid.major.y = element_line(colour="grey85", size=0.3),
-        panel.grid.minor.y = element_line(colour="grey85", size=0.3),
-        axis.line.x = element_line(size=0.4),
-        axis.ticks.x = element_line(size=0.4),
-        legend.position = "right",
-        plot.caption = element_text(hjust=0))
-}
-```
-
-```{r analysis-state, fig.height=10, fig.width=14}
+```{r fuel-state, fig.height=10, fig.width=14}
 
 pmap(list(
       list(expr(COST_ENRG),expr(COST_UNIT)),
@@ -651,7 +736,7 @@ pmap(list(
      )
 ```
 
-```{r analysis-state-relative, fig.height=10, fig.width=14}
+```{r fuel-state-relative, fig.height=10, fig.width=14}
 
 pmap(list(
       list(expr(COST_ENRG),expr(COST_UNIT)),
@@ -672,20 +757,24 @@ pmap(list(
      )
 ```
 
+### Comparative analysis
 
-# Export
+`r text_colour(colour="red", text="I envisage this section as a comparison of EIA-423 and EIA-923 to other data sources.  For example, there are a number of Bloomberg timeseries, as well as a number of timeseries for various coal regions and gas hubs provided by the EIA itself.  These both lack the depth and breadth of the EIA-423 and EIA-923, but it would be a useful sanity check to assess whether our aggregations are representative of wider fuel price indices.")`
 
-## Data
+
+## Export
+
+### Data
 This section exports the cleaned fuel data to a xlsx file:
 
-```{r export}
+```{r fuel-export}
 
 list(`Coal by Plant` = df.coal_plt,
      `Fuel by State` = df.fuel_st) %>%
-  writexl::write_xlsx(path=l.file$clean)
+  writexl::write_xlsx(path=l.file$cln_fuel)
 ```
 
-## Dictionary
+### Dictionary
 
 The following table describes the columns in the exported dataset.
 
@@ -697,8 +786,330 @@ The following table describes the columns in the exported dataset.
 | MTH | Both || Data month as a one- or two-digit integer. |
 | PURCHASES | Both || Number of annual fuel purchases by plant or state, respectively. |
 | QUANTITY | Both | Coal=tons / Gas=Mcf | Total mass or volume of annual fuel received, by plant or state, respectively. |
-| ENERGY | Both| MMBtu | Total energy of annual fuel received, by plant or state, respectively. |
+| ENERGY | Both | MMBtu | Total energy of annual fuel received, by plant or state, respectively. |
 | HEAT | Both | Coal=MMBtu/tons / Gas=MMBtu/Mcf | Mean heat content of fuel received by plant or state, respectively. |
 | COST_ENRG | Both | $USD/MMBtu | Cost per energy unit as a weighted average of annual total energy received by plant or state, respectively. |
 | COST_UNIT | Both | Coal=\$USD/ton / Gas=\$USD/Mcf | Cost per physical unit as a weighted average of annual total quantity received by plant or state, respectively. |
+
+
+# Sulfur Contents
+
+This section performs the analysis and data export for sulfur contents by mine, state and county and by year.
+
+## Analysis
+
+We first collapse the sulfur data by mine, county and year and produce a number of summary statistics.  Then, we plot densities and maps to visually inspect the data.
+
+```{r sulfur-clean}
+
+## Clean sulfur data
+df.sulfur <- df.fuel_cln %>%
+
+  ## Filter on fuel type and viable data
+  filter(FUEL=="Coal") %>%
+  filter(YR>=1985) %>%
+  filter(!is.na(CM_FIPS_STATE) | !is.na(CM_FIPS_COUNTY) | !is.na(CM_MSHAID)) %>%
+  select(YR, starts_with("CM_"), SULFUR) %>%
+  
+  ## Modify identifiers
+  mutate(CM_FIPS_STATE = ifelse(is.na(CM_FIPS_STATE), NA,
+                                 formatC(CM_FIPS_STATE, width=2, format="d", flag="0")),
+         CM_FIPS_COUNTY = ifelse(is.na(CM_FIPS_COUNTY), NA,
+                                 paste0(formatC(CM_FIPS_STATE, width=2, format="d", flag="0"),
+                                        formatC(CM_FIPS_COUNTY, width=3, format="d", flag="0"))),
+         CM_MSHAID = ifelse(is.na(CM_MSHAID), NA,
+                                 formatC(CM_MSHAID, width=7, format="d", flag="0")))
+```
+
+### Data availability
+
+```{r sulfur-data-avail-plot}
+
+## Perform aggregation over states
+df.sulfur_state <- df.sulfur %>%
+  filter(!is.na(CM_FIPS_STATE)) %>%
+  group_by(YR) %>%
+  summarise(SULFUR_N = n()) %>%
+  ungroup() %>%
+  mutate(TYPE = "State") %>%
+  select(TYPE, YR, starts_with("SULFUR"))
+
+## Perform aggregation over counties
+df.sulfur_county <- df.sulfur %>%
+  filter(!is.na(CM_FIPS_COUNTY)) %>%
+  group_by(YR) %>%
+  summarise(SULFUR_N = n()) %>%
+  ungroup() %>%
+  mutate(TYPE = "County") %>%
+  select(TYPE, YR, starts_with("SULFUR"))
+
+## Perform aggregation over MSHA IDs
+df.sulfur_msha <- df.sulfur %>%
+  filter(!is.na(CM_MSHAID)) %>%
+  group_by(YR) %>%
+  summarise(SULFUR_N = n()) %>%
+  ungroup() %>%
+  mutate(TYPE = "MSHA") %>%
+  select(TYPE, YR, starts_with("SULFUR"))
+
+## Rebind dataframes
+df.sulfur_avail <- bind_rows(df.sulfur_state, df.sulfur_county, df.sulfur_msha) %>%
+  mutate(TYPE = factor(TYPE, levels=c("State","County","MSHA"), 
+                       labels=c("State","County","Mine")))
+
+## Plot data availability
+ggplot(df.sulfur_avail) +
+  geom_line(aes(x=YR, y=SULFUR_N/10^3, color=TYPE), alpha=0.9) +
+  scale_color_viridis_d(option="viridis", direction=-1, begin=0.15, end=0.85) +
+  labs(title="Data availability by geographic level",
+       y="Count ['000]",
+       x="Year",
+       color="") +
+  theme_eia()
+
+```
+
+
+### Sulfur by mine, county & state
+
+We collapse the sulfur data for all available years and observations.  We create mine, county and state summary statistics and combine them into a single dataframe.  `r text_colour(colour="red", text="The code applying purrr and quasiquotation currently does not work.")`
+
+As defined by the [EIA](https://www.eia.gov/tools/glossary/index.php?id=Coal%20grade), low-sulfur coal generally contains 1 percent or less sulfur by weight.  For air quality standards, "low sulfur coal" contains 0.6 pounds or less sulfur per million Btu, which is equivalent to 1.2 pounds of sulfur dioxide per million Btu.
+
+```{r sulfur-stats}
+
+## Perform aggregation over states
+df.sulfur_state <- df.sulfur %>%
+  filter(!is.na(CM_FIPS_STATE)) %>%
+  group_by(CM_FIPS_STATE) %>%
+  summarise(SULFUR_N = n(),
+            SULFUR_MEAN = mean(SULFUR, na.rm=TRUE),
+            SULFUR_MEDIAN = median(SULFUR, na.rm=TRUE),
+            SULFUR_SD = sd(SULFUR, na.rm=TRUE),
+            SULFUR_MIN = min(SULFUR, na.rm=TRUE),
+            SULFUR_MAX = max(SULFUR, na.rm=TRUE),
+            SULFUR_LOW = (SULFUR_MEDIAN<=1)) %>%
+  ungroup() %>%
+  mutate(TYPE = "State") %>%
+  select(TYPE, ID = CM_FIPS_STATE, starts_with("SULFUR"))
+
+## Perform aggregation over counties
+df.sulfur_county <- df.sulfur %>%
+  filter(!is.na(CM_FIPS_COUNTY)) %>%
+  group_by(CM_FIPS_COUNTY) %>%
+  summarise(SULFUR_N = n(),
+            SULFUR_MEAN = mean(SULFUR, na.rm=TRUE),
+            SULFUR_MEDIAN = median(SULFUR, na.rm=TRUE),
+            SULFUR_SD = sd(SULFUR, na.rm=TRUE),
+            SULFUR_MIN = min(SULFUR, na.rm=TRUE),
+            SULFUR_MAX = max(SULFUR, na.rm=TRUE),
+            SULFUR_LOW = (SULFUR_MEDIAN<=1)) %>%
+  ungroup() %>%
+  mutate(TYPE = "County") %>%
+  select(TYPE, ID = CM_FIPS_COUNTY, starts_with("SULFUR"))
+
+## Perform aggregation over MSHA IDs
+df.sulfur_msha <- df.sulfur %>%
+  filter(!is.na(CM_MSHAID)) %>%
+  group_by(CM_MSHAID) %>%
+  summarise(SULFUR_N = n(),
+            SULFUR_MEAN = mean(SULFUR, na.rm=TRUE),
+            SULFUR_MEDIAN = median(SULFUR, na.rm=TRUE),
+            SULFUR_SD = sd(SULFUR, na.rm=TRUE),
+            SULFUR_MIN = min(SULFUR, na.rm=TRUE),
+            SULFUR_MAX = max(SULFUR, na.rm=TRUE),
+            SULFUR_LOW = (SULFUR_MEDIAN<=1)) %>%
+  ungroup() %>%
+  mutate(TYPE = "MSHA") %>%
+  select(TYPE, ID = CM_MSHAID, starts_with("SULFUR"))
+
+## Rebind dataframes
+df.sulfur_stats <- bind_rows(df.sulfur_state, df.sulfur_county, df.sulfur_msha)
+
+## Simplified code using purrr and quasiquotation
+## NB - It currently does not work
+# sulfur_stats <- function(df, var) {
+# 
+#   ## Assertions
+#   ## NB - Need to add assertr dataframe checks
+#   stopifnot(
+#     is.data.frame(df),
+#     var %in% c("CM_FIPS_STATE","CM_FIPS_COUNTY","CM_MSHAID"),
+#     any(names(df)==var)
+#   )
+#   
+#   ## Define type
+#   if (var=="CM_FIPS_STATE") {
+#     type <- "State"
+#   } else if (var=="CM_FIPS_COUNTY") {
+#     type <- "County"
+#   } else {
+#     type <- "MSHA"
+#   }
+#   
+#   ## Quasiquotation
+#   var_quo <- enquo(var)
+# 
+#   ## Perform aggregation
+#   df %>%
+#     filter(!is.na(!!var_quo)) %>%
+#     group_by(!!var_quo) %>%
+#     summarise(SULFUR_MEAN = mean(SULFUR, na.rm=TRUE),
+#               SULFUR_MEDIAN = median(SULFUR, na.rm=TRUE),
+#               SULFUR_SD = sd(SULFUR, na.rm=TRUE),
+#               SULFUR_N = n(),
+#               SULFUR_MIN = min(SULFUR, na.rm=TRUE),
+#               SULFUR_MAX = max(SULFUR, na.rm=TRUE)) %>%
+#     ungroup() %>%
+#     mutate(TYPE = type) %>%
+#     select(TYPE, ID = !!var_quo, starts_with("SULFUR"))
+# }
+#  
+# df.sulfur <- map_dfr(list("CM_FIPS_STATE", "CM_FIPS_COUNTY", "CM_MSHAID"),
+#                      ~sulfur_stats(df.sulfur, .x))
+
+```
+
+### Frequency plots
+
+```{r sulfur-histogram-plots}
+
+pmap(list(
+      list("State","County","MSHA"),
+      list("state","county","mine")
+      ),
+     ~ggplot(df.sulfur_stats %>% filter(TYPE==..1)) +
+        geom_histogram(aes(x=SULFUR_MEAN), color="#482677", fill="#482677", alpha=0.5) +
+        labs(title=paste("Histogram of mean sulfur content by", ..2, sep=" "),
+             y="Count",
+             x="Mean sulfur content [% by weight]") +
+        theme_eia()
+     )
+
+pmap(list(
+      list("State","County","MSHA"),
+      list("state","county","mine")
+      ),
+     ~ggplot(df.sulfur_stats %>% filter(TYPE==..1)) +
+        geom_histogram(aes(x=SULFUR_MEDIAN), color="#20A387", fill="#20A387", alpha=0.5) +
+        labs(title=paste("Histogram of median sulfur content by", ..2, sep=" "),
+             y="Count",
+             x="Median sulfur content [% by weight]") +
+        theme_eia()
+     )
+```
+
+```{r sulfur-density-plots}
+
+pmap(list(
+      list("State","County","MSHA"),
+      list("state","county","mine")
+      ),
+     ~df.sulfur_stats %>% 
+       filter(TYPE==..1) %>% 
+       select(ID, SULFUR_MEAN, SULFUR_MEDIAN) %>%
+       pivot_longer(cols=starts_with("SULFUR_"), names_to="VAR", values_to="VAL") %>%
+       mutate(VAR = factor(VAR, levels=c("SULFUR_MEAN","SULFUR_MEDIAN"), labels=c("Mean","Median"))) %>%
+       ggplot() +
+        geom_density(aes(x=VAL, color=VAR, fill=VAR), alpha=0.3) +
+        scale_color_viridis_d(option="viridis", begin=0.15, end=0.6) +
+        scale_fill_viridis_d(option="viridis", begin=0.15, end=0.6) +
+        geom_vline(xintercept=1, color="grey50", linetype="dashed") +
+        labs(title=paste("Histogram of sulfur content by", ..2, sep=" "),
+             y="Density",
+             x="Sulfur content [% by weight]",
+             color="",
+             fill="") +
+        theme_eia()
+     )
+```
+
+
+### Maps
+
+```{r sulfur-state-map}
+
+## Select viridis hex colours
+# scales::show_col(viridis::viridis_pal(option="D")(20))
+
+## Import state shapefile
+df.state <- read_sf(l.file$state) %>%
+  filter(!(STATE_ABBR %in% c("AK","HI"))) %>%
+  left_join(df.sulfur_stats %>% filter(TYPE=="State"), 
+            by=c("STATE_FIPS"="ID"))
+
+## Plot shapefile
+ggplot(data=df.state) +
+  geom_sf(aes(fill=factor(SULFUR_LOW, levels=c("TRUE","FALSE"))), color="grey90", size=0.3) +
+  scale_fill_viridis_d(option="viridis", direction=-1, begin=0.15, end=0.6, na.value="grey70") +
+  coord_sf() +
+  labs(title="Low sulfur content by state",
+       fill="Low sulfur") +
+  theme_maps()
+
+ggplot(data=df.state) +
+  geom_sf(aes(fill=SULFUR_MEDIAN), color="grey90", size=0.3) +
+  scale_fill_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey70") +
+  coord_sf() +
+  labs(title="Median sulfur content by state",
+       fill="Sulfur content\n[% by weight]") +
+  theme_maps()
+```
+
+```{r sulfur-county-map}
+
+## Import state shapefile
+df.county <- read_sf(l.file$county) %>%
+  filter(!(STATE_NAME %in% c("Alaska","Hawaii"))) %>%
+  left_join(df.sulfur_stats %>% filter(TYPE=="County"), 
+            by=c("FIPS"="ID"))
+
+## Plot shapefile
+ggplot() +
+  geom_sf(data=df.county, aes(fill=factor(SULFUR_LOW, levels=c("TRUE","FALSE"))), 
+          color="grey90", size=0.3) +
+  scale_fill_viridis_d(option="viridis", direction=-1, begin=0.15, end=0.6, na.value="grey70") +
+  geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
+  coord_sf() +
+  labs(title="Low sulfur content by county",
+       fill="Low Sulfur") +
+  theme_maps()
+
+ggplot() +
+  geom_sf(data=df.county, aes(fill=SULFUR_MEDIAN), color="grey90", size=0.3) +
+  scale_fill_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey70") +
+  geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
+  coord_sf() +
+  labs(title="Median sulfur content by county",
+       fill="Sulfur content\n[% by weight]") +
+  theme_maps()
+```
+
+
+## Export
+
+### Data
+This section exports the cleaned sulfur data to a csv file:
+
+```{r sulfur-export}
+
+readr::write_csv(df.sulfur_stats, l.file$cln_sulfur)
+saveRDS(df.sulfur_stats, fs::path_ext_set(l.file$cln_sulfur, "rds"))
+```
+
+### Dictionary
+
+The following table describes the columns in the exported dataset.
+
+| **Variable** | **Unit** | **Description** |
+|--------------|----------|-----------------|
+| TYPE || Geographic type in set {State, County, MSHA}, where the latter represents mines. |
+| ID || ID number, where for State and County it is the respective FIPS number, while for MSHA it is their mine identifier. |
+| SULFUR_N || Number of observations by geography type. |
+| SULFUR_MEAN | % by weight | Mean sulfur content by geography type. |
+| SULFUR_MEDIAN | % by weight | Median sulfur content by geography type. |
+| SULFUR_SD | % by weight | Standard deviation of sulfur content by geography type. |
+| SULFUR_MIN | % by weight | Minimum sulfur content by geography type. |
+| SULFUR_MAX | % by weight | Maximum sulfur content by geography type. |
+| SULFUR_LOW || Indicator for whether the coal at a particular geography type qualifies as "low sulfur", defined as values below or equal to 1% by weight by the EIA. |
 

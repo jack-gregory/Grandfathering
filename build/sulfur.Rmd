@@ -1,0 +1,433 @@
+---
+title: "Sulfur instrumental variable"
+author: "Jack Gregory"
+date: "25 August 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    fig_caption: yes
+    df_print: paged
+    highlight: textmate
+    keep_md: true
+  pdf_document:
+    latex_engine: pdflatex
+    highlight: haddock
+    keep_md: true
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+source(here::here("src/preamble.R"))
+
+install.packages(setdiff(c("sf", zip), rownames(installed.packages())))
+library(sf)
+library(zip)
+
+## ... Functions
+source(here("src/def_paths.R"))
+source(here("src/text_colour.R"))
+
+## ... Files
+l.file <- list(
+  sulfur = path(l.path$data, "eia_sulfur.rds"),
+  gf = path(l.path$data, "gf_original/in_regression_vars_BP.csv"),
+  epa = path(l.path$data, "epa/Facility_Attributes.zip"),
+  state = path(l.path$data, "eia/shp/USA_States_Generalized.shp"),
+  county = path(l.path$data, "eia/shp/USA_Counties_(Generalized).shp"),
+  out = path(l.path$data, "sulfur_iv.csv")
+)
+```
+
+```{r theme, include=FALSE}
+
+theme_sulfur <- function() {
+  theme_classic() +
+  theme(strip.background = element_rect(fill="grey85", color=NA),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_line(colour="grey85", size=0.3),
+        panel.grid.minor.y = element_line(colour="grey85", size=0.3),
+        axis.line.x = element_line(size=0.4),
+        axis.ticks.x = element_line(size=0.4),
+        legend.position = "right",
+        plot.caption = element_text(hjust=0))
+}
+
+theme_maps <- function() {
+  theme_void() +
+  theme(legend.position = "right",
+        legend.text = element_text(size=7),
+        plot.caption = element_text(hjust=0))
+} 
+```
+
+# Objective
+
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It prepares a sulfur instrumental variable (IV) based on plant distance to low sulfur coal.  It utilizes cleaned Energy Information Administration (EIA) Form 423 and Form 923 data from <EIA_423923.Rmd>.  
+
+The EIA-423 and EIA-923 data along with additional information can be found at the following links:
+
+- [Description](https://www.eia.gov/Survey)
+- [EIA-423](https://www.eia.gov/electricity/data/eia423)
+- [EIA-923](https://www.eia.gov/electricity/data/eia923)
+
+Further information of plant identifiers can be found using the EPA-EIA Crosswalk:
+
+- [Description](https://www.epa.gov/airmarkets/power-sector-data-crosswalk)
+- [GitHub](https://github.com/USEPA/camd-eia-crosswalk)
+
+The remainder of this workbook is organized as follows.  First, we import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  Finally, we export the data to a csv file.
+
+
+# Import
+
+First, we import the sulfur, grandfathering, and various spatial data.
+
+## Sulfur
+
+The sulfur statistics by geographic region are prepared in <EIA_423923.Rmd> and based on EIA-423 and EIA-923 datasets.
+
+```{r data-sulfur}
+
+df.sulfur <- readRDS(l.file$sulfur)
+```
+
+
+## Plant coordinates
+
+There are multiple sources for plant geographic locations:
+
+- Grandfathering dataset;
+- EPA facility attributes; and,
+- EIA860.
+
+The source for the grandfathering dataset is most likely the EIA.  Here, we rely on the grandfathering and EPA datasets.  `r text_colour(colour="red", text="In future versions, we should incorportate EIA860 coordinates in order to avoid using county centroids.")`
+
+We first import the grandfathering data, where we summarize it at the ORISPL level.
+
+```{r data-gf}
+
+## Import gf coordinate data
+df.gf <- read_csv(l.file$gf) %>%
+  select(ORISPL = plant_code, 
+       LAT = plt_latitude, 
+       LON = plt_longitude,
+       COUNTY_LAT = cty_lon,
+       COUNTY_LON = cty_lat) %>%
+  filter(ORISPL!=10673)
+
+## Determine distinct ORISPL and county coordinates
+df.gf_county <- df.gf %>%
+  distinct(ORISPL, COUNTY_LAT, COUNTY_LON) %>%
+  group_by(ORISPL) %>%
+  summarise_all(first) %>%
+  ungroup()
+
+## Create plant coordinate dataframe
+df.gf_plant <- df.gf %>%
+  select(-starts_with("COUNTY_")) %>%
+  mutate(LON = ifelse(LON>0, NA, LON)) %>%
+  filter(!(is.na(LAT) | is.na(LON))) %>%
+  distinct() %>%
+  group_by(ORISPL) %>%
+  summarise_all(first) %>%
+  ungroup() %>%
+  full_join(df.gf_county, by=c("ORISPL")) %>%
+  arrange(ORISPL)
+```
+
+We next import the EPA data, again summarizing at the ORISPL level.
+
+```{r data-epa}
+
+## Unzip EPA facility data
+epa_file <- zip::zip_list(l.file$epa) %>%
+  filter(str_detect(filename, "^facility")) %>%
+  pull(filename)
+zip::unzip(l.file$epa, file=epa_file, exdir=path(l.path$data, "epa"))
+
+## Import EPA coordinate data
+df.epa <- read_csv(path(l.path$data, "epa", epa_file)) %>%
+  select(ORISPL = `Facility ID (ORISPL)`, 
+       LAT_EPA = `Facility Latitude`, 
+       LON_EPA = `Facility Longitude`) %>%
+  distinct() %>%
+  arrange(ORISPL)
+
+## Remove EPA facility data
+fs::file_delete(path(l.path$data, "epa", epa_file))
+```
+
+
+## State shapefiles
+
+The state spatial data is sourced from the [EIA](https://atlas.eia.gov/datasets/esri::usa-states-generalized).  While, only the shp file is named below, note that its import also requires equivalently named dbf, prj, and shx files in the folder.
+
+```{r sf-state, fig.cap="State shapefile"}
+
+## Import state shapefile
+df.state <- read_sf(l.file$state) %>%
+  filter(!(STATE_ABBR %in% c("AK","HI")))
+
+## Display coordinate reference system
+st_crs(df.state)
+
+## Plot
+ggplot(data=df.state) +
+  geom_sf(color="grey40", fill="grey90", size=0.3) +
+  coord_sf()
+```
+
+
+## County shapefile
+
+The county spatial data is sourced from the [EIA](https://atlas.eia.gov/datasets/esri::usa-counties-generalized). While, only the shp file is named below, note that its import also requires equivalently named dbf, prj, and shx files in the folder.
+
+```{r sf-county, fig.cap="County shapefile"}
+
+## Import county shapefile
+df.county <- read_sf(l.file$county) %>%
+  filter(!(STATE_NAME %in% c("Alaska","Hawaii")))
+
+## Display coordinate reference system
+st_crs(df.county)
+
+## Plot
+ggplot(data=df.county) +
+  geom_sf(color="grey40", fill="grey90", size=0.3) +
+  coord_sf()
+```
+
+
+# Construction
+
+We now construct the metric by:
+
+1. Building a complete set of plant coordinates;
+2. Merging county spatial data with its corresponding sulfur data; and,
+3. ...
+
+## Plant coordinates
+
+We first construct the plant latitude and longitude coordinates using the following concordance:
+
+1. Grandfathering plant coordinates;
+2. EPA facility attributes; and,
+3. Grandfathering county centroids.
+
+The base values are from the grandfathering dataset.  For any missing values, we replace them with coordinates from EPA facility attributes.  Finally, for any remaining missing values, we adopt county centroids as calculated in the grandfathering dataset.  `r text_colour(colour="red", text="County centroids should eventually be superceded by EIA860 plant coordinates.")`
+
+```{r plant-coords}
+
+## Clean plant coordinates and convert to sf
+df.plant <- df.gf_plant %>%
+  left_join(df.epa, by=c("ORISPL")) %>%
+  mutate(LAT = case_when(!is.na(LAT) ~ LAT,
+                         is.na(LAT) & !is.na(LAT_EPA) ~ LAT_EPA,
+                         TRUE ~ COUNTY_LAT),
+         LON = case_when(!is.na(LON) ~ LON,
+                         is.na(LON) & !is.na(LON_EPA) ~ LON_EPA,
+                         TRUE ~ COUNTY_LON)) %>%
+  select(ORISPL, LAT, LON) %>%
+  st_as_sf(coords = c("LON","LAT"), crs=st_crs(df.state), agr="constant")
+
+## Display coordinate reference system
+st_crs(df.plant)
+
+## Plot
+ggplot() +
+  geom_sf(data=df.state, fill="grey75", color="grey90", size=0.3) +
+  geom_sf(data=df.plant, color="#20A387", size=1.5) +
+  coord_sf() +
+  labs(title="Coal-fired power plants") +
+  theme_maps()
+```
+
+## County sulfur merge
+
+Next, we merge county sulfur data with the county geometries.
+
+```{r sulfur-county-data, fig.cap="Sulfur county data"}
+
+## Import state shapefile
+df.county <- df.county %>%
+  left_join(df.sulfur %>% filter(TYPE=="County"), 
+            by=c("FIPS"="ID"))
+
+## Plot
+ggplot() +
+  geom_sf(data=df.county, aes(fill=factor(SULFUR_LOW, levels=c("TRUE","FALSE"))), 
+          color="grey90", size=0.3) +
+  scale_fill_viridis_d(option="viridis", direction=-1, begin=0.15, end=0.6, na.value="grey70") +
+  geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
+  coord_sf() +
+  labs(title="Low sulfur content by county",
+       fill="Low Sulfur") +
+  theme_maps()
+
+ggplot() +
+  geom_sf(data=df.county, aes(fill=SULFUR_MEDIAN), color="grey90", size=0.3) +
+  scale_fill_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey70") +
+  geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
+  coord_sf() +
+  labs(title="Median sulfur content by county",
+       fill="Sulfur content\n[% by weight]") +
+  theme_maps()
+```
+
+We can now convert the county data into centroids.
+
+```{r county-centroids, fig.cap="Sulfur county centroids"}
+
+## Merge county and sulfur data and convert to centroids
+df.sulfur_cnty <- df.county %>% 
+  select(FID, OBJECTID, NAME, STATE_NAME, STATE_FIPS, CNTY_FIPS, FIPS, SULFUR_MEDIAN,
+         SULFUR_LOW, geometry) %>%
+  filter(!is.na(SULFUR_MEDIAN)) %>%
+  # st_as_sf() %>%
+  st_centroid()
+
+## Check that all county sulfur data has a geometry match
+stopifnot(
+  df.sulfur %>% filter(TYPE=="County") %>% nrow() == nrow(df.sulfur_cnty)
+)
+
+## Plot
+ggplot() +
+  geom_sf(data=df.county, fill="grey75", color="grey90", size=0.3) +
+  geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
+  geom_sf(data=df.sulfur_cnty, aes(color=factor(SULFUR_LOW, levels=c("TRUE","FALSE"))), size=1.5) +
+  scale_color_viridis_d(option="viridis", direction=-1, begin=0.15, end=0.6, na.value="grey70") +
+  coord_sf() +
+  labs(title="Low sulfur content by county",
+       color="Low Sulfur") +
+  theme_maps()
+
+ggplot() +
+  geom_sf(data=df.county, fill="grey75", color="grey90", size=0.3) +
+  geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
+  geom_sf(data=df.sulfur_cnty, aes(color=SULFUR_MEDIAN), size=1.5) +
+  scale_color_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey70") +
+  coord_sf() +
+  labs(title="Median sulfur content by county",
+       color="Sulfur content\n[% by weight]") +
+  theme_maps()
+```
+
+## IV metrics
+
+Now, we are ready to build the sulfur IV metrics:
+
+- Weighted average of county sulfur medians by inverse distance;
+- Weighted average of county sulfur medians by inverse square distance; and,
+- Distance to nearest county with low sulfur coal.
+
+`r text_colour(colour="red", text="Other possible metrics could include: (1) using the plant-county data but calculating [distance around a barrier](https://www.r-bloggers.com/2020/02/three-ways-to-calculate-distances-in-r); (2) using plant-mine data with regular or barrier distances; or, (3) using plant-mine data with distances calculated over railroads.")`
+
+First, we calculate distances between all plants and county centroids.  After reorganizing the dataset, we generate the metrics described above.  Finally, we convert the resultant dataframe to an sf object.
+
+```{r sulfur-metrics}
+
+## Calculate matrix of distances and convert to tibble
+df.distance <- st_distance(df.plant, df.sulfur_cnty) %>%
+  as_tibble() %>%
+  rowid_to_column(var="PLANT") %>%
+  pivot_longer(cols=starts_with("V"), names_to="COUNTY", names_prefix="V", values_to="DISTANCE") %>%
+  mutate(COUNTY = as.integer(COUNTY),
+         DISTANCE = as.numeric(DISTANCE)) %>%
+  left_join(df.plant %>% 
+              as_tibble() %>%
+              rowid_to_column(var="PLANT") %>%
+              select(PLANT, ORISPL), 
+            by=c("PLANT")) %>%
+  left_join(df.sulfur_cnty %>% 
+              as_tibble() %>% 
+              rowid_to_column(var="COUNTY") %>% 
+              select(-FID, -OBJECTID, -geometry), 
+            by=c("COUNTY"))
+
+## Generate median-based distance metrics
+df.distance_med <- df.distance %>%
+  group_by(ORISPL) %>%
+  summarise(SULFUR_DIST = sum(SULFUR_MEDIAN*(1/DISTANCE), na.rm=TRUE)/sum(1/DISTANCE, na.rm=TRUE),
+            SULFUR_DIST2 = sum(SULFUR_MEDIAN*(1/DISTANCE^2), na.rm=TRUE)/sum(1/DISTANCE^2, na.rm=TRUE)) %>%
+  ungroup()
+
+## Generate low-sulfur-coal distance metric
+df.distance_low <- df.distance %>%
+  filter(SULFUR_LOW==TRUE) %>%
+  group_by(ORISPL) %>%
+  summarise(SULFUR_DISTLOW = min(DISTANCE, na.rm=TRUE)) %>%
+  mutate(SULFUR_DISTLOW = SULFUR_DISTLOW/10^3) %>%
+  ungroup()
+
+## Combine metrics and and convert to sf object
+df.distance <- df.distance_med %>%
+  full_join(df.distance_low, by=c("ORISPL")) %>%
+  full_join(df.plant, by=c("ORISPL")) %>%
+  st_as_sf(crs=st_crs(df.plant), agr="constant")
+  
+## Display coordinate reference system
+st_crs(df.distance)
+
+```
+
+We now plot the resultant metrics.
+
+```{r sulfur-metrics-plot}
+
+## Plot
+map2(list(expr(SULFUR_DIST), expr(SULFUR_DIST2), expr(SULFUR_DISTLOW)),
+     list("Weighted average of sulfur by inverse distance",
+          "Weighted average of sulfur by inverse square distance",
+          "Distance to nearest low sulfur coal"),
+     ~ggplot() +
+       geom_sf(data=df.state, fill="grey75", color="grey90", size=0.3) +
+       geom_sf(data=df.distance, aes(color=!!.x), size=1.5) +
+       scale_color_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey50") +
+       coord_sf() +
+       labs(title="Coal-fired power plants",
+            subtitle=.y) +
+       theme_maps()
+)
+```
+
+
+# Export
+
+## Data
+This section exports the cleaned sulfur data to a csv file:
+
+```{r sulfur-export}
+
+readr::write_csv(df.distance %>% as_tibble() %>% select(-geometry), 
+                 l.file$out)
+```
+
+## Dictionary
+
+The following table describes the columns in the exported dataset.
+
+| **Variable** | **Unit** | **Description** |
+|--------------|----------|-----------------|
+| ORISPL | | ORISPL code as a unique two- to five-digit integer. |
+| SULFUR_DIST || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse distance. |
+| SULFUR_DIST2 || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse square distance. |
+| SULFUR_DISTLOW || Sulfur IV metric based on the distance to the nearest county with low sulfur coal. |
+

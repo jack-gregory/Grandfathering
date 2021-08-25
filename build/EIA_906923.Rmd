@@ -1,5 +1,6 @@
 ---
 title: "EIA-906 & EIA-923 Data"
+subtitle: "Annual plant net generation"
 author: "Jack Gregory"
 date: "21 July 2021"
 output:
@@ -9,6 +10,10 @@ output:
     toc_float: yes
     fig_caption: yes
     highlight: textmate
+    keep_md: true
+  pdf_document:
+    latex_engine: pdflatex
+    highlight: haddock
     keep_md: true
 ---
 ___

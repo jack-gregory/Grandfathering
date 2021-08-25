@@ -10,6 +10,10 @@ output:
     fig_caption: yes
     highlight: textmate
     keep_md: true
+  pdf_document:
+    latex_engine: pdflatex
+    highlight: haddock
+    keep_md: true
 ---
 ___
 
