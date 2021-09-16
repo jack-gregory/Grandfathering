@@ -1,20 +1,20 @@
 ---
-title: "Sulfur instrumental variable"
+title:  "Sulfur instrumental variable"
 author: "Jack Gregory"
-date: "25 August 2021"
+date:   "25 August 2021"
 output:
   bookdown::html_document2:
-    toc: yes
-    toc_depth: 2
-    toc_float: yes
-    fig_caption: yes
-    df_print: paged
-    highlight: textmate
-    keep_md: true
+    toc:          yes
+    toc_depth:    2
+    toc_float:    yes
+    fig_caption:  yes
+    df_print:     paged
+    highlight:    textmate
+    keep_md:      true
   pdf_document:
     latex_engine: pdflatex
-    highlight: haddock
-    keep_md: true
+    highlight:    haddock
+    keep_md:      true
 ---
 ___
 
@@ -231,7 +231,7 @@ We first construct the plant latitude and longitude coordinates using the follow
 2. EPA facility attributes; and,
 3. Grandfathering county centroids.
 
-The base values are from the grandfathering dataset.  For any missing values, we replace them with coordinates from EPA facility attributes.  Finally, for any remaining missing values, we adopt county centroids as calculated in the grandfathering dataset.  `r text_colour(colour="red", text="County centroids should eventually be superceded by EIA860 plant coordinates.")`
+The base values are from the grandfathering dataset, which are sourced from EIA-860.  For any missing values, we replace them with coordinates from EPA facility attributes.  Finally, for any remaining missing values, we adopt county centroids as calculated in the grandfathering dataset.  `r text_colour(colour="red", text="County centroids should eventually be superceded by EIA860 plant coordinates.")`
 
 ```{r plant-coords}
 
