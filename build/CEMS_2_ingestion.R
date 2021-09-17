@@ -13,10 +13,11 @@
 
 ## NB - The EPA-EIA Crosswalk should not necessarily be used as the storage vehicle for repeating
 ##      CEMS characteristics.  Instead, the MySQL database should be redesigned with three tables:
-##        (1) CEMS timeseries (which already exists and does not require additional work)
-##        (2) CEMS characteristics (which exists, but merged with the xwalk)
-##        (3) EPA-EIA xwalk (which exists, but merged with CEMS characteristics)
-##        (4) GF-CEMS xwalk?
+##        (1) EPA facility characteristics (accessible from the EPA website)
+##        (2) CEMS timeseries (which already exists and does not require additional work)
+##        (3) CEMS characteristics (which exists, but merged with the xwalk)
+##        (4) EPA-EIA xwalk (which exists, but merged with CEMS characteristics)
+##        (5) GF-CEMS xwalk?
 ##      The GitHub documentation for the xwalk notes that there may be multiple generators 
 ##      associated with one boiler or vice versa.  The authors recommend that data users trying to 
 ##      match information from both data sets first decide whether to collapse on boilers or 

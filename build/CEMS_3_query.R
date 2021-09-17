@@ -176,7 +176,8 @@ DBI::dbClearResult(res)
 
 ## (3d) Import GF-CEMS xwalk
 ## NB - This step was assisted by a manual matching exercise
-df.xwalk_gf_cems <- readr::read_csv(here::here("data/gf_cems_xwalk.csv"))
+# df.xwalk_gf_cems <- readr::read_csv(here::here("data/gf_cems_xwalk.csv"))
+df.xwalk_gf_cems <- readxl::read_excel(here::here("data/gf_cems_xwalk.xlsx"))
 
 
 ## (3e) Create GF-CEMS xwalk for Stata
