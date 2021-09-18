@@ -2,7 +2,7 @@
 # We prepare the dataset by merging two dataset 
 # 1) the data on retirements that was hand-picked from a report attached to a proceeding
 # 2) retirements data created by processing our all_years_all_plants_and_features.xlsx file (EIA-based data)
-#
+
 
 #old_retir<-read.csv(file.choose(),  header = TRUE)
 
@@ -78,11 +78,37 @@ retire_all$inservice_y<-destring(retire_all$inservice_y)
 
 retired<-retire_all%>%
   mutate(age=yr-inservice_y)%>%
-  filter(survive==0)
+  filter(survive==0, yr!=inservice_y)
 
 
-ggplot(retired, aes(x = yr, y = age)) +
+
+
+#Red line shows the maximum age that the power plants could have reached
+ggplot(retired, aes(x = inservice_y, y = age)) +
+  geom_jitter(aes(colour=as.factor(grand))) +geom_abline(intercept = 2017, slope = -1, color="red", 
+  linetype="dashed", size=1.5) +geom_abline(intercept = 1978, slope = -1, color="blue", 
+                                            linetype="dashed", size=1.5)
+
+
+#Show the age of power plants retiring at a given period
+require(stats)
+reg<-lm(age ~ yr, data = retired)
+reg
+coeff=coefficients(reg)
+eq = paste0("y = ", round(coeff[2],1), "*x  ", round(coeff[1],1))
+plot_age_year<-ggplot(retired, aes(x = yr, y = age)) +
   geom_jitter(aes(colour=as.factor(grand))) 
+plot_age_year + geom_abline(intercept = -395.1187 , slope = 0.22)+geom_vline(xintercept = 1978)
+  ggtitle(eq)
+
+  
+  retired_sh<-retired%>%
+    filter(yr>1973) %>%
+    mutate(grp = yr>1982) 
+ggplot(retired_sh, aes(x = yr, y = age, color=grp))+
+  geom_point() +
+  # geom_smooth()
+  geom_smooth(method="lm")
 
 
 
