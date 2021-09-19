@@ -1076,11 +1076,11 @@ ggplot() +
   theme_maps()
 
 ggplot() +
-  geom_sf(data=df.county, aes(fill=SULFUR_MEDIAN), color="grey90", size=0.3) +
-  scale_fill_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey70") +
-  geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
+  geom_sf(data=df.county, aes(fill=SULFUR_MEDIAN), color=NA, size=0.3) +
+  scale_fill_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey85") +
+  geom_sf(data=df.state, fill=NA, color="grey95", size=0.3) +
   coord_sf() +
-  labs(title="Median sulfur content by county",
+  labs(#title="Median sulfur content by county",
        fill="Sulfur content\n[% by weight]") +
   theme_maps()
 ```

@@ -113,17 +113,18 @@ df.gf %>%
               color="grey80", alpha=0.4) +
     geom_col(aes(x=VINTAGE_NUM, y=SHARE, fill="#20A387"), 
              width=0.75, color="#20A387", size=0.5, alpha=0.8) +
-    geom_vline(aes(xintercept=5.5), color="#33638D", linetype="dashed", size=0.5) +
+    # geom_vline(aes(xintercept=5.5), color="#33638D", linetype="dashed", size=0.5) +
     scale_fill_identity(guide="legend", name="", labels=c("Share","Number")) +
     scale_y_continuous(name="Survival share",
                        sec.axis = sec_axis(~.*300, name="Number of boilers")) +
     scale_x_continuous(breaks=seq(1,8),
                        labels=c("(1932,1942]","(1942,1952]","(1952,1962]","(1962,1972]",
                                 "(1972,1982]","(1982,1992]","(1992,2002]","(2002,2012]")) +
-    labs(title="Survival share by vintage in 2014",
-         subtitle="10-year bins",
-         x="Vintage",
-         caption="Note: Vertical dashed line represents the approximate NSR cutoff.") +
+    labs(#title="Survival share by vintage in 2014",
+         #subtitle="10-year bins",
+         x="Vintage"#,
+         #caption="Note: Vertical dashed line represents the approximate NSR cutoff."
+         ) +
     theme_classic() +
     theme(strip.background = ggplot2::element_rect(fill="grey85", color=NA),
           axis.line.y = ggplot2::element_blank(),

@@ -398,12 +398,13 @@ map2(list(expr(SULFUR_DIST), expr(SULFUR_DIST2), expr(SULFUR_DISTLOW)),
           "Weighted average of sulfur by inverse square distance",
           "Distance to nearest low sulfur coal"),
      ~ggplot() +
-       geom_sf(data=df.state, fill="grey75", color="grey90", size=0.3) +
+       geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
        geom_sf(data=df.distance, aes(color=!!.x), size=1.5) +
        scale_color_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey50") +
        coord_sf() +
-       labs(title="Coal-fired power plants",
-            subtitle=.y) +
+       labs(#title="Coal-fired power plants",
+            #subtitle=.y
+            color="Sulfur IV") +
        theme_maps()
 )
 ```
