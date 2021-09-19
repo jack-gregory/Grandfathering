@@ -59,15 +59,48 @@ theme_lr <- function() {
           plot.caption = element_text(hjust=0))
 }
 
+df.state_miss <- tribble(
+  ~STATE, ~YEAR, 
+  "California", 1985,
+  "California", 2017,
+  "District of Columbia", 1985,
+  "District of Columbia", 2017,
+  "Idaho", 1985,
+  "Idaho", 2017,
+  "Maine", 1985,
+  "Maine", 2017,
+  "Ohio", 1985,
+  "Ohio", 2017,
+  "Pennsylvania", 1985,
+  "Pennsylvania", 2017,
+  "Vermont", 1985,
+  "Vermont", 2017
+)
+
 df.gf %>%
   left_join(df.state, by=c("STATE_CODE")) %>%
-  filter(YEAR>=1985) %>%
+  filter(YEAR>=1985 & YEAR!=2006 & YEAR<=2017) %>%
   filter(STATE!="Hawaii") %>%
   group_by(STATE, YEAR) %>%
   summarise(LOCALREG = mean(LOCALREG, na.rm=TRUE),
             .groups="drop") %>%
-  ggplot(aes(x=YEAR, y=LOCALREG)) +
-    geom_line(color="#20A387", size=0.75) +
+  bind_rows(df.state_miss) %>%
+  group_by(STATE) %>%
+  complete(YEAR = seq(min(YEAR), max(YEAR))) %>%
+  fill(LOCALREG, .direction="down") %>%
+  ungroup() %>%
+  mutate(xmin = ifelse(STATE %in% c("California","District of Columbia","Idaho","Maine","Ohio","Pennsylvania","Vermont"), 
+                       -Inf, NA),
+         xmax = ifelse(STATE %in% c("California","District of Columbia","Idaho","Maine","Ohio","Pennsylvania","Vermont"), 
+                       Inf, NA),
+         ymin = ifelse(STATE %in% c("California","District of Columbia","Idaho","Maine","Ohio","Pennsylvania","Vermont"), 
+                       -Inf, NA),
+         ymax = ifelse(STATE %in% c("California","District of Columbia","Idaho","Maine","Ohio","Pennsylvania","Vermont"), 
+                       Inf, NA)) %>%
+  mutate_at(vars(ymin, ymax), as.numeric) %>%
+  ggplot() +
+    geom_line(aes(x=YEAR, y=LOCALREG), color="#20A387", size=0.75) +
+    geom_rect(aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax), fill="grey85") +
     facet_geo(~ STATE, grid="us_state_contiguous_grid1") +
     labs(#title="Mean local regulation by state and year",
          y="Local regulation [lbs/mmBTu]",
