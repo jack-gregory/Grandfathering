@@ -307,13 +307,15 @@ st_crs(df.plant)
 ## Plot
 ggplot() +
   geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
-  geom_sf(data=df.plant, aes(color=factor(GF, levels=c(0,1), labels=c("Not GF","GF")), size=N)) +
-  scale_color_viridis_d(option="B", begin=0.25, end=0.85, alpha=0.3) +
+  geom_sf(data=df.plant, aes(color=factor(GF, levels=c(1,0), labels=c("GF","Non-GF")), size=N)) +
+  scale_color_viridis_d(begin=0.25, end=0.7, alpha=0.35) +
   coord_sf() +
-  labs(title="Coal-fired power plants",
+  labs(#title="Coal-fired power plants",
        color="NSR",
        size="Boilers") +
-  theme_maps()
+  theme_maps() +
+  guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
+         size = guide_legend(order=2))
 ```
 
 
