@@ -340,7 +340,7 @@ df.gr %>%
             GR = sum(DURATION*GR)/sum(DURATION))
 
 
-## (5b) Perform regressions
+## (5b) Perform naive linear regressions
 ## List specifications
 l.spec <- list(
   Base = as.formula(GR ~ GF),
@@ -395,7 +395,7 @@ regtbl <- function(df, tbl.type="text") {
     transmute(age = map_chr(formula, ~ifelse(deparse(.) %>% str_detect("AGE"), "X", " ")),
               cap = map_chr(formula, ~ifelse(deparse(.) %>% str_detect("CAP"), "X", " "))) %>%
     add_row(age="Age",
-            cap="Capacity",
+            cap="Size",
             .before=1) %>%
     as.list()
   
@@ -436,6 +436,28 @@ regtbl <- function(df, tbl.type="text") {
 ## Build regtbl
 regtbl(df.reg %>% slice(1:2))
 regtbl(df.reg %>% slice(1:2), tbl.type="latex")
+
+
+## (5d) Perform fe regressions
+## NB - Regressions with ORISPL FEs are not necessarily appropriate given that they are
+##      likely to be collinear with initial GF status.  A time-varying GF indicator may
+##      avoid these issues but reintroduce endogeneity, as GF status then becomes a 
+##      choice variable.
+# library(fixest)
+# 
+# ## List specifications
+# l.spec_fe <- list(
+#   Base = as.formula(GR ~ GF | ORISPL),
+#   `+Chars` = as.formula(GR ~ GF + AGE + CAP | ORISPL),
+#   `+TimeFE` = as.formula(GR ~ GF + AGE + CAP | ORISPL + YR + MTH)
+# )
+# 
+# ## Display regressions
+# map(l.spec_fe,
+#     ~feols(fml=.x,
+#            data=df.gr %>% mutate(DATE = ydm(paste(YR, MTH, "01", sep="-"))),
+#            cluster="ORISPL",
+#            panel.id=c("ORISPL","DATE")))
 
 
 ### END CODE ###
