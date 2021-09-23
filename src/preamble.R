@@ -40,6 +40,11 @@ library(fs)
 if (!("here" %in% installed.packages())) install.packages("here")
 library(here)
 
+## zip
+## Accessing zip files
+if (!("zip" %in% installed.packages())) install.packages("zip")
+library(zip)
+
 ## MySQL
 ## Interfacing with MySQL
 install.packages(setdiff(c("DBI","RMySQL"), rownames(installed.packages())))
@@ -47,9 +52,14 @@ library(DBI)
 library(RMySQL)
 
 ## readxl
-## Reading/writing xls & xlsx file data
-if (!("here" %in% installed.packages())) install.packages("here")
+## Reading xls & xlsx files
+if (!("readxl" %in% installed.packages())) install.packages("readxl")
 library(readxl)
+
+## haven
+## Reading/writing Stata dta files
+if (!("haven" %in% installed.packages())) install.packages("haven")
+library(haven)
 
 
 ## (2b) Data Wrangling

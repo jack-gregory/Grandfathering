@@ -35,11 +35,10 @@ knitr::opts_chunk$set(
 ## ... Packages
 source(here::here("src/preamble.R"))
 
-install.packages(setdiff(c("httr","rvest","zip","sf","geofacet","writexl"), 
+install.packages(setdiff(c("httr","rvest","sf","geofacet","writexl"), 
                          rownames(installed.packages())))
 library(httr)
 library(rvest)
-library(zip)
 library(sf)
 library(geofacet)
 library(writexl)

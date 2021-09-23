@@ -35,11 +35,10 @@ knitr::opts_chunk$set(
 ## ... Packages
 source(here::here("src/preamble.R"))
 
-install.packages(setdiff(c("httr","rvest","zip","geofacet","writexl"), 
+install.packages(setdiff(c("httr","rvest","geofacet","writexl"), 
                          rownames(installed.packages())))
 library(httr)
 library(rvest)
-library(zip)
 library(geofacet)
 library(writexl)
 
@@ -50,7 +49,8 @@ source(here("src/text_colour.R"))
 ## ... Files
 l.file <- list(
   fuel = path(l.path$data, "eia923_fuel_dictionary.csv"),
-  clean = path(l.path$data, "eia_netgen.csv")
+  gen = path(l.path$data, "eia_netgen.csv"),
+  genunit = path(l.path$data, "eia_netgen_unit.csv")
 )
 
 ## ... URLs
@@ -200,24 +200,31 @@ if (length(l.url_dl)>(length(nfiles) + 6)) {
 ```
 
 
-# Import
+# Generation and Fuel Data
+
+This section is dedicated to importing, cleaning and exporting the data from the worksheet "Page 1 Generation and Fuel Data."  It includes net generation by ORISPL, prime mover, fuel and month.
+
+## Import
 
 Next, we import the data.  This process is made more challenging due to the changes in EIA-906 and EIA-923 reporting format experienced throughout their existence.  The Notes subsection briefly describes these changes, while the Data subsection performs the import and cleaning.
 
-## Notes
+### Notes
 
 Throughout the existence of the Fuel Receipts and Costs survey, there have been a set of consistent variables.  Over time, these have been supplemented with additional descriptors.  The complete set of variables is presented in the table below.
 
 | **Variable** | **Unit** | **Description** |
 |--------------|----------|-----------------|
-| Plant Id || ORISPL code as a unique two- to five-digit number. |
+| Plant ID || ORISPL code as a unique one- to five-digit number. |
 | Plant Name || Plant name. |
 | Operator Name || Operator name. |
-| Operator Id || Operator ID. |
+| Operator ID || Operator code as a unique one- to five-digit number. |
 | State || Plant state code represented by a unique two-letter abbreviation. |
 | Census Region || Census region represented by a unique three- to four-letter abbreviation. |
 | NERC Region || NERC region represented by a unique four-letter abbreviation. |
+| Combined Heat & Power Plant || Indicator of whether the plant is a combined heat and power station in set {Y, N} |
+| Reported Prime Mover || Specific prime mover code represented by a unique two-letter abbreviation. |
 | Reported Fuel Type Code || Specific fuel type code represented by a unique two- to three-letter abbreviation. |
+| AER Fuel Type Code || Specific fuel type code from the AER represented by a unique two- to three-letter abbreviation |
 | Physical Unit Label || Physical units. |
 | Total Quantity Consumed in Physical Units | Fuel specific | Total quantity consumed for electric generation and useful thermal output in a yearly and wide by month format. |
 | Quantity Consumed in Physical Units for Electric Generation | Fuel specific | Quantity consumed for electric generation only in a yearly and wide by month format. |
@@ -229,19 +236,19 @@ Throughout the existence of the Fuel Receipts and Costs survey, there have been 
 ```{r months, include=FALSE}
 
 df.months <- tribble(
-  ~MONTH, ~MTH,
-  "JAN", 1,
-  "FEB", 2,
-  "MAR", 3,
-  "APR", 4,
-  "MAY", 5,
-  "JUN", 6,
-  "JUL", 7,
-  "AUG", 8,
-  "SEP", 9,
-  "OCT", 10,
-  "NOV", 11,
-  "DEC", 12
+  ~MONTH, ~MTH_ABBR, ~MTH, 
+  "January", "JAN", 1,
+  "February", "FEB", 2,
+  "March", "MAR", 3,
+  "April", "APR", 4,
+  "May", "MAY", 5,
+  "June", "JUN", 6,
+  "July", "JUL", 7,
+  "August", "AUG", 8,
+  "September", "SEP", 9,
+  "October", "OCT", 10,
+  "November", "NOV", 11,
+  "December", "DEC", 12
 )
 ```
 
@@ -303,7 +310,6 @@ df.state <- tribble(
 )
 ```
 
-
 ```{r prime-mover, include=FALSE}
 
 df.pm <- tribble(
@@ -325,20 +331,21 @@ df.fuel <- read_csv(l.file$fuel) %>%
   rename(YR = YEAR)
 ```
 
-## Data
+### Data
 
 Next, we import the net generation data from the xls files and zip archives into R.
 
 `r text_colour(colour="red", text="NB - This section is incomplete.  Many of the variables identified above are currently sacrificed.  The data is much more rich than what we end up importing and cleaning for this exercise.")`
 
-```{r wrangle-fn, include=FALSE}
+```{r wrangle-fn-1, include=FALSE}
 
 ## Define function
 wrangle <- function(df) {
   
-  if (!exists("df.state")) {
-    stop("The dataframe df.state does not exist.")
-  }
+  if (!exists("df.months")) {stop("The dataframe df.months does not exist.")}
+  if (!exists("df.state")) {stop("The dataframe df.state does not exist.")}
+  if (!exists("df.pm")) {stop("The dataframe df.pm does not exist.")}
+  if (!exists("df.fuel")) {stop("The dataframe df.fuel does not exist.")}
   
   UseMethod("wrangle")
 }
@@ -378,11 +385,11 @@ wrangle.YEAR <- function(df) {
            GENTYPE = GENERATYPE,
            YR = YEAR,
            ends_with("GENERAT")) %>%
-    pivot_longer(cols=ends_with("GENERAT"), names_to="MONTH", values_to="NETGEN") %>%
-    mutate(MONTH = str_extract(MONTH, ".*(?=GENERAT)")) %>%
+    pivot_longer(cols=ends_with("GENERAT"), names_to="MTH_ABBR", values_to="NETGEN") %>%
+    mutate(MTH_ABBR = str_extract(MTH_ABBR, ".*(?=GENERAT)")) %>%
     mutate_at(vars(ORISPL, PM_CODE, YR, NETGEN), as.numeric) %>%
     mutate(NETGEN = ifelse(is.na(NETGEN), 0, NETGEN/10^3)) %>%
-    left_join(df.months, by=c("MONTH")) %>%
+    left_join(df.months %>% select(MTH_ABBR, MTH), by=c("MTH_ABBR")) %>%
     left_join(df.pm %>% select(-PM_DESC), by=c("PM_CODE")) %>%
     mutate(FUEL_SYM = ifelse(PM=="HY", "0", FUEL_SYM)) %>%
     left_join(df.fuel %>% select(YR, FUEL, FUEL_CODE, FUEL_SYM), by=c("YR","FUEL_SYM")) %>%
@@ -391,7 +398,7 @@ wrangle.YEAR <- function(df) {
 }
 
 ## Define current method (2001-present)
-wrangle.current <- function(df) {
+wrangle.current1 <- function(df) {
   df <- df %>%
     select(ORISPL = ...1,
            NAME = ...4,
@@ -423,9 +430,16 @@ wrangle.current <- function(df) {
 }
 ```
 
-```{r extract-fn, include=FALSE}
+```{r extract-fn-1, include=FALSE}
 
-extract_zip <- function(zip, file, sheet) {
+## Define function
+extract_zip <- function(zip, file, ...) {
+  
+  UseMethod("extract_zip", file)
+}
+
+## Define Page 1 method: Generation and Fuel Data
+extract_zip.p1 <- function(zip, file, sheet) {
   
   ## Assertions
   if (!exists("l.path")) {
@@ -468,7 +482,7 @@ extract_zip <- function(zip, file, sheet) {
     stringr::str_to_upper() %>%
     stringr::str_replace_all(c("\\."="", "_"="")) %>%
     stringr::str_extract("^[A-Z]*")
-  if (type=="") type <- "current"
+  if (type=="") type <- "current1"
   df <- structure(df, class=c(type, class(df)))
   
   ## Wrangle data based on type; produce error if cleaning fn does not exist
@@ -483,13 +497,13 @@ extract_zip <- function(zip, file, sheet) {
 }
 ```
 
-``` {r import}
+``` {r import-1}
 
 ## Build zip list
-l.zip <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="f(906|906920|923)_\\d{4}\\.zip$")
+l.zip1 <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="f(906|906920|923)_\\d{4}\\.zip$")
 
 ## Build zip & file dataframe
-df.zip <- l.zip %>%
+df.zip1 <- l.zip1 %>%
   map_dfr(~utils::unzip(.x, list=TRUE) %>% mutate(Zip = .x)) %>%
   rename_with(.fn=str_to_upper) %>%
   mutate(S3 = case_when(str_detect(NAME, "[fF](759|906).*\\d{4}(mu|nu|)\\.xls") ~ 1,
@@ -501,25 +515,32 @@ df.zip <- l.zip %>%
   filter(S3==1) #%>%
   #filter(SHEET)
 
+## Modify NAME class within zip dataframe
+df.zip1 <- df.zip1 %>%
+  mutate(NAME = map(NAME, ~structure(.x, class=c(class(.x), "p1"))))
+
 ## Import dataset
-if ((length(l.zip)+2)!=nrow(df.zip)) {
+if ((length(l.zip1)+2)!=nrow(df.zip1)) {
   stop("Number of data files does not match the number of zip archives.")
 }
-df.gen <- pmap_dfr(df.zip %>% select(ZIP, NAME, SHEET),
+df.gen <- pmap_dfr(df.zip1 %>% select(ZIP, NAME, SHEET),
                      ~extract_zip(..1, ..2, ..3))
 ```
 
 
-# Clean
+## Clean
 
 At present, we perform the following to clean the dataset:
 
 - Correct `FUEL` and `FUEL_CODE` errors;
 - Drop NJ plants with equivalents in PA;
-- Drop non-contiguous states, irrelevant ORISPL codes, and all `FUEL`s other than coal; and,
+- Drop unnecessary observations, including non-contiguous states and irrelevant ORISPL codes;
+- Drop all `FUEL`s other than biomass, coal, gas and oil;
+- Drop irrelevant prime movers including CE and FC;
+- Drop all data prior to 2003, as a result of missing prime mover data from the 2001 & 2002 data years `r text_colour(colour="red", text="(NB -- in the future, this could be relaxed such that 1997 to 2000 data years are included)")`; and,
 - Aggregate over `ORISPL`, `YR` and `MTH`.
 
-```{r clean}
+```{r clean-1}
 
 ## Check for incorrect FUEL_CODEs
 ## NB - Run prior to "Correct FUEL & FUEL_CODE errors" line below
@@ -531,7 +552,7 @@ At present, we perform the following to clean the dataset:
 df.gen_cln <- df.gen %>%
   
   ## Fill NAME, OPERATOR & PM
-  # arrange(ORISPL, FUEL, FUEL_CODE, YR, MTH) %>%
+  # arrange(ORISPL, FUEL, FUEL_CODE, PM, YR, MTH) %>%
   # group_by(ORISPL, FUEL) %>%
   # fill(NAME, OPERATOR, PM, .direction="updown") %>%
   # ungroup() %>%
@@ -581,17 +602,23 @@ df.gen_cln <- df.gen %>%
   filter(!is.na(FUEL_CODE)) %>%
   filter(!(STATE %in% c("AK","HI"))) %>%
   filter(!(ORISPL %in% c(9999,99999) | is.na(ORISPL))) %>%
-  filter(FUEL=="Coal") %>%
+
+  ## Keep only relevant fuels and prime movers
+  filter(FUEL %in% c("Biomass","Coal","Gas","Oil")) %>%
+  filter(!(PM %in% c("CE","FC"))) %>%
+  
+  ## Drop all values prior to 2003
+  filter(YR>=2003) %>%
   
   ## Aggregate coal NETGEN
-  group_by(ORISPL, STATE, FUEL, YR, MTH) %>%
+  group_by(ORISPL, STATE, PM, FUEL, YR, MTH) %>%
   summarise(NETGEN = sum(NETGEN, na.rm=TRUE), .groups="drop")
 ```
 
 
-# Analysis
+## Analysis
 
-`r text_colour(colour="red", text="I envisage this section as a sanity check on the various net generation values by fuel, state and year-month.  At present, it only presents a plot for coal.")`
+`r text_colour(colour="red", text="I envisage this section as a sanity check on the various net generation values by fuel, state and year-month.  At present, it only presents plots for coal, natural gas, and oil.")`
 
 ```{r theme, include=FALSE}
 
@@ -604,28 +631,30 @@ theme_eia <- function() {
         panel.grid.minor.y = element_line(colour="grey85", size=0.3),
         axis.line.x = element_line(size=0.4),
         axis.ticks.x = element_line(size=0.4),
+        axis.text.x = element_text(angle=50, hjust=1),
         legend.position = "right",
         plot.caption = element_text(hjust=0))
 }
 ```
 
-```{r analysis-state, fig.height=10, fig.width=14}
+```{r analysis-gen-state, fig.height=10, fig.width=14}
 
 # df.gen_st <- df.gen_cln %>%
 #       group_by(FUEL, STATE, YR, MTH) %>%
 #       summarise(NETGEN = sum(NETGEN, na.rm=TRUE)/10^6, .groups="drop") %>%
 #       mutate(YM = ymd(paste(YR, MTH, "01", sep="-")))
 
-map(list("Coal"),
+map(list("Coal","Gas","Oil"),
     ~df.gen_cln %>%
       group_by(FUEL, STATE, YR, MTH) %>%
       summarise(NETGEN = sum(NETGEN, na.rm=TRUE)/10^6, .groups="drop") %>%
       mutate(YM = ymd(paste(YR, MTH, "01", sep="-"))) %>%
+      filter(FUEL==.x) %>%
       ggplot() +
-        geom_line(aes(x=YM, y=NETGEN, color=FUEL), size=0.5) +
-        scale_color_viridis_d(option="inferno", begin=0.1, end=0.55) +
+        geom_line(aes(x=YM, y=NETGEN), size=0.5) +
+        # scale_color_viridis_d(option="inferno", begin=0.1, end=0.55) +
         facet_geo(~ STATE, grid="us_state_contiguous_grid1") +
-        labs(title="Net generation by fuel and state",
+        labs(title=paste0(.x, " net generation by state"),
              y="Net generation [TWh]",
              x="Month",
              color="") +
@@ -634,38 +663,41 @@ map(list("Coal"),
 )
 ```
 
-```{r analysis-state-relative, fig.height=10, fig.width=14}
+```{r analysis-gen-state-relative, fig.height=10, fig.width=14}
 
-map(list("Coal"),
+map(list("Coal","Gas","Oil"),
     ~df.gen_cln %>%
       group_by(FUEL, STATE, YR, MTH) %>%
       summarise(NETGEN = sum(NETGEN, na.rm=TRUE)/10^6, .groups="drop") %>%
       mutate(YM = ymd(paste(YR, MTH, "01", sep="-"))) %>%
+      filter(FUEL==.x) %>%
       ggplot() +
-        geom_line(aes(x=YM, y=NETGEN, color=FUEL), size=0.5) +
-        scale_color_viridis_d(option="inferno", begin=0.1, end=0.55) +
+        geom_line(aes(x=YM, y=NETGEN), size=0.5) +
+        # scale_color_viridis_d(option="inferno", begin=0.1, end=0.55) +
         facet_geo(~ STATE, grid="us_state_contiguous_grid1", scales="free_y") +
-        labs(title="Net generation by fuel and state",
+        labs(title=paste0(.x, " net generation by state"),
              y="Net generation [TWh]",
              x="Month",
              color="") +
         theme_eia() +
+        theme(axis.text.y = element_blank()) +
         guides(color = guide_legend(override.aes=list(size=2)))
 )
 ```
 
 
-# Export
+## Export
 
-## Data
-This section exports the cleaned fuel data to a csv file:
+### Data
+This section exports the cleaned net generation by ORISPL data to a csv and/or an rds file:
 
-```{r export}
+```{r export-1}
 
-write_csv(df.gen_cln, l.file$clean)
+# write_csv(df.gen_cln, l.file$gen)
+saveRDS(df.gen_cln, fs::path_ext_set(l.file$gen, "rds"))
 ```
 
-## Dictionary
+### Dictionary
 
 The following table describes the columns in the exported dataset.
 
@@ -673,8 +705,242 @@ The following table describes the columns in the exported dataset.
 |------------------------|-----------------|
 | ORISPL || ORISPL code as a unique two- to five-digit integer. |
 | STATE || Plant state code represented by a unique two-letter abbreviation. |
-| FUEL || Fuel type in set {Coal} |
+| PM || Prime mover in set {CA, CC, CS, CT, GT, IC, OT, ST} |
+| FUEL || Fuel type in set {Biomass, Coal, Gas, Oil} |
 | YR || Data year from 1997 to 2019. |
 | MTH || Data month as a one- or two-digit integer. |
 | NETGEN | MWh | Net electricity generation in a particular year-month over all `FUEL_CODE`s in the respective `FUEL` type. |
+
+
+# Generator Data
+
+This section is dedicated to importing, cleaning and exporting the data from the worksheet "Page 4 Generator Data."  It includes net generation by ORISPL, unit and month.
+
+## Import
+
+Next, we import the data.  The Notes subsection briefly describes the raw data, while the Data subsection performs the import and cleaning.
+
+### Notes
+
+The "Page 4" worksheet only commenced in 2008 and maintains a consistent format throughout.  The complete set of variables is presented in the table below.
+
+| **Variable** | **Unit** | **Description** |
+|--------------|----------|-----------------|
+| Plant ID || ORISPL code as a unique one- to five-digit number. |
+| Plant Name || Plant name. |
+| Operator Name || Operator name. |
+| Operator ID || Operator code as a unique one- to five-digit number. |
+| State || Plant state code represented by a unique two-letter abbreviation. |
+| Census Region || Census region represented by a unique three- to four-letter abbreviation. |
+| NERC Region || NERC region represented by a unique four-letter abbreviation. |
+| Combined Heat & Power Plant || Indicator of whether the plant is a combined heat and power station in set {Y, N} |
+| Reported Prime Mover || Specific prime mover code represented by a unique two-letter abbreviation. |
+| Generator ID || Generator code as a unique one- to five-alphanumeric. |
+| Net Generation | MWh | Net electricity generation in a yearly and wide by month format. |
+
+
+### Data
+
+Next, we import the net generation data from the xls files and zip archives into R.
+
+`r text_colour(colour="red", text="NB - This section is incomplete.  Many of the variables identified above are currently sacrificed.  The data is much more rich than what we end up importing and cleaning for this exercise.")`
+
+```{r wrangle-fn-4, include=FALSE}
+
+## Define current method (2008-present)
+wrangle.current4 <- function(df) {
+  df <- df %>%
+    select(ORISPL = ...1,
+           NAME = ...3,
+           OPERATOR_ID = ...5,
+           OPERATOR = ...4,
+           STATE = ...6,
+           GENERATOR_ID = ...12,
+           PM = ...13,
+           YR = ...27,
+           NETGEN_1 = ...14,
+           NETGEN_2 = ...15,
+           NETGEN_3 = ...16,
+           NETGEN_4 = ...17,
+           NETGEN_5 = ...18,
+           NETGEN_6 = ...19,
+           NETGEN_7 = ...20,
+           NETGEN_8 = ...21,
+           NETGEN_9 = ...22,
+           NETGEN_10 = ...23,
+           NETGEN_11 = ...24,
+           NETGEN_12 = ...25) %>%
+    filter(!(is.na(NAME) | str_to_upper(NAME)=="PLANT NAME")) %>%
+    pivot_longer(cols=starts_with("NETGEN"), names_to="MTH", names_prefix="NETGEN_", 
+                 values_to="NETGEN") %>%
+    mutate_at(vars(ORISPL, OPERATOR_ID, YR, MTH, NETGEN), as.numeric) %>%
+    mutate(NETGEN = ifelse(is.na(NETGEN), 0, NETGEN)) %>%
+    select(ORISPL, NAME, OPERATOR_ID, OPERATOR, STATE, GENERATOR_ID, PM, YR, MTH, NETGEN)
+}
+```
+
+```{r extract-fn4, include=FALSE}
+
+## Define Page 1 method: Generation and Fuel Data
+extract_zip.p4 <- function(zip, file) {
+  
+  ## Assertions
+  if (!exists("l.path")) {
+    stop("Function requires l.path list in the global environment.")
+  }
+  stopifnot(
+    fs::is_file(zip),
+    fs::path_ext(zip)=="zip",
+    fs::path_ext(file) %>% str_to_lower() %in% c("xls","xlsx")
+  )
+  
+  cat(fs::path_file(zip), "\n", sep="")
+  
+  ## IMPORT DATA
+  ## Unzip data
+  unzip(zip, files=file, exdir=path(l.path$data, "eia/f923"))
+  
+  ## Import data
+  sheet <- readxl::excel_sheets(path(l.path$data, "eia/f923", file)) %>%
+    purrr::keep(str_detect(., "Page 4 Gen"))
+  df <- readxl::read_excel(path(l.path$data, "eia/f923", file), sheet=sheet, 
+                           col_names=FALSE, guess_max=10^5)
+
+  ## Delete unzipped data
+  file %>%
+    fs::path_split() %>%
+    purrr::flatten() %>%
+    .[[1]] %>%
+    fs::path(l.path$data, "eia/f923", .) %>%
+    fs::file_delete()
+
+  ## CLEAN DATA
+  ## Set df type
+  type <- names(df)[[1]] %>%
+    stringr::str_to_upper() %>%
+    stringr::str_replace_all(c("\\."="", "_"="")) %>%
+    stringr::str_extract("^[A-Z]*")
+  if (type=="") type <- "current4"
+  df <- structure(df, class=c(type, class(df)))
+  
+  ## Wrangle data based on type; produce error if cleaning fn does not exist
+  df <- tryCatch(
+    wrangle(df),
+    error = function(e) {
+      stop(glue("Cleaning function does not currently run or exist for the last imported year.
+                 wrangle.{type} {e}"))
+    }
+  )
+  return(df)
+}
+```
+
+``` {r import-4}
+
+## Build zip list
+l.zip4 <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="f923_\\d{4}\\.zip$")
+
+## Build zip & file dataframe
+df.zip4 <- l.zip4 %>%
+  map_dfr(~utils::unzip(.x, list=TRUE) %>% mutate(Zip = .x)) %>%
+  rename_with(.fn=str_to_upper) %>%
+  mutate(S3 = case_when(str_detect(NAME, "eia923December2008\\.xls") ~ 1,
+                        str_detect(NAME, "EIA923( SCHEDULES |_Schedules_)2_3_4_5.*\\.(xls|XLS|xlsx)") ~ 1,
+                        TRUE ~ 0),
+         YR = str_extract(NAME, "(19|20)\\d{2}") %>% as.numeric()) %>%
+  filter(S3==1)
+
+## Modify NAME class within zip dataframe
+df.zip4 <- df.zip4 %>%
+  mutate(NAME = map(NAME, ~structure(.x, class=c(class(.x), "p4"))))
+
+## Import dataset
+if (length(l.zip4)!=nrow(df.zip4)) {
+  stop("Number of data files does not match the number of zip archives.")
+}
+df.genunit <- pmap_dfr(df.zip4 %>% select(ZIP, NAME),
+                       ~extract_zip(..1, ..2))
+```
+
+
+## Clean
+
+At present, we perform the following to clean the dataset:
+
+- Drop unnecessary observations, including non-contiguous states;
+
+```{r clean-4}
+
+## Clean fuel data
+df.genunit_cln <- df.genunit %>%
+
+  ## Drop unnecessary obs
+  filter(!(STATE %in% c("AK","HI"))) %>%
+  
+  ## Finalize dataset
+  select(ORISPL, GENERATOR_ID, STATE, PM, YR, MTH, NETGEN) %>%
+  arrange(ORISPL, GENERATOR_ID, YR, MTH)
+```
+
+
+## Analysis
+
+`r text_colour(colour="red", text="I envisage this section as a sanity check on the various net generation values by state and year-month.  At present, it only presents an aggregated plot at the state level.")`
+
+```{r analysis-genunit-state, fig.height=10, fig.width=14}
+
+df.genunit_cln %>%
+  group_by(STATE, YR, MTH) %>%
+  summarise(NETGEN = sum(NETGEN, na.rm=TRUE)/10^6, .groups="drop") %>%
+  mutate(YM = ymd(paste(YR, MTH, "01", sep="-"))) %>%
+  ggplot() +
+    geom_line(aes(x=YM, y=NETGEN), size=0.5) +
+    facet_geo(~ STATE, grid="us_state_contiguous_grid1") +
+    labs(title="Net generation by state",
+         y="Net generation [TWh]",
+         x="Month") +
+    theme_eia()
+```
+
+```{r analysis-genunit-state-relative, fig.height=10, fig.width=14}
+
+df.genunit_cln %>%
+  group_by(STATE, YR, MTH) %>%
+  summarise(NETGEN = sum(NETGEN, na.rm=TRUE)/10^6, .groups="drop") %>%
+  mutate(YM = ymd(paste(YR, MTH, "01", sep="-"))) %>%
+  ggplot() +
+    geom_line(aes(x=YM, y=NETGEN), size=0.5) +
+    facet_geo(~ STATE, grid="us_state_contiguous_grid1", scales="free_y") +
+    labs(title="Net generation by state",
+         y="Net generation [TWh]",
+         x="Month") +
+    theme_eia() +
+    theme(axis.text.y = element_blank())
+```
+
+
+## Export
+
+### Data
+This section exports the cleaned net generation by unit data to a csv and/or an rds file:
+
+```{r export}
+
+# write_csv(df.genunit_cln, l.file$genunit)
+saveRDS(df.genunit_cln, fs::path_ext_set(l.file$genunit, "rds"))
+```
+
+### Dictionary
+
+The following table describes the columns in the exported dataset.
+
+| **Variable** | **Unit** | **Description** |
+|------------------------|-----------------|
+| ORISPL || ORISPL code as a unique two- to five-digit integer. |
+| GENERATOR_ID || Generator code as a unique one- to five-alphanumeric. |
+| STATE || Plant state code represented by a unique two-letter abbreviation. |
+| PM || Prime mover in set {CA, CS, CT, OT, ST} |
+| YR || Data year from 1997 to 2019. |
+| MTH || Data month as a one- or two-digit integer. |
+| NETGEN | MWh | Net electricity generation in a particular year-month. |
 

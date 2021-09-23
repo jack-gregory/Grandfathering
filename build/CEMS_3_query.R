@@ -303,6 +303,7 @@ res <- glue::glue_sql("
   			      DATETIME,
               DURATION,
   		        GLOAD,
+  		        SLOAD,
         			HEAT,
         			CO2_MASS,
         			SO2_MASS,
@@ -312,11 +313,11 @@ res <- glue::glue_sql("
     ;", .con=con) %>% 
   DBI::SQL() %>% 
   {DBI::dbSendQuery(con, .)}
-df <- DBI::dbFetch(res, n=-1)
+df.cems <- DBI::dbFetch(res, n=-1)
 DBI::dbClearResult(res)
 
 ## Filter on GF boilers
-df <- df %>%
+df.cems <- df.cems %>%
   inner_join(df.xwalk_gf_cems %>% rename(UNIT = CEMS_UNIT), by=c("ORISPL","UNIT")) %>%
   relocate(GF_BOILER, .after=UNIT)
 
@@ -329,7 +330,7 @@ df.netgen <- read_csv(path(l.path$data, "eia_netgen.csv")) %>%
 ## NB - There appears to be quite a few instances where the ratio is either greater than one
 ##      or equal to zero.  These are likely a result of poor matching between boilers within
 ##      plants and should be checked.
-df.cems_mth <- df %>%
+df.cems_mth <- df.cems %>%
   rename(YR = YEAR) %>%
   mutate(MTH = month(DATETIME)) %>%
   group_by(ORISPL, YR, MTH) %>%

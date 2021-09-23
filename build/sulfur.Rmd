@@ -35,9 +35,8 @@ knitr::opts_chunk$set(
 ## ... Packages
 source(here::here("src/preamble.R"))
 
-install.packages(setdiff(c("sf", zip), rownames(installed.packages())))
+install.packages(setdiff(c("sf"), rownames(installed.packages())))
 library(sf)
-library(zip)
 
 ## ... Functions
 source(here("src/def_paths.R"))
