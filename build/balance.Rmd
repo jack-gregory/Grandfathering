@@ -294,26 +294,57 @@ df.plant <- df.gf_raw %>%
   right_join(df.gf_cln %>%
               group_by(ORISPL) %>%
               summarise(N = n(),
-                        GF = max(GF, na.rm=TRUE),
+                        GF_MAX = max(GF, na.rm=TRUE),
+                        GF_MEAN = mean(GF, na.rm=TRUE),
                         .groups="drop"),
             by=c("ORISPL")) %>%
+  mutate(GF_MAX = factor(GF_MAX, levels=c(1,0), labels=c("GF","Non-GF")),
+         GF_GRP = ifelse(GF_MEAN>0 & GF_MEAN<1, 2, GF_MEAN),
+         GF_GRP = factor(GF_GRP, levels=c(1,2,0), labels=c("GF","Both","Non-GF"))) %>%
   st_as_sf(coords = c("LONGITUDE","LATITUDE"), crs=st_crs(df.state), agr="constant")
 
 ## Display coordinate reference system
 st_crs(df.plant)
 
-## Plot
+## Plots
 ggplot() +
   geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
-  geom_sf(data=df.plant, aes(color=factor(GF, levels=c(1,0), labels=c("GF","Non-GF")), size=N)) +
+  geom_sf(data=df.plant, aes(color=GF_MAX, size=N)) +
   scale_color_viridis_d(begin=0.25, end=0.7, alpha=0.35) +
+  scale_size(breaks=c(5,10)) +
   coord_sf() +
   labs(#title="Coal-fired power plants",
        color="NSR",
        size="Boilers") +
   theme_maps() +
   guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
-         size = guide_legend(order=2))
+         size = guide_legend(order=2), override.aes=list(alpha=0.5))
+
+ggplot() +
+  geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
+  geom_sf(data=df.plant, aes(color=GF_GRP, size=N)) +
+  scale_color_viridis_d(begin=0.1, end=0.85, alpha=0.35) +
+  scale_size(breaks=c(5,10)) +
+  coord_sf() +
+  labs(#title="Coal-fired power plants",
+       color="NSR",
+       size="Boilers") +
+  theme_maps() +
+  guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
+         size = guide_legend(order=2), override.aes=list(alpha=0.5))
+
+ggplot() +
+  geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
+  geom_sf(data=df.plant, aes(color=GF_MEAN, size=N)) +
+  scale_color_viridis_c(direction=-1, begin=0.1, end=0.85, alpha=0.4) +
+  scale_size(breaks=c(5,10)) +
+  coord_sf() +
+  labs(#title="Coal-fired power plants",
+       color="Share NSR\ngrandfathered",
+       size="Boilers") +
+  theme_maps() +
+  guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
+         size = guide_legend(order=2), override.aes=list(alpha=0.5))
 ```
 
 
