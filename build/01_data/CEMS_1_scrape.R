@@ -8,7 +8,7 @@
 
 ## INTRODUCTION -----------------------------------------------------------------------------------
 ## This program scrapes Continuous Emissions Montitoring Systems (CEMS) data from the US 
-## Environmental Protection Agency (EPA).  
+## Environmental Protection Agency (EPA).
 
 ## EPA websites:
 ##  - Description:

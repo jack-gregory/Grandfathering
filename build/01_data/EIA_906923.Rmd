@@ -63,9 +63,9 @@ l.url <- list(
 
 # Objective
 
-This workbook forms a part of the data cleaning process related to the Grandfathering project.  It describes Energy Information Administration (EIA) Form 906 and Form 923 data.  
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It describes Energy Information Administration (EIA) Form 906 and Form 923 data.
 
-The EIA-906, EIA-920, EIA-923 and predecessor forms provide monthly and annual data on generation and fuel consumption at the power plant and prime mover level.  A subset of plants, steam-electric plants 10 MW and above, also provides boiler level and generator level data.  Power plant data prior to 2001 are separate files for utility and nonutility plants.  For 2001 data and subsequent years, the data are Excel spreadsheet files that include data for all plants and make other changes to the presentation of the data.  The data are sourced from Schedules 3A & 5A: generator data including generation, fuel consumption and stocks.
+The EIA-906, EIA-920, EIA-923 and predecessor forms provide monthly and annual data on generation and fuel consumption at the power plant and prime mover level.  A subset of plants -- steam-electric plants 10 MW and above -- also provide boiler level and generator level data.  Power plant data prior to 2001 are separate files for utility and nonutility plants.  For 2001 data and subsequent years, the data are Excel spreadsheet files that include data for all plants and make other changes to the presentation of the data.  The data are sourced from Schedules 3A & 5A: generator data including generation, fuel consumption and stocks.
 
 The data is (theoretically) a balanced panel of plant by fuel by month net generation.  Data for utility plants are available from 1970, and for nonutility plants from 1999.  It includes the  following variables:
 
