@@ -1,0 +1,71 @@
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Grandfathering
+## Analysis -- Master
+## Jack Gregory
+## 26 September 2021
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+# INTRODUCTION ------------------------------------------------------------------------------------
+## This script performs analysis for the Grandfathering project.
+
+## It is composed of the following scripts:
+##  (1) master -- provides setup and runs all subordinate scripts
+##  (2) data -- prepares necessary data for reg and plot scripts
+##  (3) regs -- runs all regs and outputs coefficient tables
+##  (4) plots -- builds all plots
+
+
+# VERSION HISTORY ---------------------------------------------------------------------------------
+## V    DATE      EDITOR        NOTES
+## 1.0  30May2021 Jack Gregory  Initial version
+## 1.1  26Aug2021 Jack Gregory  New draft; Update for the draft dissertation chapter
+## 2.0  26Sep2021 Jack Gregory  New version; Conversion to multi-script
+
+
+### START CODE ###
+
+
+# (1) SETUP --------------------------------------------------------------------------------------
+
+## (1a) Initiate packages
+source(here::here("src/preamble.R"))
+
+# install.packages(setdiff(c("sf"), rownames(installed.packages())))
+# library(sf)
+
+## RStata -- Glue between R & Stata
+if(!("RStata" %in% installed.packages())) install.packages("RStata")
+library(RStata)
+if (Sys.info()[["user"]]=="Jack") {
+  options("RStata.StataPath"="\"C:\\Program Files (x86)\\Stata14\\StataSE-64\"")
+  options("RStata.StataVersion"=14.2)
+} else if (Sys.info()[["user"]]=="lorenariveraleon") {
+  options("RStata.StataPath"="/Applications/Stata 13/Stata.app")
+  options("RStata.StataVersion"=13.1)
+} else {
+  stop("User not recognized, please see RStata package in <preamble.R>.")
+}
+
+
+## (1b) Initiate paths
+source(here("src/def_paths.R"))
+
+
+# (2) IMPORT DATA ---------------------------------------------------------------------------------
+
+source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "2_GFanalysis_data.R")))
+
+
+# (3) REGRESSIONS --------------------------------------------------------------------------------
+
+source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "3_GFanalysis_regs.R")))
+
+
+# (4) PLOTS ---------------------------------------------------------------------------------------
+
+source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "4_GFanalysis_plots.R")))
+
+
+### END CODE ###
+
