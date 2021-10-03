@@ -40,9 +40,9 @@ library(RStata)
 if (Sys.info()[["user"]]=="Jack") {
   options("RStata.StataPath"="\"C:\\Program Files (x86)\\Stata14\\StataSE-64\"")
   options("RStata.StataVersion"=14.2)
-} else if (Sys.info()[["user"]]=="lorenariveraleon") {
-  options("RStata.StataPath"="/Applications/Stata 13/Stata.app")
-  options("RStata.StataVersion"=13.1)
+} else if (Sys.info()[["user"]]=="Bialek-S") {
+  options("RStata.StataPath"="\"C:\\Program Files\\Stata16\\StataSE-64\"")
+  options("RStata.StataVersion"=16.1)
 } else {
   stop("User not recognized, please see RStata package in <preamble.R>.")
 }
