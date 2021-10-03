@@ -1,0 +1,260 @@
+---
+title: "CEMS Data"
+author: "Jack Gregory"
+date: "8 April 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    fig_caption: yes
+    highlight: textmate
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+## fs
+## File system management
+if (!("fs" %in% installed.packages())) install.packages("fs")
+library(fs)
+
+## here
+## R project home directory
+if (!("here" %in% installed.packages())) install.packages("here")
+library(here)
+
+## tidyverse
+## Comprehensive data science package
+## Includes tibble, readr, tidyr, dplyr, stringr, forcats, purrr, ggplot2
+packages <- c("tidyverse","lubridate","glue")
+install.packages(setdiff(packages, rownames(installed.packages())))
+rm(packages)
+library(tidyverse)
+library(lubridate)
+library(glue)
+
+
+## ... Working directory
+here::i_am("CEMS.Rmd")
+
+
+## ... Source files
+fs::dir_ls(fs::path(here::here())) %>%
+  as.list() %>%
+  purrr::set_names(., nm=purrr::map_chr(., ~fs::path_ext_remove(fs::path_file(.x)))) %>%
+  # .[c("preamble","def_paths", setdiff(names(.), c("preamble","def_paths")))] %>%
+  purrr::keep(stringr::str_detect(., "\\.R$")) %>%
+  purrr::walk(source)
+```
+
+
+# Objective
+
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It describes Continuous Emissions Montitoring Systems (CEMS) data from the US Environmental Protection Agency (EPA).  The data is a panel of plant by hour data commencing in 1995.  It contains the following variables for fossil fuel plants across the US at the hourly level: 
+
+- plant identifiers, including Office of the Regulatory Information System PLant (ORISPL) codes;
+- operation time; 
+- generation;
+- emissions, including CO_2, SO_2 and NO_X; and,
+- heat input.
+
+The CEMS data along with additional information can be found at the following links:
+
+- [Description](https://www.epa.gov/emc/emc-continuous-emission-monitoring-systems)
+- [Database](https://gaftp.epa.gov/dmdnload/emissions)
+
+Further information of plant identifiers can be found using the EPA-EIA Crosswalk:
+
+- [Description](https://www.epa.gov/airmarkets/power-sector-data-crosswalk)
+- [GitHub](https://github.com/USEPA/camd-eia-crosswalk)
+
+`r text_colour(colour="red", text="The remainder of this workbook is organised as follows.  First, we import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  Finally, we export the data to a csv file.")`
+
+
+# Import
+
+## CEMS
+
+First, we define a function that extracts the csv from a zip file, imports the extracted csv using readr, standardizes its content, and deletes the extracted csv.
+
+``` {r data-CEMS-function}
+
+import_data <- function(zip) {
+  
+  ## Assertions
+  stopifnot(
+    is_file(zip),
+    path_ext(zip)=="zip"
+  )
+  
+  ## Determine contents of the zip
+  df.zip <- zip::zip_list(zip)
+  
+  ## Create a character vector of the csv files
+  csv <- df.zip %>%
+    filter(str_detect(filename, "\\.csv")) %>%
+    pull(filename)
+  
+  ## Unzip the csv files
+  zip::unzip(zip, 
+             files=csv,
+             junkpaths=TRUE)
+  
+  ## Import data
+  df <- read_csv(csv, guess_max=2*10^5) %>%
+    mutate(FILE = fs::path_ext_remove(csv)) %>%
+    select(FILE, STATE, 
+           FAC_NAME = FACILITY_NAME,
+           ORISPL = ORISPL_CODE,
+           UNITID, FAC_ID, UNIT_ID,
+           DATE = OP_DATE,
+           HOUR = OP_HOUR,
+           OP_TIME = OP_TIME,
+           GEN = `GLOAD (MW)`,
+           HEAT_INPUT = `HEAT_INPUT (mmBtu)`,
+           CO2_MASS = `CO2_MASS (tons)`,
+           SO2_MASS = `SO2_MASS (lbs)`,
+           NOX_MASS = `NOX_MASS (lbs)`) 
+  
+  ## Remove extracted csv files
+  fs::file_delete(csv)
+  
+  return(df)
+}
+
+```
+
+We then import a list of zip files from the <..Grandfathering/epa> directory, and iterate over each file to build the dataset.
+
+```{r data-CEMS-import}
+
+## Create list of zip files
+l.zip <- here() %>%
+  fs::dir_ls(regexp="\\.zip$") %>%
+  as.list()
+
+## Iterate over zip files to import data
+df.cems <- map_dfr(l.zip, import_data)
+```
+
+The following table summarizes the imported columns in the data.
+
+| **Column** | **Unit** | **Description** |
+|------------|----------|-----------------|
+| File || Source filename |
+| STATE || State abbreviation |
+| FAC_NAME || Facility/plant name |
+| ORISPL || Office of the Regulatory Information System PLant (ORISPL) code |
+| UNITID || Boiler identifier |
+| FAC_ID || CEMS-specific facility identifier |
+| UNIT_ID|| CEMS-specific boiler identifier |
+| DATE || Operation date |
+| HOUR || Operation hour |
+| OP_TIME | hours | Operation time during the particular date and hour |
+| GEN | MW | Generation load |
+| HEAT_INPUT | mmBtu | Heat content consumed |
+| CO2_MASS | tons | Carbon dioxide expelled |
+| SO2_MASS | lbs | Sulfur dioxide expelled |
+| NOX_MASS | lbs | Nitrogen oxides expelled |
+
+
+## EPA-EIA Crosswalk
+
+```{r data-xwalk}
+
+df.xwalk <- read_csv("epa_eia_crosswalk.csv", guess_max=2*10^5)
+```
+
+
+## Grandfathered Plants
+
+```{r data-xwalk}
+
+df.grand <- read_csv("NJ_plants.csv", guess_max=2*10^5)
+```
+
+
+# Tests
+
+```{r grand-xwalk}
+
+df.test <- df.xwalk %>%
+  select(plant_code = CAMD_PLANT_ID) %>%
+  distinct(plant_code) %>%
+  inner_join(df.grand, by="plant_code")
+
+```
+
+
+```{r grand-cems}
+
+df.test <- df.cems %>%
+  select(plant_code = ORISPL) %>%
+  distinct(plant_code) %>%
+  inner_join(df.grand, by="plant_code")
+
+```
+
+
+
+
+
+<!-- # Clean -->
+
+
+
+<!-- # Export -->
+
+<!-- ## Data -->
+<!-- This section exports the cleaned indicator data to a csv file: -->
+
+<!-- ```{r data-export} -->
+
+<!-- write_csv(df, file=path(here(), "NHGIS.csv")) -->
+<!-- ``` -->
+
+<!-- ## Dictionary -->
+
+<!-- The following table describes the columns in the exported dataset. -->
+
+<!-- | **Column** | **Description** | -->
+<!-- |------------|-----------------| -->
+<!-- | STATE | State name | -->
+<!-- | STATE_FIPS | State FIPS code | -->
+<!-- | COUNTY | County name | -->
+<!-- | COUNTY_FIPS | County FIPS code | -->
+<!-- | YEAR | Row source year | -->
+<!-- | POP | Total population (persons) | -->
+<!-- | RACE_WHT | Ratio White | -->
+<!-- | RACE_BLK | Ratio Black or African American | -->
+<!-- | RACE_NTV | Ratio American Indian and Alaska Native | -->
+<!-- | RACE_ASN | Ratio Asian and Pacific Islander and other | -->
+<!-- | RACE_2P | Ratio two or more races | -->
+<!-- | RACE_LTN | Ratio Hispanic or Latino | -->
+<!-- | INCOME | Per capita income where the units are further defined in the table below (\$USD) | -->
+<!-- | POVERTY | Ratio below poverty level in previous year | -->
+
+<!-- The following table summarizes the units for the `INCOME` column. -->
+
+<!-- | **Year** | **Income Unit** | -->
+<!-- |----------|-----------------| -->
+<!-- | 1980 | \$USD 1979 | -->
+<!-- | 1990 | \$USD 1989 | -->
+<!-- | 2000 | \$USD 1999 | -->
+<!-- | 2010 | \$USD 2012 | -->
+<!-- | 2019 | \$USD 2019 | -->
+

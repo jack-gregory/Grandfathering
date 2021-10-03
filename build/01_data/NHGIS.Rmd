@@ -1,0 +1,406 @@
+---
+title: "NHGIS Data"
+author: "Jack Gregory"
+date: "4 April 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    fig_caption: yes
+    highlight: textmate
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+## fs
+## File system management
+if (!("fs" %in% installed.packages())) install.packages("fs")
+library(fs)
+
+## here
+## R project home directory
+if (!("here" %in% installed.packages())) install.packages("here")
+library(here)
+
+## tidyverse
+## Comprehensive data science package
+## Includes tibble, readr, tidyr, dplyr, stringr, forcats, purrr, ggplot2
+packages <- c("tidyverse","lubridate","glue")
+install.packages(setdiff(packages, rownames(installed.packages())))
+rm(packages)
+library(tidyverse)
+library(lubridate)
+library(glue)
+
+
+## ... Working directory
+here::i_am("NHGIS.Rmd")
+
+
+## ... Source files
+# fs::dir_ls(fs::path(here::here(), "src")) %>%
+#   as.list() %>%
+#   purrr::set_names(., nm=purrr::map_chr(., ~fs::path_ext_remove(fs::path_file(.x)))) %>%
+#   .[c("preamble","def_paths", setdiff(names(.), c("preamble","def_paths")))] %>%
+#   purrr::walk(source)
+
+
+### ... Filenames
+l.file <- list(
+  data = "nhgis0002_csv.zip"
+)
+```
+
+
+# Objective
+
+This workbook describes the IPUMS NHGIS data cleaning process for the Grandfathering project.  The data comprises of county level socio-demographic data, including:
+
+- total population;
+- persons by race;
+- persons of Hispanic or Latino origin;
+- per capita income; and,
+- persons below poverty level in previous year.
+
+The data are sourced from both decennial Census and American Community Survey products.  Further information can be found in the codebooks located in the corresponding zipfile:
+
+- <*../Grandfathering/nhgis0002_csv.zip*>.
+
+Information on the NHGIS can be found at the following link:
+
+- [www.nhgis.org](https://www.nhgis.org)
+
+The remainder of this workbook is organised as follows.  First, we import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  Finally, we export the data to a csv file.
+
+
+# Import
+
+## Data
+
+First, we extract the necessary csv files from the zip file.
+
+``` {r data-unzip}
+
+## Determine contents of the zip
+df.zip <- here() %>%
+  fs::dir_ls() %>%
+  as.list() %>%
+  keep(str_detect(., "\\.zip")) %>%
+  as.character() %>%
+  zip::zip_list()
+
+## Create a character vector of the csv files
+csv <- df.zip %>%
+  filter(str_detect(filename, "\\.csv")) %>%
+  pull(filename)
+
+## Unzip the csv files
+zip::unzip(l.file$data, 
+           files=csv,
+           junkpaths=TRUE)
+```
+
+Next, we import the csv files into R.
+
+``` {r data-import}
+
+## Create list of extracted csv files
+l.csv <- csv %>% 
+  path_file() %>%
+  as.list()
+
+## Import data
+l.data <- l.csv %>%
+  map(~read_csv(.x, guess_max=2*10^5)) %>%
+  set_names(nm=l.csv %>% unlist())
+```
+
+Finally, we remove the unzipped files.
+
+``` {r data-remove}
+
+## Create list of extracted csv files
+l.csv %>%
+  walk(file_delete)
+```
+
+
+## Dictionary
+
+The following table summarizes the important columns in the data.
+
+| **File** | **Column** | **Description** |
+|----------|------------|-----------------|
+| All | STATE | State name |
+|| STATEFP / STATEA | State FIPS code |
+|| COUNTY | County name |
+|| COUNTYFP / COUNTYA | County FIPS code |
+|| YEAR | Row source year |
+| nhgis0002_ts_nominal_cty_sub | AV0AA | Total population (persons) |
+|| B18AA | Persons by race: White (single race; persons) |
+|| B18AB | Persons by race: Black or African American (single race; persons) |
+|| B18AC | Persons by race: American Indian and Alaska Native (single race; persons) |
+|| B18AD | Persons by race: Asian and Pacific Islander and Other Race (single race; persons) |
+|| B18AE | Persons by race: Two or More Races (persons) |
+|| A35AA | Persons of Hispanic or Latino origin (persons) |
+|| BD5AA | Per capita income in previous year (\$USD in prior year except 2010 which is in \$2012) |
+|| CL6AA | Persons below poverty level in previous year (persons) |
+| nhgis0002_ds244_20195_2019_cty_sub | ALUBE001 | Total population (persons) |
+|| ALUCE001 | Total population (persons) |
+|| ALUCE002 | Persons by race: White (single race; persons) |
+|| ALUCE003 | Persons by race: Black or African American (single race; persons) |
+|| ALUCE004 | Persons by race: American Indian and Alaska Native (single race; persons) |
+|| ALUCE005 | Persons by race: Asian (single race; persons) |
+|| ALUCE006 | Persons by race: Native Hawaiian and Other Pacific Islander (single race; persons) |
+|| ALUCE007 | Persons by race: Some other race alone (persons) |
+|| ALUCE008 | Persons by race: Two or more races (persons) |
+|| ALUCE009 | Persons by race: Two races including Some other race (persons) |
+|| ALUCE010 | Persons by race: Two races excluding Some other race, and three or more races (persons) |
+|| ALULE001 | Persons of Hispanic or Latino origin: Total (persons) |
+|| ALULE002 | Persons of Hispanic or Latino origin: Not Hispanic or Latino |
+|| ALULE003 | Persons of Hispanic or Latino origin: Hispanic or Latino |
+|| ALX5E001 | Per capita income in the past 12 months (\$USD in \$2019) |
+| nhgis0002_ds245_20195_2019_cty_sub | AMCPE001 | Poverty Status in the Past 12 Months: Total (persons) |
+|| AMCPE002 | Poverty Status in the Past 12 Months: Income in the past 12 months below poverty level (persons) |
+|| AMCPE010 | Poverty Status in the Past 12 Months: Income in the past 12 months at or above poverty level (persons) |
+
+
+# Clean
+
+Below, we clean each csv file in turn and then combine them into a single dataframe for export.
+
+## nhgis0002_ts_nominal_cty_sub.csv
+
+The following code cleans and describes each step for the data from <*nhgis0002_ts_nominal_cty_sub.csv*>.  Note that the `POP` column cannot be associated with the `INCOME` nor the `POVERTY` columns for the 2010 decennial year.  
+
+Also, the `POP` and `RACE` columns are inconsistent for the 1980 survey year.  To correct for this, all `RACE` columns are subtracted from `POP` to create a `RACE_OTH` column.  The `RACE_LTN` values reduce `RACE_OTH` before reducing `RACE_WHT`.
+
+```{r clean1}
+
+df1 <- l.data$nhgis0002_ts_nominal_cty_sub.csv %>%
+  
+  ## Remove unnecessary cols and rows
+  select(STATE,
+         STATE_FIPS = STATEFP,
+         COUNTY,
+         COUNTY_FIPS = COUNTYFP,
+         YEAR,
+         POP = AV0AA,
+         RACE_WHT = B18AA,
+         RACE_BLK = B18AB,
+         RACE_NTV = B18AC,
+         RACE_ASN = B18AD,
+         RACE_2P = B18AE,
+         RACE_LTN = A35AA,
+         INCOME = BD5AA,
+         POVERTY = CL6AA) %>%
+  filter(YEAR!="1970") %>%
+  
+  ## Standardize INCOME
+  group_by(STATE, STATE_FIPS, COUNTY, COUNTY_FIPS, YEAR) %>%
+  mutate(INCOME = INCOME*POP/sum(POP, na.rm=TRUE)) %>% 
+  
+  ## Sum over sub-county units
+  summarise_at(vars(POP:POVERTY), sum, na.rm=TRUE) %>%
+  
+  ## Correct RACE_WHT
+  mutate(RACE_OTH = ifelse(YEAR=="2008-2012", 0,
+                           POP - RACE_WHT - RACE_BLK - RACE_NTV - RACE_ASN - RACE_2P),
+         RACE_WHT = RACE_WHT - (RACE_LTN - RACE_OTH)) %>%
+  select(-RACE_OTH) %>%
+  
+  ## Convert person vars to ratios
+  mutate_at(vars(starts_with("RACE"), POVERTY), ~./POP) %>%
+  
+  ## Combine Census 2010 and ACS 2008-2012 data into same row 
+  mutate_at(vars(INCOME, POVERTY), ~ifelse(.==0, NA, .)) %>%
+  fill(INCOME, POVERTY, .direction="down") %>%
+  filter(YEAR!="2008-2012") %>%
+  ungroup()
+```
+
+## nhgis0002_ds244_20195_2019_cty_sub.csv
+
+The following code cleans and describes each step for the data from <*nhgis0002_ds244_20195_2019_cty_sub.csv*>.  First, let's assess whether the total population variables are consistent.
+
+```{r cor2a}
+
+## Total pop vs Total pop (persons by race)
+cor(l.data$nhgis0002_ds244_20195_2019_cty_sub.csv$ALUBE001, l.data$nhgis0002_ds244_20195_2019_cty_sub.csv$ALUCE001)
+```
+
+```{r corr2b}
+
+## Total pop vs Total pop (persons of Hispanic or Latino origin)
+cor(l.data$nhgis0002_ds244_20195_2019_cty_sub.csv$ALUBE001, l.data$nhgis0002_ds244_20195_2019_cty_sub.csv$ALULE001)
+```
+
+Since the correlations between the various total population variables are all 1, we can safely combine the data using the base `POP` variable.
+
+```{r clean2}
+
+df2 <- l.data$nhgis0002_ds244_20195_2019_cty_sub.csv %>%
+  
+  ## Remove unnecessary cols and rows
+  select(STATE,
+         STATE_FIPS = STATEA,
+         COUNTY,
+         COUNTY_FIPS = COUNTYA,
+         YEAR,
+         POP = ALUBE001,
+         RACE_WHT = ALUCE002,
+         RACE_BLK = ALUCE003,
+         RACE_NTV = ALUCE004,
+         RACE_ASN = ALUCE005,
+         RACE_PI = ALUCE006,
+         RACE_OTH = ALUCE007,
+         RACE_2P = ALUCE008,
+         RACE_LTN = ALULE003,
+         INCOME = ALX5E001) %>%
+  
+  ## Correct RACE vars and standardize INCOME
+  group_by(STATE, STATE_FIPS, COUNTY, COUNTY_FIPS, YEAR) %>%
+  mutate(RACE_WHT = RACE_WHT - RACE_LTN,
+         RACE_ASN = RACE_ASN + RACE_PI + RACE_OTH,
+         INCOME = INCOME*POP/sum(POP, na.rm=TRUE)) %>%
+  select(-RACE_PI, -RACE_OTH) %>%
+  
+  ## Sum over sub-county units
+  summarise_at(vars(POP:INCOME), sum, na.rm=TRUE) %>%
+  
+  ## Convert person vars to ratios
+  mutate_at(vars(starts_with("RACE")), ~./POP) %>%
+  ungroup()
+```
+
+## nhgis0002_ds245_20195_2019_cty_sub.csv
+
+The following code cleans and describes each step for the data from <*nhgis0002_ds245_20195_2019_cty_sub.csv*>.  Again first, let's assess whether the total population variables are consistent.
+
+```{r cor3}
+
+## Total pop vs Total pop (poverty status in the past 12 months)
+cor(l.data$nhgis0002_ds244_20195_2019_cty_sub.csv$ALUBE001, l.data$nhgis0002_ds245_20195_2019_cty_sub.csv$AMCPE001)
+```
+
+Since the correlation is less than one, the total population variables in the <*nhgis0002_ds244_20195_2019_cty_sub.csv*> and the <*nhgis0002_ds245_20195_2019_cty_sub.csv*> files are inconsistent.
+
+```{r clean3}
+
+df3 <- l.data$nhgis0002_ds245_20195_2019_cty_sub.csv %>%
+  
+  ## Remove unnecessary cols and rows
+  select(STATE,
+         STATE_FIPS = STATEA,
+         COUNTY,
+         COUNTY_FIPS = COUNTYA,
+         YEAR,
+         POP = AMCPE001,
+         POVERTY = AMCPE002) %>%
+  
+  ## Sum over sub-county units
+  group_by(STATE, STATE_FIPS, COUNTY, COUNTY_FIPS, YEAR) %>%
+  summarise_at(vars(POP:POVERTY), sum, na.rm=TRUE) %>%
+  
+  ## Convert person vars to ratios
+  mutate(POVERTY = POVERTY/POP) %>%
+  select(-POP) %>%
+  ungroup()
+```
+
+## Synthesize
+
+With the data cleaned and standardized, we can now synthesize the three dataframes.  We'll begin with `df2` and `df3` which contain ACS 2015-2019 data only.  Note that the `POP` column cannot be associated with `POVERTY` for this particular survey year. 
+
+Let's first check that the two dataframes have the same number of rows.
+
+```{r bind1}
+
+nrow(df2)==nrow(df3)
+```
+
+Since they are the same, we can safely proceed with a `left_join()`.
+
+```{r bind2}
+
+df2 <- df2 %>%
+  left_join(df3, by=c("STATE","STATE_FIPS","COUNTY","COUNTY_FIPS","YEAR")) %>%
+  mutate(YEAR = "2019")
+```
+
+Now we can `bind_rows()` for all the earlier and later data.
+
+```{r bind3}
+
+df <- bind_rows(df1, df2) %>%
+  arrange(STATE_FIPS, COUNTY_FIPS, YEAR)
+```
+
+As a quick check of consistency, let's see whether the `RACE` columns sum to 1 rounded to two decimal places.
+
+```{r check}
+
+df %>% 
+  mutate(RACE = round(RACE_WHT + RACE_BLK + RACE_NTV + RACE_ASN + RACE_LTN + RACE_2P, digits=2)) %>%
+  filter(RACE!=1)
+```
+
+At least by this one measure, the dataframe appears to be consistent.
+
+
+# Export
+
+## Data
+This section exports the cleaned indicator data to a csv file:
+
+```{r data-export}
+
+write_csv(df, file=path(here(), "NHGIS.csv"))
+```
+
+## Dictionary
+
+The following table describes the columns in the exported dataset.
+
+| **Column** | **Description** |
+|------------|-----------------|
+| STATE | State name |
+| STATE_FIPS | State FIPS code |
+| COUNTY | County name |
+| COUNTY_FIPS | County FIPS code |
+| YEAR | Row source year |
+| POP | Total population (persons) |
+| RACE_WHT | Ratio White |
+| RACE_BLK | Ratio Black or African American |
+| RACE_NTV | Ratio American Indian and Alaska Native |
+| RACE_ASN | Ratio Asian and Pacific Islander and other |
+| RACE_2P | Ratio two or more races |
+| RACE_LTN | Ratio Hispanic or Latino |
+| INCOME | Per capita income where the units are further defined in the table below (\$USD) |
+| POVERTY | Ratio below poverty level in previous year |
+
+The following table summarizes the units for the `INCOME` column.
+
+| **Year** | **Income Unit** |
+|----------|-----------------|
+| 1980 | \$USD 1979 |
+| 1990 | \$USD 1989 |
+| 2000 | \$USD 1999 |
+| 2010 | \$USD 2012 |
+| 2019 | \$USD 2019 |
+

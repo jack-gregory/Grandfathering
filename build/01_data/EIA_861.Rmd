@@ -1,0 +1,463 @@
+---
+title: "EIA-861 Data"
+subtitle: "Annual utility revenues, sales and customers"
+author: "Jack Gregory"
+date: "9 July 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    fig_caption: yes
+    highlight: textmate
+  #   keep_md: true
+  # pdf_document:
+  #   latex_engine: pdflatex
+  #   highlight: haddock
+  #   keep_md: true
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+source(here::here("src/preamble.R"))
+
+install.packages(setdiff(c("httr","rvest"), rownames(installed.packages())))
+library(httr)
+library(rvest)
+
+## ... Functions
+source(here("src/def_paths.R"))
+source(here("src/text_colour.R"))
+
+## ... Files
+l.file <- list(
+  clean = path(l.path$data, "eia_sales.csv")
+)
+
+## ... URLs
+l.url <- list(
+  data = "https://www.eia.gov/electricity/data/eia861/"
+)
+```
+
+
+# Objective
+
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It downloads and cleans annual sales by utility from the Energy Information Administration (EIA).  Specifically, it utilises the "Sales to Ultimate Customers" table reported in form EIA-861.  The data are available from 1990 onwards and represent a balanced panel by utility with the following variables:
+
+- Utility name and number;
+- Balancing authority and state;
+- Ownership type;
+- Revenues [$'000 USD]; 
+- Sales [MWh]; and,
+- Customers.
+
+The data along with additional information can be found at the following link:
+
+- [www.eia.gov/electricity/data/eia861](https://www.eia.gov/electricity/data/eia861)
+
+The remainder of this workbook is organized as follows.  First, we download and import the necessary data.  Next, we clean the data while also providing a running commentary for replication.  Finally, we export the data to a csv file.
+
+
+# Download
+
+We first download the set of publicly available zip archives storing the data to Dropbox here:
+
+- `r path(l.path$data, "eia/f861")`
+
+Note that the following code only runs if the number of online zips exceeds the number previously downloaded.
+
+```{r download-zip-fn, include=FALSE}
+
+## Define download function
+download_zip <- function(url) {
+
+  ## Assertions
+  if (!exists("l.path")) {
+    stop("List l.path does not exist.")
+  }
+  stopifnot(
+    stringr::str_detect(url, "https://www.eia.gov/electricity/data/eia861/"),
+    fs::path_ext(url)=="zip"
+  )
+
+  ## Define destination file name
+  if (stringr::str_detect(url, "f861[0-9]{2,4}\\.zip")) {
+    file <- url %>%
+      stringr::str_extract("f861[0-9]{2,4}\\.zip") %>%
+      stringr::str_replace("f861","f861_")
+    if (stringr::str_length(file)<13) {
+      file <- stringr::str_split(file, "_") %>% purrr::flatten()
+      if (stringr::str_detect(file[[2]], "^9")) {
+        file[[2]] <- paste0("19", file[[2]])
+      } else {
+        file[[2]] <- paste0("20", file[[2]])
+      }
+      file <- stringr::str_c(file, collapse="_")
+    }
+  } else {
+    file <- url %>%
+      stringr::str_extract("861_[0-9]{4}") %>%
+      {paste0("f", ., "_refmt.zip")}
+  }
+
+  cat(file, "\n", sep="")
+
+  ## Define destination
+  file <- path(l.path$data, "eia/f861", file)
+
+  ## Download zip
+  httr::RETRY("GET", url=url, times=5) %>%
+    content("raw") %>%
+    writeBin(file)
+  # download.file(url, file, mode="wb", quiet=TRUE)
+}
+```
+
+```{r download}
+
+## Scrape list of zip archives
+l.zip_url <- l.url$data %>%
+  httr::RETRY("GET", url=., times=5) %>%
+  read_html() %>%
+  rvest::html_nodes("a") %>%
+  rvest::html_attr("href") %>%
+  as.list() %>%
+  purrr::keep(str_detect(., "861[0-9_]{2,5}\\.zip$")) %>%
+  map(~xml2::url_absolute(.x, l.url$data))
+
+## Perform download, if necessary
+if (length(l.zip_url)>length(fs::dir_ls(path(l.path$data, "eia/f861"), regexp="\\.zip$"))) {
+  walk(l.zip_url, download_zip)
+}
+```
+
+
+# Import
+
+Next, we import the zipped data.  This process is made more challenging due to the changes in EIA-861 reporting format experienced throughout the forms' existence.  The Notes subsection briefly describes these changes, while the Data subsection performs the import and cleaning.
+
+`r text_colour(colour="red", text='NB -- The EIA also provides "reformatted" data for the 1990 to 2011 report years. This data is provided in a similar format to the 2012-present reporting years.  Notably, the reformatted versions lack some of the categorical variables present in later years; moreover, they also appear to have different row counts.')`
+
+## Notes
+
+For our purposes, the EIA-861 has three distinct phases:
+
+1. **1990-1998**: Zip archives contain "Types."
+2. **1999-2011**: Zip archives contain "Files."
+3. **2012-present**: Zip archives contain named files.
+
+The 1990-1998 format stores the necessary data across Type 1 and Type 3.  The former contains utility names and identifiers, as well as aggregate revenues and sales.  The latter contains utility identifiers and revenues, sales, and customers in a wide format by state.  The following table summarizes the germane variables and their Type for the pre-1998 format.
+
+| **Variable** | **Unit** | **Type** | **Description** |
+|--------------|----------|----------|-----------------|
+| UTILCODE || Type 1 & 3 | EIA utility ID represented by a unique six-digit code assigned to each respondent. |
+| UTILNAME || Type 1 | The name of the electric utility as designated by the respondent. |
+| CONTROLNUM || Type 1 | EIA control area ID represented by a a unique six-digit code assigned to the Control Area Operator (CAO) and as reported by the respondent. |
+| CONTROLOP || Type 1 | The name of the electric system which has primary responsibility for the application of a common generation and transmission control scheme for all electric utility systems within a defined area.  The Control Area Operator is responsible for the economic dispatch of utility generating units, the coordination of customer loads with available capacity, and the safe loading of transmission lines within its area. |
+| REVCONSUM | $'000 USD | Type 1 | Revenues from sales to ultimate consumers representing the total of all revenue received from ultimate consumers served by the respondent which was for the direct sale of electric power.  These revenues include taxes (income, gross receipts, environmental surcharges, etc.) applied to the utility and recoverable from the ratepayer, the net of the application of all monthly fuel or purchased power adjustment charges or credits, as well as fixed facility charges. |
+| SALESCONS | MWh | Type 1 | Sales to ultimate consumers representing the total sales of electric energy to all classes of ultimate consumers (retail) served by the respondent.  It does not include sales to other electric utilities intended for resale. |
+| STCODE*_1 || Type 1 & 3 | State code represented by a unique two-letter abbreviation. |
+| REV*_6 | $'000 USD | Type 1 & 3 | State-level revenues from sales to ultimate consumers. |
+| MWH*_6 | MWh | Type 1 & 3 | State-level sales to ultimate consumers. |
+| CONSUM*_6 || Type 1 & 3 | State-level consumers. |
+
+The post-1998 formats are structured similarly and, thus, will be considered together.  The major difference is that the 1999-2011 format stores the necessary data in File 2, while the 2012-present format renames this file as <Sales_Ult_Cust_*.xlsx>.  Other than some superficial changes, the tables are structurally stable.  It contains utility names and identifiers, as well as total revenues, sales, and customers.  The following table summarizes the germane variables for the post-1998 formats.
+
+`r text_colour(colour="red", text="NB -- The reformatted data is structured based on the table below.")`
+
+| **Variable** | **Unit** | **Description** |
+|--------------|----------|-----------------|
+| UTILITY_ID / utility_id / Utility Number || EIA utility code represented by a unique six-digit number assigned to each respondent.  Note that “99999” is not a utility ID; it instead represents an adjustment factor. |
+| UTILITY_NAME / Utility Name || The name of the electric utility as designated by the respondent. |
+| YEAR | | Survey year. |
+| STATE_CODE / State || State code represented by a unique two-letter abbreviation. |
+| service_type / Service Type || The provider type designating electric service types in set {Bundled, Energy, Delivery}. |
+| DATA_TYPE / data_type / Data Type || Indicator for observed or imputed data in set {O,I} |
+| Owner Type / OWNERSHIP / Ownership || The ownership type in set {Federal, Political Subdivision, Municipal Marketing Authority, Cooperative, State, Municipal, Investor-Owned, Retail Power Marketer, (Wholesale) Power Marketer, Unregulated}. |
+| BA_CODE / BA Code || The balancing authority code represented by a unique three- or four-letter abbreviation.  It represents the electric system which has primary responsibility for the application of a common generation and transmission control scheme for all electric utility systems within a defined area.  The Control Area Operator is responsible for the economic dispatch of utility generating units, the coordination of customer loads with available capacity, and the safe loading of transmission lines within its area. |
+| Total Revenue (000) / TOTAL_REVENUES / TOTAL:Revenues  | $'000 USD | Revenues from sales to ultimate consumers representing the total of all revenue received from ultimate consumers served by the respondent which was for the direct sale of electric power.  These revenues include taxes (income, gross receipts, environmental surcharges, etc.) applied to the utility and recoverable from the ratepayer, the net of the application of all monthly fuel or purchased power adjustment charges or credits, as well as fixed facility charges. |
+| Total Sales (MWh) / TOTAL_SALES / TOTAL:Sales | MWh | Sales to ultimate consumers representing the total sales of electric energy to all classes of ultimate consumers (retail) served by the respondent.  It does not include sales to other electric utilities intended for resale. |
+| Total Consumers (n) / TOTAL_CONSUMERS / TOTAL:Customers || Ultimate consumers representing the count of ultimate consumers served by the respondent. |
+
+## Data
+
+Next, we import the "Ultimate Customers" data from the zip archives into R.
+
+`r text_colour(colour="red", text='NB -- For the moment, we import only the original datasets.  However, it may be worth revisiting the reformatted versions as a robustness check or even a replacement dataset.  This may be relevant as they contain a complete Customers timeseries as well as different observations numbers to the original datasets.  It may also be worth considering importing all data into a combined dataset and identifying source on reformatting or not.')`
+
+```{r wrangle-fn, include=FALSE}
+
+## Define function
+wrangle <- function(df) {
+  UseMethod("wrangle")
+}
+
+## Define UTILRECTYP method
+wrangle.UTILRECTYP <- function(df) {
+  df <- df %>%
+    pivot_longer(cols=c(FEDERAL, STATE, MUNI, PRIVATE, COOP), 
+                 names_to="OWNERSHIP", values_to="OWNERSHIP_VAL") %>%
+    group_by(UTILCODE) %>%
+    arrange(OWNERSHIP_VAL) %>%
+    summarise_all(first) %>%
+    mutate(OWNERSHIP = ifelse(is.na(OWNERSHIP_VAL), NA, OWNERSHIP)) %>%
+    ungroup() %>%
+    pivot_longer(cols=c(ASCC, ECAR, ERCOT, MAIN, MAAC, MAPP, NPCC, SERC, SPP, WSCC, HI, PR_TERR),
+                 names_to="NERC", values_to="NERC_VAL") %>%
+    group_by(UTILCODE) %>%
+    arrange(NERC_VAL) %>%
+    summarise_all(first) %>%
+    mutate(NERC = ifelse(is.na(NERC_VAL), NA, NERC)) %>%
+    ungroup() %>%
+    mutate(UTILCODE = as.numeric(UTILCODE))
+  if (any(names(df)=="CONTROLOP")) {
+    df %>%
+      select(UTILITY_ID = UTILCODE,
+             UTILITY_NAME = UTILNAME,
+             STATE = STCODE1_1,
+             OWNERSHIP, NERC, 
+             CAO = CONTROLOP,
+             CAO_ID = CONTROLNUM,
+             REVENUES = REVCONSUM,
+             SALES = SALESCONS)
+  } else {
+    df %>%
+      select(UTILITY_ID = UTILCODE,
+             UTILITY_NAME = UTILNAME,
+             STATE = STCODE1_1,
+             OWNERSHIP, NERC, 
+             REVENUES = REVCONSUM,
+             SALES = SALESCONS)
+  }
+}
+
+## Define UTILCODE method
+wrangle.UTILCODE <- function(df) {
+  df %>%
+    select(UTILITY_ID = UTILCODE,
+           UTILITY_NAME = UTILNAME,
+           STATE,
+           REVENUES = TOTREV,
+           SALES = TOTSALES,
+           CUSTOMERS = TOTCONS)
+}
+
+## Define YEAR method
+wrangle.YEAR <- function(df) {
+  df %>%
+    rename_with(.fn=function(x) {
+      str_to_upper(x) %>%
+        str_replace_all("\\s\\(.+\\)", "") %>%
+        str_replace_all("\\s", "_") %>%
+        str_replace_all(c("STATE_CODE"="STATE", "OWNER_TYPE"="OWNERSHIP", "REVENUE$"="REVENUES"))
+      }) %>%
+    select(UTILITY_ID, UTILITY_NAME, YEAR, STATE, 
+           SERVICE = SERVICE_TYPE,
+           DATA = DATA_TYPE,
+           OWNERSHIP,
+           REVENUES = TOTAL_REVENUES,
+           SALES = TOTAL_SALES,
+           CUSTOMERS = TOTAL_CONSUMERS)
+}
+
+## Define UTILITY method
+wrangle.UTILITY <- function(df) {
+  if (length(names(df))==25) {
+    df <- df %>%
+      select(UTILITY_ID = ...2, 
+             UTILITY_NAME = ...3, 
+             YEAR = `Utility Characteristics`, 
+             STATE = ...7, 
+             SERVICE = ...5,
+             DATA = ...6,
+             OWNERSHIP = ...8,
+             BA_CODE = ...9,
+             REVENUES = TOTAL,
+             SALES = ...24,
+             CUSTOMERS = ...25)
+  } else if (length(names(df))==24) {
+    df <- df %>%
+      select(UTILITY_ID = ...2, 
+             UTILITY_NAME = ...3, 
+             YEAR = `Utility Characteristics`, 
+             STATE = ...7, 
+             SERVICE = ...5,
+             DATA = ...6,
+             OWNERSHIP = ...8,
+             BA_CODE = ...9,
+             REVENUES = TOTAL,
+             SALES = ...23,
+             CUSTOMERS = ...24)
+  } else {
+    df <- df %>%
+      select(UTILITY_ID = ...2, 
+             UTILITY_NAME = ...3, 
+             YEAR = `Utility Charateristics`, 
+             STATE = ...7, 
+             SERVICE = ...5,
+             DATA = ...6,
+             OWNERSHIP = ...8,
+             REVENUES = TOTAL,
+             SALES = ...22,
+             CUSTOMERS = ...23)
+  }
+  df %>%
+    slice(3:n()) %>%
+    mutate_at(vars(UTILITY_ID, YEAR, REVENUES, SALES, CUSTOMERS), as.numeric)
+}
+```
+
+```{r extract-fn, include=FALSE}
+
+extract_zip <- function(zip, file) {
+  
+  ## Assertions
+  if (!exists("l.path")) {
+    stop("Function requires l.path list in the global environment.")
+  }
+  stopifnot(
+    fs::is_file(zip),
+    fs::path_ext(zip)=="zip",
+    fs::path_ext(file) %in% c("xls","xlsx")
+  )
+  
+  cat(fs::path_file(zip), "\n", sep="")
+  
+  ## IMPORT DATA
+  ## Unzip data
+  unzip(zip, files=file, exdir=path(l.path$data, "eia/f861"))
+  
+  ## Import data
+  df <- read_excel(path(l.path$data, "eia/f861", file), guess_max=5000)
+  
+  ## Delete unzipped data
+  file %>%
+    fs::path_split() %>%
+    flatten() %>%
+    .[[1]] %>%
+    fs::path(l.path$data, "eia/f861", .) %>%
+    fs::file_delete()
+
+  ## CLEAN DATA
+  ## Set df type
+  type <- names(df)[[1]] %>%
+    stringr::str_to_upper() %>%
+    stringr::str_extract("^[A-Z]*")
+  df <- structure(df, class=c(type, class(df)))
+  
+  ## Wrangle data based on type; produce error if cleaning fn does not exist
+  df <- tryCatch(
+    wrangle(df),
+    error = function(e) {
+      stop(glue("Cleaning function does not currently run or exist for the last imported year.
+                 wrangle.{type} {e}"))
+    }
+  )
+  if (!any(names(df)=="YEAR")) {
+    df <- df %>%
+      mutate(YEAR = str_extract(zip, "\\d{4}") %>% as.numeric()) %>%
+      relocate(YEAR, .after=STATE)
+  }
+  return(df)
+}
+```
+
+``` {r import}
+
+## Build zip list
+l.zip_dir <- fs::dir_ls(path(l.path$data, "eia/f861"), regexp="f861_\\d{4}\\.zip$")
+
+## Build zip & file dataframe
+df.zip_dir <- l.zip_dir %>%
+  map_dfr(~unzip(.x, list=TRUE) %>% mutate(Zip = .x)) %>%
+  filter(str_detect(Name, "(TYP1|[Ff][Ii][Ll][Ee]2|Sales_Ult_Cust_\\d{4})")) %>%
+  rename_with(.fn=str_to_upper)
+
+## Import dataset
+if (length(l.zip_dir)!=nrow(df.zip_dir)) {
+  stop("Number of data files does not match the number of zip archives.")
+}
+df.sales <- map2_dfr(df.zip_dir %>% pull(ZIP) %>% as.list(),
+                     df.zip_dir %>% pull(NAME) %>% as.list(),
+                     ~extract_zip(.x, .y)) %>%
+  select(UTILITY_ID, UTILITY_NAME, STATE, YEAR, OWNERSHIP, SERVICE, DATA, NERC,
+         CAO, CAO_ID, BA_CODE, REVENUES, SALES, CUSTOMERS) %>%
+  arrange(UTILITY_ID, STATE, YEAR)
+```
+
+
+# Clean
+
+At present, we perform the following to clean the dataset:
+
+- Drop non-contiguous states;
+- Drop "Withheld", "Adjustments", and NAs within UTILITY_ID;
+- Aggregate over service types; and,
+- Aggregate over states while dropping extraneous variables.
+
+`r text_colour(colour="red", text="NB - This section is incomplete.  Many of the categorical variables that are currently sacrificed could instead be included through a fill operation.  Importantly, we aggregate over states even when their distribution regions are non-contiguous.  And, we drop REVENUES and CUSTOMERS, which could be included, though we would need to transition to the reformatted datasets first.")`
+
+```{r clean}
+
+## Clean sales data
+df.sales_cln <- df.sales %>%
+  
+  ## Drop unnecessary obs
+  filter(!(STATE %in% c("AK","GU","HI","PR"))) %>%
+  filter(!(UTILITY_ID %in% c(88888, 99999) | is.na(UTILITY_ID))) %>%
+  
+  ## Aggregate over SERVICE types
+  group_by(UTILITY_ID, UTILITY_NAME, STATE, YEAR, OWNERSHIP, DATA, NERC,
+           CAO, CAO_ID, BA_CODE) %>%
+  summarise_at(vars(REVENUES, SALES, CUSTOMERS), sum, na.rm=TRUE) %>%
+  
+  ## Aggregate over STATEs; Drop REVENUES & CUSTOMERS
+  arrange(UTILITY_ID, YEAR, desc(SALES)) %>%
+  group_by(UTILITY_ID, YEAR) %>%
+  summarise(UTILITY_NAME = first(UTILITY_NAME),
+            STATE = first(STATE),
+            SALES = sum(SALES, na.rm=TRUE),
+            .groups="drop") %>%
+  
+  ## Finalize dataframe
+  relocate(YEAR, .after=STATE)
+```
+
+
+# Export
+
+## Data
+This section exports the cleaned indicator data to a csv file:
+
+```{r export}
+
+write_csv(df.sales_cln, file=l.file$clean)
+```
+
+## Dictionary
+
+The following table describes the columns in the exported dataset.
+
+| **Variable** | **Unit** | **Description** |
+|--------------|----------|-----------------|
+| UTILITY_ID || EIA utility ID as a unique six-digit code. |
+| UTILITY_NAME || The name of the electric utility as designated by the respondent; thus, these values are not necessarily consistent for a particular UTILITY_ID year-over-year. |
+| STATE || State abbreviation as a unique two-letter code. |
+| YEAR || Data year from 1990 to 2019 |
+| SALES | MWh | Sales of electricity to ultimate consumers served by the respondent. |
+
