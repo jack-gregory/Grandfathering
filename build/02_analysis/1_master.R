@@ -54,12 +54,12 @@ source(here("src/def_paths.R"))
 
 # (2) IMPORT DATA ---------------------------------------------------------------------------------
 
-source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "2_GFanalysis_data.R")))
+source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "2_data.R")))
 
 
 # (3) REGRESSIONS --------------------------------------------------------------------------------
 
-source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "3_GFanalysis_regs.R")))
+source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "3_regs.R")))
 
 
 # (4) PLOTS ---------------------------------------------------------------------------------------

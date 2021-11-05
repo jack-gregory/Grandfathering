@@ -121,8 +121,8 @@ ctrl_env <- "so2_nonattain grand_NSR_in_nonnat_const applic_reg applic_reg_const
 ctrl_mkt <- "state_cap_growth coal2gas_price d_growth"
 fes <- "i.year i.states i.ut_type"
 
-# gf <- "grand_NSR_const"
-gf <- "gf_1978"
+ gf <- "grand_NSR_const"
+# gf <- "gf_1978"
 # gf <- "gf_1981"
 
 l.rhs <- list(
@@ -141,10 +141,10 @@ l.ctrl <- list(
 
 ## Regression conditions
 l.cond <- list(
-  "",
-  "",
-  "",
-  "",
+  "if ut_type==4",
+  "if ut_type==4",
+  "if ut_type==4",
+  "if ut_type==4",
   "if ut_type==4",
   "if ut_type==4"
 )
@@ -196,10 +196,10 @@ tbl_colnames <- df.reg %>%
   mutate_at(vars(last_col(offset=1)), ~str_replace(., " &$", ""))
 
 ## Construct table coefficients
-# l.var <- list("grand_NSR_const","max_boi_nameplate","capacity_gf","so2_nonattain",
-#               "grand_NSR_in_nonnat_const","applic_reg","applic_reg_const")
-l.var <- list("gf_1978","max_boi_nameplate","capacity_gf","so2_nonattain",
+l.var <- list("grand_NSR_const","max_boi_nameplate","capacity_gf","so2_nonattain",
               "grand_NSR_in_nonnat_const","applic_reg","applic_reg_const")
+# l.var <- list("gf_1978","max_boi_nameplate","capacity_gf","so2_nonattain",
+#               "grand_NSR_in_nonnat_const","applic_reg","applic_reg_const")
 # l.var <- list("gf_1981","max_boi_nameplate","capacity_gf","so2_nonattain",
 #               "grand_NSR_in_nonnat_const","applic_reg","applic_reg_const")
 l.var_labs <- list("GF","size","GF $\\times$ size","NAAQS","GF $\\times$ NAAQS",
