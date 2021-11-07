@@ -129,29 +129,29 @@ l.rhs <- list(
   glue("{gf} {ctrl_boiler} {fes}"),
   glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
   glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
+  glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes} ARPprice_sp ARPprice_sp*sulfur_content_tot"),
   glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
-  glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} i.year i.states"),
   glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} i.year i.states")
 )
 
 ## Market controls
 l.ctrl <- list(
-  0,0,1,1,0,1
+  0,0,1,1,1,1
 )
 
 ## Regression conditions
 l.cond <- list(
-  "if ut_type==4",
-  "if ut_type==4",
-  "if ut_type==4",
-  "if ut_type==4",
-  "if ut_type==4",
+  "if (ut_type==4|ut_type==5 |ut_type==2)",
+  "if (ut_type==4|ut_type==5 |ut_type==2)",
+  "if (ut_type==4|ut_type==5 |ut_type==2)",
+  "if (ut_type==4|ut_type==5 |ut_type==2)",
+  "if ut_type!=.",
   "if ut_type==4"
 )
 
 ## Regression type
 l.type <- list(
-  "reg","reg","reg","iv","reg","iv"
+  "reg","reg","reg","iv","iv","iv"
 )
 
 
@@ -167,8 +167,9 @@ df.reg <- tibble(l.type, l.rhs, l.ctrl, l.cond) %>%
   unnest(cols=c(l.lhs, data)) %>%
   rename_with(.fn=~str_replace(., "l\\.", "")) %>%
   mutate(ctrl = ifelse(lhs!="SO2" & ctrl==1, ctrl_mkt, ""),
+         sample = ifelse(lhs=="survive", "& max_boi_nameplate>0.075", ""),
          cond = as.character(cond),
-         fml = paste(lhs, rhs, ctrl, cond, sep=" ")) %>%
+         fml = paste(lhs, rhs, ctrl, cond, sample, sep=" ")) %>%
   mutate_at(vars(-model_id), as.character) %>%
   mutate(model = map2(fml, type,
                       ~stata_reg(.x, df.gf, .y)),
@@ -181,7 +182,9 @@ df.reg <- tibble(l.type, l.rhs, l.ctrl, l.cond) %>%
 ## Build regression table (longtable) -----------------------------------------
 ## Construct column names
 tbl_colnames <- df.reg %>%
-  mutate(owner = ifelse(str_detect(fml, "i.ut_type"), "All", "IOU")) %>%
+  mutate(owner = case_when(str_detect(fml, "if ut_type==4") ~ "IOU",
+                           str_detect(fml, "ut_type==5") ~ "IOU+",
+                           TRUE ~ "All"))  %>%
   distinct(model_id, type, owner) %>%
   mutate(model_id = paste0("\\multicolumn{1}{c}{(", model_id, ")}"),
          type = ifelse(type=="reg", "OLS", "IV"),
@@ -242,7 +245,7 @@ tbl_summary <- df.reg %>%
          fe_st = ifelse(str_detect(fml, "i.states"), "X", ""),
          fe_ut = ifelse(str_detect(fml, "i.ut_type"), "X", ""),
          ctrl_mkt = ifelse(str_detect(fml, ctrl_mkt), "X", ""),
-         ctrl_so2 = ifelse(type=="iv", "X", "")) %>%
+         ctrl_so2 = ifelse((type=="iv"|str_detect(fml, "sulfur_content_tot")), "X", "")) %>%
   select(lhs, model_id, starts_with("fe"), starts_with("ctrl"), N, r2) %>%
   mutate_at(vars(starts_with("fe"), starts_with("ctrl")), 
             ~case_when(is.na(.) ~ "\\textit{}",
@@ -293,7 +296,10 @@ tbl_midder <- c("\\hline \\\\ [-1.8ex]")
 tbl_footer <- c("\\hline\\hline",
                 paste0("\\textit{Notes:} & \\multicolumn{", ncol(tbl_colnames)-2,
                        "}{l}{*** p$<$0.001;  ** p$<$0.01;  * p$<$0.05; ",
-                       "\\textit{t}-statistics in parentheses.} \\\\"),
+                       "\\textit{t}-statistics in parentheses. Market controls include electricity demand growth, 
+                       coal-gas price ratios and generation capacity growth in the state. 
+                       Sulfur controls include applicable ARPprice_sp
+                       state_cap_growth coal2gas_price d_growth  } \\\\"),
                 "\\\\",
                 "\\end{longtable}\n",
                 "\\end{scriptsize}",
@@ -522,7 +528,10 @@ df.reg <- tibble(l.type, l.rhs, l.cond) %>%
 ## Build regression table (table) ---------------------------------------------
 ## Construct column names
 tbl_colnames <- df.reg %>%
-  mutate(owner = ifelse(str_detect(fml, "i.ut_type"), "All", "IOU")) %>%
+  tbl_colnames <- df.reg %>%
+  mutate(owner = case_when(str_detect(fml, "if ut_type==4") ~ "IOU",
+                           str_detect(fml, "ut_type==5") ~ "Comm,IOU",
+                           TRUE ~ "All"))  %>%
   distinct(lhs, model_id, type, owner) %>%
   mutate(lhs = factor(lhs, levels=c("DURATION","survive","SO2"),
                       labels=c("Utilization","Survival","Emissions")),
