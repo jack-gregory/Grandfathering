@@ -12,7 +12,8 @@
 # DEFINE ------------------------------------------------------------------------------------------
 
 ## Create output folder
-date <- format(Sys.Date(), "%Y%m%d")
+# date <- format(Sys.Date(), "%Y%m%d")
+date <- "20211123"
 dir_create(path(l.path$out, date))
 
 ## Create list of hourly CEMS files
@@ -69,8 +70,8 @@ itr_hr <- function(fml, df, type, hr) {
 
 ## Left-hand side vars
 l.lhs <- list(
-  "DURATION",
-  "SO2"
+  "DURATION"#,
+  # "SO2"
 )
 
 ## Right-hand side vars
@@ -126,33 +127,35 @@ df.reg_hr <- tibble(l.type, l.rhs, l.cond) %>%
 ## Build plots ----------------------------------------------------------------
 
 ## Define plot names
-l.name <- list("utilization","emissions")
+l.name <- list("utilization"#,"emissions"
+               )
 
 ## Build hourly regression plots
 p.coef_hr <- map2(
   l.lhs,
-  list("Hours under load [hrs]","Emissions [SO2 lbs/MWh]"),
+  list("Hours under load [hrs]"#,"Emissions [SO2 lbs/MWh]"
+       ),
   ~df.reg_hr %>%
     filter(lhs==.x) %>%
     filter(str_detect(var, "^grand_NSR_const$")) %>%
     mutate(hr = as.numeric(hr)) %>%
     ggplot() +
-      geom_hline(yintercept=0, size=0.3, color="#1A1A1A") +
-      geom_ribbon(aes(x=hr, ymin=ci_lower, ymax=ci_upper), alpha=0.2, fill="#2dCFAC") +
-      geom_line(aes(x=hr, y=coef), size=0.5, color="#20A387") +
-      geom_point(aes(x=hr, y=coef), size=1.5, color="#20A387") +
-      labs(#title="Grandfathering yearly coefficients",
-           y=.y,
-           x="Hour"#,
-           #caption="Shaded area represents the 95% confidence interval."
-           ) +
-      theme_classic() +
-      theme(axis.line.y = element_blank(),
-            axis.ticks.y = element_blank(),
-            panel.grid.major.y = element_line(color="grey85", size=0.3),
-            panel.grid.minor.y = element_line(color="grey85", size=0.3),
-            plot.caption = element_text(hjust=0))
-  ) %>%
+    geom_hline(yintercept=0, size=0.3, color="#1A1A1A") +
+    geom_ribbon(aes(x=hr, ymin=ci_lower, ymax=ci_upper), alpha=0.2, fill="#2dCFAC") +
+    geom_line(aes(x=hr, y=coef), size=0.5, color="#20A387") +
+    geom_point(aes(x=hr, y=coef), size=1.5, color="#20A387") +
+    labs(#title="Grandfathering yearly coefficients",
+      y=.y,
+      x="Hour"#,
+      #caption="Shaded area represents the 95% confidence interval."
+    ) +
+    theme_classic() +
+    theme(axis.line.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          panel.grid.major.y = element_line(color="grey85", size=0.3),
+          panel.grid.minor.y = element_line(color="grey85", size=0.3),
+          plot.caption = element_text(hjust=0))
+) %>%
   set_names(nm=unlist(l.name))
 
 ## Save plots

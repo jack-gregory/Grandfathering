@@ -51,6 +51,11 @@ l.file <- list(
   epa = path(l.path$data, "epa/Facility_Attributes.zip"),
   state = path(l.path$data, "eia/shp/USA_States_Generalized.shp")
 )
+
+## ... Definitions
+date <- format(Sys.Date(), "%Y%m%d")
+# date <- "20211123"
+fs::dir_create(path(l.path$out, date))
 ```
 
 ```{r theme, include=FALSE}
@@ -345,6 +350,9 @@ ggplot() +
   theme_maps() +
   guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
          size = guide_legend(order=2), override.aes=list(alpha=0.5))
+
+# ggsave(path(l.path$out, date, "fig.gf_share_map.png"),
+#        width=8, height=4.25, units="in")
 ```
 
 
@@ -357,17 +365,16 @@ ggplot() +
 df.boiler <- df.gf_cln %>%
   left_join(df.plant %>%
               as_tibble() %>% 
-              select(-N, -GF, -geometry), 
+              select(-N, -starts_with("GF"), -geometry), 
             by=c("ORISPL"))
 ```
 
 
-
-
 # Analysis
 
+...
 
-```{r}
+```{r analysis}
 
 ## NB - See <http://www.stat.yale.edu/Courses/1997-98/101/meancomp.htm>
 
@@ -376,7 +383,7 @@ levels <- c("NONATTAIN","ARP","LOCALREG","LAT","LON","CAPACITY","AGE","INSERVICE
   "RETIREMENT","RETIRE","DURATION","GLOAD","HEATRATE","SO2_RATE","SULFUR_DIST","UT_C","UT_COM",
   "UT_F","UT_I","UT_IND","UT_M","UT_P","UT_Q","UT_S","N")
 labels <- c("Nonattainment",
-            "Acid Rain Program (ARP)",
+            "Acid Rain Program",
             "Applicable Non-NSR Emission Standard [lbs/mmBTu]",
             "Latitude",
             "Longitude",
@@ -385,11 +392,11 @@ labels <- c("Nonattainment",
             "Inservice Year",
             "Retirement Year",
             "Retire",
-            "Duration [hr/yr]",
-            "Generation [GWh/yr]",
+            "Duration$^{\\dagger}$ [hr/yr]",
+            "Generation$^{\\dagger}$ [GWh/yr]",
             "Heat Rate [mmBTu/MW]",
-            "SO2 Emissions [lbs/mmBTu]",
-            "Weighted Average Mine Sulfur Content [% weight]",
+            "SO2 Emissions$^{\\dagger}$ [lbs/mmBTu]",
+            "Weighted Average Mine Sulfur Content [\\% weight]",
             "Share of Co-operatives",
             "Share of Commercial",
             "Share of Federal",
@@ -411,6 +418,7 @@ df.bal_n <- df.boiler %>%
   select(VAR, ORDER, GF_1, GF_0)
 
 df.bal <- df.boiler %>%
+  select(-HEATRATE) %>%
   mutate(GLOAD = GLOAD/10^3,
          UT_C = (UTILITY_TYPE==1),
          UT_COM = (UTILITY_TYPE==2),
@@ -431,9 +439,9 @@ df.bal <- df.boiler %>%
   pivot_wider(id_cols=VAR, names_from=GF, values_from=c(MEAN, SD, N)) %>%
   mutate(DIFF = MEAN_1 - MEAN_0,
          TSTAT = (MEAN_1 - MEAN_0)/sqrt(SD_0^2/N_0 + SD_1^2/N_1),
-         SIG = case_when(abs(TSTAT)>=3.291 ~ "***",
-                         abs(TSTAT)>=2.576 ~ "**",
-                         abs(TSTAT)>=1.960 ~ "*",
+         SIG = case_when(abs(TSTAT)>=3.291 ~ "^{***}",
+                         abs(TSTAT)>=2.576 ~ "^{**}",
+                         abs(TSTAT)>=1.960 ~ "^{*}",
                          TRUE ~ "")) %>%
   mutate_at(vars(matches("MEAN|SD|DIFF|TSTAT")), ~formatC(., format="f", digits=2, big.mark=",")) %>%
   mutate_at(vars(starts_with("SD")), ~glue("({.})")) %>%
@@ -450,33 +458,107 @@ df.bal <- df.boiler %>%
   mutate(VAR = factor(VAR, levels=levels, labels=labels)) %>%
   arrange(VAR, ORDER) %>%
   mutate(VAR = as.character(VAR),
-         VAR = ifelse(ORDER==2, NA, VAR)) %>%
+         VAR = case_when(VAR=="Applicable Non-NSR Emission Standard [lbs/mmBTu]" & ORDER==1 ~ 
+                           "Applicable Non-NSR Emission",
+                         VAR=="Applicable Non-NSR Emission Standard [lbs/mmBTu]" & ORDER==2 ~ 
+                           " Standard [lbs/mmBTu]",
+                         VAR=="Weighted Average Mine Sulfur Content [\\% weight]" & ORDER==1 ~ 
+                           "Weighted Average Mine Sulfur",
+                         VAR=="Weighted Average Mine Sulfur Content [\\% weight]" & ORDER==2 ~ 
+                           " Content [\\% weight]",
+                         ORDER==2 ~ as.character(NA),
+                         TRUE ~ VAR)) %>%
   mutate_all(~ifelse(is.na(.), "", .)) %>%
-  select(VAR, GF_1, GF_0, DIFF)
+  select(ORDER, VAR, GF_1, GF_0, DIFF)
+```
+
+```{r balance-tbl}
+
+if (knitr::is_html_output()) {
+  df.bal %>%
+    kable(format="html", align="lrrr", booktabs=TRUE, linesep=c(""),
+          caption="Average characteristics of boilers by NSR grandfathering status",
+          col.names=c("","Grandfathered","Non-Granfathered","Difference")) 
+} else {
+  df.bal
+}
 ```
 
 
+# Export
 
-```{r}
+This section exports the table to a tex file.
 
+```{r export}
 
-df.bal %>%
-  kable(format="latex", align="lrrr", booktabs=TRUE, linesep=c(""),
-        caption="Average characteristics of boilers by NSR grandfathering status",
-        col.names=c("","Grandfathered","Non-Granfathered","Difference")) 
+## Build regression table (longtable) -----------------------------------------
 
+## Construct table coefficients
+tbl_coef <- df.bal %>%
+  filter(VAR!="N") %>%
+  mutate_at(vars(last_col()), ~case_when(ORDER==1 ~ paste0(., " \\\\"),
+                                         TRUE ~ paste0(., " \\\\ [1.0ex]"))) %>%
+  mutate_at(vars(2:last_col(offset=1)), ~paste0(., " &")) %>%
+  select(-ORDER)
+
+## Construct table summary
+tbl_summary <- df.bal %>%
+  filter(VAR=="N") %>%
+  mutate(VAR = "Number of Boilers") %>%
+  mutate_at(vars(2:last_col(offset=1)), ~paste0(., " &")) %>%
+  mutate_at(vars(last_col()), ~paste0(., " \\\\")) %>%
+  select(-ORDER)
+
+## Prepare file header and table header, midder and footer
+f_header <- c("%% Grandfathering Project",
+              "%% Balance table",
+              glue::glue("%% Compiled on {base::Sys.time()} using <balance.Rmd>"),
+              "%% Written by Jack Gregory",
+              "\n")
+tbl_header <- c("\\begin{center}",
+                "\\begin{singlespace}",
+                "\\begin{footnotesize}\n",
+                "\\begin{longtable}[c]{@{\\extracolsep{0.7ex}}l*{3}{D{.}{.}{-2}}@{}}",
+                "\t\\caption{Average characteristics of boilers by NSR grandfathering status}",
+                "\t\\label{tbl:balance}\n",
+                "\\\\",
+                "\\hline\\hline",
+                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{Grandfathered}} & ",
+                       "\\multicolumn{1}{c}{\\textbf{Non-Grandfathered}} & ",
+                       "\\multicolumn{1}{c}{\\textbf{Difference}} \\\\ [1.0ex]"),
+                "\\midrule",
+                "\\endfirsthead",
+                "\\hline\\hline",
+                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{Grandfathered}} & ",
+                       "\\multicolumn{1}{c}{\\textbf{Non-Grandfathered}} & ",
+                       "\\multicolumn{1}{c}{\\textbf{Difference}} \\\\ [1.0ex]"),
+                "\\midrule",
+                "\\endhead")
+tbl_midder <- c("\\midrule")
+tbl_footer <- c("\\hline\\hline",
+                paste0("\\multicolumn{4}{p{14cm}}{\\textit{Notes}:  This table displays average ",
+                       "characteristics by NSR grandfathering status.  Standard deviations are in ",
+                       "parentheses, with \\textit{t}-statistics of the difference between ",
+                       "`grandfathered' and `non-grandfathered' boilers in brackets where ",
+                       "*** p<0.001;  ** p<0.01;  * p<0.05.  All variables utilize the full extent ",
+                       "of our dataset, except for those from CEMS which are from 1997 onwards and ",
+                       "are identified with a $^{\\dagger}$. Each row is a separate calculation, and ",
+                       "is not conditional on the other variables reported here.  Co-operatives, ",
+                       "commercial, federal, investor-owned, industrial, IPPs (independent power ",
+                       "producers), municipal, political, and state refer to boiler ownership.} \\\\"),
+                "\\end{longtable}\n",
+                "\\end{footnotesize}",
+                "\\end{singlespace}",
+                "\\end{center}\n")
+
+## Output TeX table file
+f_header %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=FALSE)
+tbl_header %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=TRUE)
+tbl_coef %>% write_tsv(path(l.path$out, date, "tbl.balance.tex"), 
+                       append=TRUE, col_names=FALSE, quote_escape=FALSE)
+tbl_midder %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=TRUE)
+tbl_summary %>% write_tsv(path(l.path$out, date, "tbl.balance.tex"), 
+                          append=TRUE, col_names=FALSE, quote_escape=FALSE)
+tbl_footer %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=TRUE)
 ```
-
-
-# Export???
-
-<!-- This section exports the cleaned sulfur data to a csv file: -->
-
-<!-- ```{r sulfur-export} -->
-
-<!-- readr::write_csv(df.distance %>% as_tibble() %>% select(-geometry),  -->
-<!--                  l.file$out) -->
-<!-- ``` -->
-
-
 

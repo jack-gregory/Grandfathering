@@ -12,7 +12,8 @@
 # DEFINE ------------------------------------------------------------------------------------------
 
 ## Create output folder
-date <- format(Sys.Date(), "%Y%m%d")
+# date <- format(Sys.Date(), "%Y%m%d")
+date <- "20211123"
 dir_create(path(l.path$out, date))
 
 
@@ -91,8 +92,8 @@ p.coef_yr <- map2(
   ~df.reg %>%
     filter(lhs==.x) %>%
     filter(str_detect(var, "^1.grand_NSR_const.*#[0-9]{4}")) %>%
-    mutate(year = str_extract(var, "[0-9]{4}") %>% as.numeric(),
-           var = ifelse(lhs=="DURATION", var/10^3, var)) %>%
+    mutate(year = str_extract(var, "[0-9]{4}") %>% as.numeric()) %>%
+    mutate_at(vars(coef, starts_with("ci_")), ~ifelse(lhs=="DURATION", ./10^3, .)) %>%
     ggplot() +
       geom_hline(yintercept=0, size=0.3, color="#1A1A1A") +
       geom_ribbon(aes(x=year, ymin=ci_lower, ymax=ci_upper), alpha=0.2, fill="#2dCFAC") +

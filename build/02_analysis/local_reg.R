@@ -1,3 +1,28 @@
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Grandfathering
+## 02_analysis/local_reg.R
+## Jack Gregory
+## 20 September 2021
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+# INTRODUCTION ------------------------------------------------------------------------------------
+## This script produces the "local regulations" plot for the Grandfathering project.
+
+
+# VERSION HISTORY ---------------------------------------------------------------------------------
+## V    DATE      EDITOR        NOTES
+## 1.0  20Sep2021 Jack Gregory  Initial version
+## ...
+## 2.0  05Aug2020 Jack Gregory  New version; ...
+## 2.1  26Aug2020 Jack Gregory  New draft; ...
+
+
+### START CODE ###
+
+
+# (1) PREAMBLE ------------------------------------------------------------------------------------
+
 ## (1a) Initiate 
 ## ... Packages
 source(fs::path(here::here(), "src/preamble.R"))
@@ -13,8 +38,15 @@ l.file <- list(
   state = path(l.path$data, "eia/shp/USA_States_Generalized.shp")
 )
 
-## ... Data
-## Grandfathering
+## ... Definitions
+date <- format(Sys.Date(), "%Y%m%d")
+# date <- "20210918"
+fs::dir_create(path(l.path$out, date))
+
+
+# (2) DATA ---------------------------------------------------------------------------------------
+
+## (2a) Grandfathering data
 df.gf <- haven::read_dta(l.file$gf) %>%
   select(ORISPL = plant_code, 
          UNIT = boiler_id,
@@ -23,11 +55,12 @@ df.gf <- haven::read_dta(l.file$gf) %>%
          LOCALREG = leg_lbs_mmbtu_calc) %>%
   arrange(ORISPL, UNIT, YEAR) 
 
+
+## (2b) State spatial data
 df.state <- attributes(df.gf$STATE_CODE)$labels %>%
   as.list() %>%
   as_tibble() %>%
   pivot_longer(cols=everything(), names_to="STATE", values_to="STATE_CODE")
-
 
 # ## State shapefile
 # ## Import state shapefile
@@ -43,22 +76,25 @@ df.state <- attributes(df.gf$STATE_CODE)$labels %>%
 #   coord_sf()
 
 
+# (3) PLOT ---------------------------------------------------------------------------------------
 
-## Plot maps ...
+## (3a) ggplot theme function
 theme_lr <- function() {
   theme_classic() +
-    theme(strip.background = element_rect(fill="grey85", color=NA),
-          axis.line.y = element_blank(),
-          axis.ticks.y = element_blank(),
-          panel.grid.major.y = element_line(colour="grey85", size=0.3),
-          # panel.grid.minor.y = element_line(colour="grey85", size=0.3),
-          axis.line.x = element_line(size=0.4),
-          axis.ticks.x = element_line(size=0.4),
-          axis.text.x = element_text(angle=50, hjust=1),
-          legend.position = "right",
-          plot.caption = element_text(hjust=0))
+  theme(strip.background = element_rect(fill="grey85", color=NA),
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_line(colour="grey85", size=0.3),
+        # panel.grid.minor.y = element_line(colour="grey85", size=0.3),
+        axis.line.x = element_line(size=0.4),
+        axis.ticks.x = element_line(size=0.4),
+        axis.text.x = element_text(angle=50, hjust=1),
+        legend.position = "right",
+        plot.caption = element_text(hjust=0))
 }
 
+
+## (3b) Create missing state datafame
 df.state_miss <- tribble(
   ~STATE, ~YEAR, 
   "California", 1985,
@@ -77,6 +113,8 @@ df.state_miss <- tribble(
   "Vermont", 2017
 )
 
+
+## (3c) Build local regulation plot
 df.gf %>%
   left_join(df.state, by=c("STATE_CODE")) %>%
   filter(YEAR>=1985 & YEAR!=2006 & YEAR<=2017) %>%
@@ -106,4 +144,10 @@ df.gf %>%
          y="Local regulation [lbs/mmBTu]",
          x="") +
     theme_lr()
+
+ggsave(path(l.path$out, date, "fig.local_reg.pdf"),
+       width=11, height=8, units="in")
+
+
+### END CODE ###
 

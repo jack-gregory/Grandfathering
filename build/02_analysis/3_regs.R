@@ -12,12 +12,14 @@
 # DEFINE ------------------------------------------------------------------------------------------
 
 ## Create output folder
-date <- format(Sys.Date(), "%Y%m%d")
+# date <- format(Sys.Date(), "%Y%m%d")
+date <- "20211123"
 dir_create(path(l.path$out, date))
 
 ## Add output files to l.file
-l.file$tbl_main <- path(l.path$out, date, "reg_main.tex")
-l.file$tbl_main_fs <- path(l.path$out, date, "reg_main_fs.tex")
+l.file$tbl_main <- path(l.path$out, date, "tbl.reg_main.tex")
+l.file$tbl_main_fs <- path(l.path$out, date, "tbl.reg_main_fs.tex")
+l.file$tbl_restr <- path(l.path$out, date, "tbl.reg_restr.tex")
 
 
 # MAIN REGRESSIONS --------------------------------------------------------------------------------
@@ -106,6 +108,18 @@ stata_reg.iv <- function(fml, df, ...) {
 }
 
 
+## Define version -------------------------------------------------------------
+
+## Define regression version
+# ver <- "main"
+ver <- "restr"
+
+## Define GF variable
+gf_ver <- "const"
+# gf_ver <- "alt"
+gf <- glue("grand_NSR_{gf_ver}")
+
+
 ## Build specifications -------------------------------------------------------
 
 ## Left-hand side vars
@@ -117,13 +131,9 @@ l.lhs <- list(
 
 ## Right-hand side vars
 ctrl_boiler <- "age max_boi_nameplate"
-ctrl_env <- "so2_nonattain grand_NSR_in_nonnat_const applic_reg applic_reg_const ARPprice_sp"
+ctrl_env <- glue("so2_nonattain grand_NSR_in_nonnat_{gf_ver} applic_reg applic_reg_const ARPprice_sp")
 ctrl_mkt <- "state_cap_growth coal2gas_price d_growth"
 fes <- "i.year i.states i.ut_type"
-
- gf <- "grand_NSR_const"
-# gf <- "gf_1978"
-# gf <- "gf_1981"
 
 l.rhs <- list(
   glue("{gf} {ctrl_boiler} {fes}"),
@@ -141,25 +151,29 @@ l.ctrl <- list(
 )
 
 ## Regression conditions
-l.cond <- list(
-  "if ((ut_type==4|ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994 )",
-  "if ((ut_type==4|ut_type==5 |ut_type==2)& inservice_y>1972 & inservice_y<1994 )",
-  "if ((ut_type==4|ut_type==5 |ut_type==2)& inservice_y>1972 & inservice_y<1994 )",
-  "if ((ut_type==4|ut_type==5 |ut_type==2)& inservice_y>1972 & inservice_y<1994 )",
-  "if ((ut_type==4|ut_type==5 |ut_type==2)&  inservice_y>1972 & inservice_y<1994 )",
-  "if (ut_type!=.& inservice_y>1972 & inservice_y<1994 )",
-  "if (ut_type==4 & inservice_y>1972 & inservice_y<1994 )"
-)
-
-# l.cond <- list(
-#   "if (ut_type==4|ut_type==5 |ut_type==2)",
-#   "if (ut_type==4|ut_type==5 |ut_type==2)",
-#   "if (ut_type==4|ut_type==5 |ut_type==2)",
-#   "if (ut_type==4|ut_type==5 |ut_type==2)",
-#   "if (ut_type==4|ut_type==5 |ut_type==2)",
-#   "if ut_type!=.",
-#   "if ut_type==4"
-# )
+if (ver=="main") {
+  ## Main regs
+  l.cond <- list(
+    "if (ut_type==4 | ut_type==5 | ut_type==2)",
+    "if (ut_type==4 | ut_type==5 | ut_type==2)",
+    "if (ut_type==4 | ut_type==5 | ut_type==2)",
+    "if (ut_type==4 | ut_type==5 | ut_type==2)",
+    "if (ut_type==4 | ut_type==5 | ut_type==2)",
+    "if ut_type!=.",
+    "if ut_type==4"
+  )
+} else {
+  # Robustness regs based on time discontinuity
+  l.cond <- list(
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
+    "if (ut_type!=. & inservice_y>1972 & inservice_y<1994)",
+    "if (ut_type==4 & inservice_y>1972 & inservice_y<1994)"
+  )
+}
 
 ## Regression type
 l.type <- list(
@@ -194,9 +208,9 @@ df.reg <- tibble(l.type, l.rhs, l.ctrl, l.cond) %>%
 ## Build regression table (longtable) -----------------------------------------
 ## Construct column names
 tbl_colnames <- df.reg %>%
-  mutate(owner = case_when(str_detect(fml, "if ut_type==4") ~ "IOU",
-                           str_detect(fml, "ut_type==5") ~ "IOU+",
-                           TRUE ~ "All"))  %>%
+  mutate(owner = case_when(str_detect(fml, "ut_type==5") ~ "IOU+",
+                           str_detect(fml, "ut_type==4") ~ "IOU",
+                           TRUE ~ "All")) %>%
   distinct(model_id, type, owner) %>%
   mutate(model_id = paste0("\\multicolumn{1}{c}{(", model_id, ")}"),
          type = ifelse(type=="reg", "OLS", "IV"),
@@ -211,12 +225,8 @@ tbl_colnames <- df.reg %>%
   mutate_at(vars(last_col(offset=1)), ~str_replace(., " &$", ""))
 
 ## Construct table coefficients
-l.var <- list("grand_NSR_const","max_boi_nameplate","capacity_gf","so2_nonattain",
-              "grand_NSR_in_nonnat_const","applic_reg","applic_reg_const")
-# l.var <- list("gf_1978","max_boi_nameplate","capacity_gf","so2_nonattain",
-#               "grand_NSR_in_nonnat_const","applic_reg","applic_reg_const")
-# l.var <- list("gf_1981","max_boi_nameplate","capacity_gf","so2_nonattain",
-#               "grand_NSR_in_nonnat_const","applic_reg","applic_reg_const")
+l.var <- list(glue("grand_NSR_{gf_ver}"),"max_boi_nameplate","capacity_gf","so2_nonattain",
+              glue("grand_NSR_in_nonnat_{gf_ver}"),"applic_reg","applic_reg_const")
 l.var_labs <- list("GF","size","GF $\\times$ size","NAAQS","GF $\\times$ NAAQS",
                    "MMBTU","GF $\\times$ MMBTU")
 tbl_coef <- df.reg %>%
@@ -273,18 +283,24 @@ tbl_summary <- df.reg %>%
   mutate_at(vars(last_col()), ~paste0(., " \\\\"))
 
 ## Prepare file header, table header and footer, and subtable headers
-f_header <- c("%% Grandfathering Project",
+if (ver=="main") {
+  f_header <- c("%% Grandfathering Project",
               "%% Main regression table",
               glue::glue("%% Compiled on {base::Sys.time()} using <3_regs.R>"),
-              "%% Written by Jack Gregory",
-              "\n")
+              "%% Written by Jack Gregory\n")
+} else {
+  f_header <- c("%% Grandfathering Project",
+                "%% Restricted regression table",
+                glue::glue("%% Compiled on {base::Sys.time()} using <3_regs.R>"),
+                "%% Written by Jack Gregory\n")
+}
 tbl_header1 <- c("\\begin{center}",
                  "\\begin{singlespace}",
                  "\\begin{scriptsize}\n",
-                 paste0("\\begin{longtable}[c]{@{\\extracolsep{0.43ex}}l*{", 
+                 paste0("\\begin{longtable}[c]{@{\\extracolsep{-0.3ex}}l*{", 
                         ncol(tbl_colnames)-2, "}{D{.}{.}{-2}}@{}}"),
                  "\t\\caption{Main regression results}",
-                 "\t\\label{tbl:reg_main}\n",
+                 paste0("\t\\label{tbl:reg_", ver, "}\n"),
                  "\\\\",
                  "\\hline\\hline")
 tbl_header2 <- c("\\midrule \\\\",
@@ -319,47 +335,48 @@ tbl_footer <- c("\\hline\\hline",
 #coal-gas price ratios and generation capacity growth in the state. 
 #Sulfur controls include..
 ## Output TeX table file
-f_header %>% write_lines(l.file$tbl_main, append=FALSE)
-tbl_header1 %>% write_lines(l.file$tbl_main, append=TRUE)
-tbl_colnames %>% write_tsv(l.file$tbl_main, append=TRUE, col_names=FALSE, quote_escape=FALSE)
-tbl_header2 %>% write_lines(l.file$tbl_main, append=TRUE)
-tbl_colnames %>% write_tsv(l.file$tbl_main, append=TRUE, col_names=FALSE, quote_escape=FALSE)
-tbl_header3 %>% write_lines(l.file$tbl_main, append=TRUE)
+file <- l.file[[paste0("tbl_", ver)]]
+f_header %>% write_lines(file, append=FALSE)
+tbl_header1 %>% write_lines(file, append=TRUE)
+tbl_colnames %>% write_tsv(file, append=TRUE, col_names=FALSE, quote_escape=FALSE)
+tbl_header2 %>% write_lines(file, append=TRUE)
+tbl_colnames %>% write_tsv(file, append=TRUE, col_names=FALSE, quote_escape=FALSE)
+tbl_header3 %>% write_lines(file, append=TRUE)
 
-subtbl_headerA %>% write_lines(l.file$tbl_main, append=TRUE)
+subtbl_headerA %>% write_lines(file, append=TRUE)
 tbl_coef %>% 
   filter(lhs=="Utilization") %>%
   select(-lhs) %>%
-  write_tsv(l.file$tbl_main, append=TRUE, col_names=FALSE, quote_escape=FALSE)
-tbl_midder %>% write_lines(l.file$tbl_main, append=TRUE)
+  write_tsv(file, append=TRUE, col_names=FALSE, quote_escape=FALSE)
+tbl_midder %>% write_lines(file, append=TRUE)
 tbl_summary %>% 
   filter(lhs=="Utilization") %>%
   select(-lhs) %>%
-  write_tsv(l.file$tbl_main, append=TRUE, col_names=FALSE, quote_escape=FALSE)
+  write_tsv(file, append=TRUE, col_names=FALSE, quote_escape=FALSE)
 
-subtbl_headerB %>% write_lines(l.file$tbl_main, append=TRUE)
+subtbl_headerB %>% write_lines(file, append=TRUE)
 tbl_coef %>% 
   filter(lhs=="Survival") %>%
   select(-lhs) %>%
-  write_tsv(l.file$tbl_main, append=TRUE, col_names=FALSE, quote_escape=FALSE)
-tbl_midder %>% write_lines(l.file$tbl_main, append=TRUE)
+  write_tsv(file, append=TRUE, col_names=FALSE, quote_escape=FALSE)
+tbl_midder %>% write_lines(file, append=TRUE)
 tbl_summary %>% 
   filter(lhs=="Survival") %>%
   select(-lhs) %>%
-  write_tsv(l.file$tbl_main, append=TRUE, col_names=FALSE, quote_escape=FALSE)
+  write_tsv(file, append=TRUE, col_names=FALSE, quote_escape=FALSE)
 
-subtbl_headerC %>% write_lines(l.file$tbl_main, append=TRUE)
+subtbl_headerC %>% write_lines(file, append=TRUE)
 tbl_coef %>%
   filter(lhs=="Emissions") %>%
   select(-lhs) %>%
-  write_tsv(l.file$tbl_main, append=TRUE, col_names=FALSE, quote_escape=FALSE)
-tbl_midder %>% write_lines(l.file$tbl_main, append=TRUE)
+  write_tsv(file, append=TRUE, col_names=FALSE, quote_escape=FALSE)
+tbl_midder %>% write_lines(file, append=TRUE)
 tbl_summary %>%
   filter(lhs=="Emissions") %>%
   select(-lhs) %>%
-  write_tsv(l.file$tbl_main, append=TRUE, col_names=FALSE, quote_escape=FALSE)
+  write_tsv(file, append=TRUE, col_names=FALSE, quote_escape=FALSE)
 
-tbl_footer %>% write_lines(l.file$tbl_main, append=TRUE)
+tbl_footer %>% write_lines(file, append=TRUE)
 
 
 ## Build regression table (table) ---------------------------------------------
@@ -476,7 +493,7 @@ tbl_footer %>% write_lines(l.file$tbl_main, append=TRUE)
 
 
 ## Clean environment ------------------------------------------------------------------------------
-rm(list=ls(pattern="^(f|tbl)_"))
+rm(list=ls(pattern="^(f|tbl|subtbl)_"))
 rm(list=ls(pattern="^ctrl_"), fes)
 rm(l.lhs, l.rhs, l.ctrl, l.cond, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
 
@@ -500,18 +517,20 @@ fes <- "i.year i.states i.ut_type"
 
 l.rhs <- list(
   glue("grand_NSR_const {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
+  glue("grand_NSR_const {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
   glue("grand_NSR_const {ctrl_boiler} capacity_gf {ctrl_env} i.year i.states")
 )
 
 ## Regression conditions
 l.cond <- list(
-  "",
+  "if (ut_type==4 | ut_type==5 | ut_type==2)",
+  "if ut_type!=.",
   "if ut_type==4"
 )
 
 ## Regression type
 l.type <- list(
-  "reg","reg"
+  "reg","reg","reg"
 )
 
 
@@ -540,16 +559,14 @@ df.reg <- tibble(l.type, l.rhs, l.cond) %>%
 ## Build regression table (table) ---------------------------------------------
 ## Construct column names
 tbl_colnames <- df.reg %>%
-  tbl_colnames <- df.reg %>%
-  mutate(owner = case_when(str_detect(fml, "if ut_type==4") ~ "IOU",
-                           str_detect(fml, "ut_type==5") ~ "Comm,IOU",
-                           TRUE ~ "All"))  %>%
+  mutate(owner = case_when(str_detect(fml, "ut_type==5") ~ "IOU+",
+                           str_detect(fml, "if ut_type==4") ~ "IOU",
+                           TRUE ~ "All")) %>%
   distinct(lhs, model_id, type, owner) %>%
   mutate(lhs = factor(lhs, levels=c("DURATION","survive","SO2"),
                       labels=c("Utilization","Survival","Emissions")),
-         lhs = ifelse(model_id==1, "", 
-                      paste0("\\multicolumn{2}{c}{", lhs, "}")),
-         model_id = ifelse(model_id==1, 4, 6),
+         lhs = ifelse(model_id==max(model_id), paste0("\\multicolumn{3}{c}{", lhs, "}"), ""),
+         model_id = model_id + 3,
          model_id = paste0("\\multicolumn{1}{c}{(", model_id, ")}"),
          type = ifelse(type=="reg", "OLS", "IV"),
          type = paste0("\\multicolumn{1}{c}{\\textit{", type, "}}"),
@@ -557,7 +574,7 @@ tbl_colnames <- df.reg %>%
   mutate_all(~paste0(., " &")) %>%
   mutate(lhs = ifelse(lhs==" &", "", lhs)) %>%
   add_row(lhs=" &", model_id=" &", type=" &", owner=" &", .before=1) %>%
-  add_row(lhs="\\\\ \\cmidrule{2-3}\\cmidrule{4-5}\\cmidrule{6-7}", 
+  add_row(lhs="\\\\ \\cmidrule{2-4}\\cmidrule{5-7}\\cmidrule{8-10}", 
           model_id="\\\\\\\\ [-1.8ex]", type="\\\\\\\\ [-1.8ex]", owner="\\\\") %>%
   t() %>%
   as_tibble() %>%
@@ -624,7 +641,7 @@ tbl_header <- c("\\begin{table}[ht]",
                 "\t\\caption{Main regression first-stage results} ",
                 "\t\\label{tbl:reg_main_fs}",
                 "\\scriptsize\n",
-                paste0("\\begin{tabular}{@{\\extracolsep{1.0ex}}l*{", ncol(tbl_colnames)-2,
+                paste0("\\begin{tabular}{@{\\extracolsep{0.5ex}}l*{", ncol(tbl_colnames)-2,
                        "}{D{.}{.}{-2}}@{}}"),
                 "\\\\[-1.8ex] \\hline",
                 "\\hline \\\\[-1.8ex]")

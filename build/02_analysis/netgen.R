@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## NetGen
+## 02_analysis/netgen.R
 ## Jack Gregory
 ## 23 September 2021
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

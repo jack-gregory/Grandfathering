@@ -64,7 +64,8 @@ source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "3_regs.
 
 # (4) PLOTS ---------------------------------------------------------------------------------------
 
-source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "4_GFanalysis_plots.R")))
+source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "4a_plots_coefyr.R")))
+source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "4a_plots_coefhr.R")))
 
 
 ### END CODE ###
