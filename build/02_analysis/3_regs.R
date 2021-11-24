@@ -129,29 +129,41 @@ l.rhs <- list(
   glue("{gf} {ctrl_boiler} {fes}"),
   glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
   glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
-  glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes} ARPprice_sp ARPprice_sp*sulfur_content_tot"),
+  glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes} ARPprice_sp c.ARPprice_sp#c.sulfur_content_tot"),
+  glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
   glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} {fes}"),
   glue("{gf} {ctrl_boiler} capacity_gf {ctrl_env} i.year i.states")
 )
 
 ## Market controls
 l.ctrl <- list(
-  0,0,1,1,1,1
+  0,0,1,1,1,1,1
 )
 
 ## Regression conditions
 l.cond <- list(
-  "if (ut_type==4|ut_type==5 |ut_type==2)",
-  "if (ut_type==4|ut_type==5 |ut_type==2)",
-  "if (ut_type==4|ut_type==5 |ut_type==2)",
-  "if (ut_type==4|ut_type==5 |ut_type==2)",
-  "if ut_type!=.",
-  "if ut_type==4"
+  "if ((ut_type==4|ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994 )",
+  "if ((ut_type==4|ut_type==5 |ut_type==2)& inservice_y>1972 & inservice_y<1994 )",
+  "if ((ut_type==4|ut_type==5 |ut_type==2)& inservice_y>1972 & inservice_y<1994 )",
+  "if ((ut_type==4|ut_type==5 |ut_type==2)& inservice_y>1972 & inservice_y<1994 )",
+  "if ((ut_type==4|ut_type==5 |ut_type==2)&  inservice_y>1972 & inservice_y<1994 )",
+  "if (ut_type!=.& inservice_y>1972 & inservice_y<1994 )",
+  "if (ut_type==4 & inservice_y>1972 & inservice_y<1994 )"
 )
+
+# l.cond <- list(
+#   "if (ut_type==4|ut_type==5 |ut_type==2)",
+#   "if (ut_type==4|ut_type==5 |ut_type==2)",
+#   "if (ut_type==4|ut_type==5 |ut_type==2)",
+#   "if (ut_type==4|ut_type==5 |ut_type==2)",
+#   "if (ut_type==4|ut_type==5 |ut_type==2)",
+#   "if ut_type!=.",
+#   "if ut_type==4"
+# )
 
 ## Regression type
 l.type <- list(
-  "reg","reg","reg","iv","iv","iv"
+  "reg","reg","reg","reg","iv","iv","iv"
 )
 
 
@@ -269,7 +281,7 @@ f_header <- c("%% Grandfathering Project",
 tbl_header1 <- c("\\begin{center}",
                  "\\begin{singlespace}",
                  "\\begin{scriptsize}\n",
-                 paste0("\\begin{longtable}[c]{@{\\extracolsep{0.7ex}}l*{", 
+                 paste0("\\begin{longtable}[c]{@{\\extracolsep{0.43ex}}l*{", 
                         ncol(tbl_colnames)-2, "}{D{.}{.}{-2}}@{}}"),
                  "\t\\caption{Main regression results}",
                  "\t\\label{tbl:reg_main}\n",
@@ -296,16 +308,16 @@ tbl_midder <- c("\\hline \\\\ [-1.8ex]")
 tbl_footer <- c("\\hline\\hline",
                 paste0("\\textit{Notes:} & \\multicolumn{", ncol(tbl_colnames)-2,
                        "}{l}{*** p$<$0.001;  ** p$<$0.01;  * p$<$0.05; ",
-                       "\\textit{t}-statistics in parentheses. Market controls include electricity demand growth, 
-                       coal-gas price ratios and generation capacity growth in the state. 
-                       Sulfur controls include applicable ARPprice_sp
-                       state_cap_growth coal2gas_price d_growth  } \\\\"),
+                       "\\textit{t}-statistics in parentheses.  } \\\\"),
                 "\\\\",
                 "\\end{longtable}\n",
                 "\\end{scriptsize}",
                 "\\end{singlespace}",
                 "\\end{center}")
 
+#Add to notes: Market controls include electricity demand growth, 
+#coal-gas price ratios and generation capacity growth in the state. 
+#Sulfur controls include..
 ## Output TeX table file
 f_header %>% write_lines(l.file$tbl_main, append=FALSE)
 tbl_header1 %>% write_lines(l.file$tbl_main, append=TRUE)
