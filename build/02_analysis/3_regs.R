@@ -6,14 +6,15 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+# for the restricted sample - can we automatically remove the survival panel?
 ### START CODE ###
 
 
 # DEFINE ------------------------------------------------------------------------------------------
 
 ## Create output folder
-# date <- format(Sys.Date(), "%Y%m%d")
-date <- "20211123"
+ date <- format(Sys.Date(), "%Y%m%d")
+#date <- "20211123"
 dir_create(path(l.path$out, date))
 
 ## Add output files to l.file
@@ -115,7 +116,7 @@ stata_reg.iv <- function(fml, df, ...) {
 ver <- "restr"
 
 ## Define GF variable
-gf_ver <- "const"
+ gf_ver <- "const"
 # gf_ver <- "alt"
 gf <- glue("grand_NSR_{gf_ver}")
 
@@ -153,25 +154,26 @@ l.ctrl <- list(
 ## Regression conditions
 if (ver=="main") {
   ## Main regs
+  # "condition ut_type!=." does not matter - same observation set
   l.cond <- list(
     "if (ut_type==4 | ut_type==5 | ut_type==2)",
     "if (ut_type==4 | ut_type==5 | ut_type==2)",
     "if (ut_type==4 | ut_type==5 | ut_type==2)",
     "if (ut_type==4 | ut_type==5 | ut_type==2)",
     "if (ut_type==4 | ut_type==5 | ut_type==2)",
-    "if ut_type!=.",
+    "if year<2019",
     "if ut_type==4"
   )
 } else {
   # Robustness regs based on time discontinuity
   l.cond <- list(
-    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
-    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
-    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
-    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
-    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>1972 & inservice_y<1994)",
-    "if (ut_type!=. & inservice_y>1972 & inservice_y<1994)",
-    "if (ut_type==4 & inservice_y>1972 & inservice_y<1994)"
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>=1970 & inservice_y<1995)",
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>=1970 & inservice_y<1995)",
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>=1970 & inservice_y<1995)",
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>=1970 & inservice_y<1995)",
+    "if ((ut_type==4 | ut_type==5 |ut_type==2) & inservice_y>=1970 & inservice_y<1995)",
+    "if (year<2019 & inservice_y>=1970 & inservice_y<1995)",
+    "if (ut_type==4 & inservice_y>=1970 & inservice_y<1995)"
   )
 }
 
@@ -204,6 +206,10 @@ df.reg <- tibble(l.type, l.rhs, l.ctrl, l.cond) %>%
                              N, r2, r2_a))) %>%
   unnest(model)
 
+## Summarize formulae
+df.reg_summary <- df.reg %>% 
+  distinct(lhs, model_id, type, fml)
+
 
 ## Build regression table (longtable) -----------------------------------------
 ## Construct column names
@@ -226,9 +232,9 @@ tbl_colnames <- df.reg %>%
 
 ## Construct table coefficients
 l.var <- list(glue("grand_NSR_{gf_ver}"),"max_boi_nameplate","capacity_gf","so2_nonattain",
-              glue("grand_NSR_in_nonnat_{gf_ver}"),"applic_reg","applic_reg_const")
+              glue("grand_NSR_in_nonnat_{gf_ver}"),"applic_reg","applic_reg_const", "sulf_cont_iv")
 l.var_labs <- list("GF","size","GF $\\times$ size","NAAQS","GF $\\times$ NAAQS",
-                   "MMBTU","GF $\\times$ MMBTU")
+                   "MMBTU","GF $\\times$ MMBTU", "SO2cont IV")
 tbl_coef <- df.reg %>%
   filter(var %in% unlist(l.var)) %>%
   mutate_at(vars(coef, tstat), ~formatC(round(., digits=2), format="f", digits=2)) %>%
@@ -499,6 +505,10 @@ rm(l.lhs, l.rhs, l.ctrl, l.cond, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
 
 
 # FIRST STAGE REGRESSIONS-------------------------------------------------------------------------
+# changes needed:
+# have two  sets of regressions (separately for utilization/survival and emissions)
+# change the footnote (like in overleaf)
+# automate the first stage with the second stage
 
 ## Build specifications -------------------------------------------------------
 
