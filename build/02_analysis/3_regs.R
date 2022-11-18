@@ -6,14 +6,15 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+# for the restricted sample - can we automatically remove the survival panel?
 ### START CODE ###
 
 
 # DEFINE ------------------------------------------------------------------------------------------
 
 ## Create output folder
-# date <- format(Sys.Date(), "%Y%m%d")
-date <- "20221117"
+date <- format(Sys.Date(), "%Y%m%d")
+# date <- "20221117"
 dir_create(path(l.path$out, date))
 
 
@@ -957,7 +958,7 @@ rm(list=ls(pattern="^ctrl_"), fes, file, gf)
 rm(l.lhs, l.rhs, l.cond, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
 
 
-# # MAIN REGRESSIONS (fixest) ----------------------------------------------------------------------
+# MAIN REGRESSIONS (fixest) -----------------------------------------------------------------------
 # 
 # library(fixest)
 # 
