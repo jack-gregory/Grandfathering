@@ -14,7 +14,7 @@
 
 ## Define import files
 l.file <- list(
-  gf = path(l.path$data, "gf_original/regressions_ready_data.dta")
+  gf = path(l.path$data, "gf_original/regressions_ready_data2.dta")
 )
 
 ## Import GF dataset

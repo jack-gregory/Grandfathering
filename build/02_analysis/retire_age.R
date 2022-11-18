@@ -73,7 +73,7 @@ theme_ra <- function() {
 }
 
 
-## (3c) Count plot w/ ten-year bins
+## (3b) Count plot w/ ten-year bins
 df.gf %>% 
   filter(SURVIVE==0) %>% 
   filter(YEAR>=1985 & YEAR<=2017) %>%
@@ -109,7 +109,7 @@ ggsave(path(l.path$out, date, "fig.retire_age_count.pdf"),
        width=8, height=4.5, units="in")
 
 
-## (3d) Share plot w/ ten-year bins
+## (3c) Share plot w/ ten-year bins
 df.gf %>% 
   filter(SURVIVE==0) %>% 
   filter(YEAR>=1985 & YEAR<=2017) %>%
