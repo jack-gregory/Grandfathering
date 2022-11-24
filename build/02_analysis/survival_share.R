@@ -32,7 +32,7 @@ source(fs::path(here::here(), "src/def_paths.R"))
 
 ## ... Files
 l.file <- list(
-  gf = path(l.path$data, "gf_original/regressions_ready_data.dta")
+  gf = path(l.path$data, "gf_original/regressions_ready_data2.dta")
 )
 
 ## ... Definitions
@@ -97,7 +97,7 @@ theme_ss <- function() {
         panel.grid.minor.y = ggplot2::element_line(colour="grey85", size=0.3),
         axis.line.x = ggplot2::element_line(size=0.4),
         axis.ticks.x = ggplot2::element_line(size=0.4),
-        axis.text.x = element_text(angle=90, vjust=0.1),
+        axis.text.x = element_text(angle=60, vjust=0.5),
         legend.position = "right",
         plot.caption = ggplot2::element_text(hjust=0, size=8))
 }
@@ -158,14 +158,14 @@ df.gf %>%
   mutate(SHARE = N/N_MAX,
          VINTAGE_NUM = as.numeric(VINTAGE_BIN)) %>%
   ggplot() +
-    geom_area(aes(x=VINTAGE_NUM, y=N_MAX/300, fill="grey90"), 
-              color="grey80", alpha=0.4) +
+    geom_area(aes(x=VINTAGE_NUM, y=N_MAX/250, fill="#433E85"), 
+              color="#433E85", alpha=0.2) +
     geom_col(aes(x=VINTAGE_NUM, y=SHARE, fill="#20A387"), 
              width=0.75, color="#20A387", size=0.5, alpha=0.8) +
     # geom_vline(aes(xintercept=5.5), color="#33638D", linetype="dashed", size=0.5) +
     scale_fill_identity(guide="legend", name="", labels=c("Share","Number")) +
-    scale_y_continuous(name="Survival share",
-                       sec.axis = sec_axis(~.*300, name="Number of boilers")) +
+    scale_y_continuous(name="Survival share", labels=label_percent(), limits=c(0,1), breaks=seq(0,1,0.2),
+                       sec.axis = sec_axis(~.*250, name="Number of boilers")) +
     scale_x_continuous(breaks=seq(1,8),
                        labels=c("(1932,1942]","(1942,1952]","(1952,1962]","(1962,1972]",
                                 "(1972,1982]","(1982,1992]","(1992,2002]","(2002,2012]")) +

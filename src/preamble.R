@@ -71,11 +71,12 @@ library(assertr)
 ## tidyverse
 ## Comprehensive data science package
 ## Includes tibble, readr, tidyr, dplyr, stringr, forcats, purrr, ggplot2
-install.packages(setdiff(c("tidyverse","lubridate","glue"), 
+install.packages(setdiff(c("tidyverse","lubridate","glue","scales"), 
                          rownames(installed.packages())))
 library(tidyverse)
 library(lubridate)
 library(glue)
+library(scales)
 
 
 ### END CODE ###
