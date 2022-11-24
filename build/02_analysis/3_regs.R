@@ -6,7 +6,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-# for the restricted sample - can we automatically remove the survival panel?
 ### START CODE ###
 
 
@@ -265,8 +264,8 @@ for (v in l.version) {
     unnest(cols=c(l.lhs, data)) %>%
     rename_with(.fn=~str_replace(., "l\\.", "")) %>%
     mutate(ctrl = ifelse(lhs!="SO2" & ctrl==1, ctrl_mkt, ""),
-           sample = ifelse(lhs=="survive", "& max_boi_nameplate>0.075", ""),
            cond = as.character(cond),
+           sample = ifelse(lhs=="survive", "& max_boi_nameplate>0.075 & year<=2017", ""),
            fml = paste(lhs, rhs, ctrl, cond, sample, sep=" ")) %>%
     mutate_at(vars(-model_id), as.character) %>%
     mutate(bs = ifelse(type=="iv", TRUE, FALSE)) %>%
@@ -664,7 +663,8 @@ for (v in l.version) {
     rename_with(.fn=~str_replace(., "l\\.", "")) %>%
     mutate(ctrl = ctrl_mkt,
            cond = as.character(cond),
-           fml = paste("sulfur_content_tot sulfur_dist", rhs, ctrl, cond, sep=" ")) %>%
+           sample = ifelse(lhs=="survive", "& max_boi_nameplate>0.075 & year<=2017", ""),
+           fml = paste("sulfur_content_tot sulfur_dist", rhs, ctrl, cond, sample, sep=" ")) %>%
     mutate_at(vars(-model_id), as.character) %>%
     mutate(model = map2(fml, type,
                         ~stata_reg(fml=.x, df=df.gf, type=.y, bootstrap=FALSE)),
