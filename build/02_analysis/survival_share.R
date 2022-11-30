@@ -164,7 +164,7 @@ df.gf %>%
              width=0.75, color="#20A387", size=0.5, alpha=0.8) +
     # geom_vline(aes(xintercept=5.5), color="#33638D", linetype="dashed", size=0.5) +
     scale_fill_identity(guide="legend", name="", labels=c("Share","Number")) +
-    scale_y_continuous(name="Survival share", labels=label_percent(), limits=c(0,1), breaks=seq(0,1,0.2),
+    scale_y_continuous(name="Survival share", limits=c(0,1), breaks=seq(0,1,0.2), #labels=label_percent(), 
                        sec.axis = sec_axis(~.*250, name="Number of boilers")) +
     scale_x_continuous(breaks=seq(1,8),
                        labels=c("(1932,1942]","(1942,1952]","(1952,1962]","(1962,1972]",
@@ -175,7 +175,10 @@ df.gf %>%
          #caption="Note: Vertical dashed line represents the approximate NSR cutoff."
          ) +
     theme_ss() +
-    guides(fill = guide_legend(override.aes=list(color=NA)))
+    theme(axis.title.y = element_text(colour="#20A387", face="bold"),
+          axis.title.y.right = element_text(colour="#433E85", face="bold"),
+          axis.title.x = element_text(face="bold")) +
+    guides(fill = guide_legend(override.aes=list(color=c(NA,"#433E85"), alpha=c(0.8,0.2))))
 
 ggsave(path(l.path$out, date, "fig.survival_share_10yr.pdf"),
        width=7, height=4, units="in")

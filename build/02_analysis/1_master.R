@@ -40,6 +40,9 @@ library(RStata)
 if (Sys.info()[["user"]]=="Jack") {
   options("RStata.StataPath"="\"C:\\Program Files (x86)\\Stata14\\StataSE-64\"")
   options("RStata.StataVersion"=14.2)
+} else if (Sys.info()[["user"]]=="ajg") {
+  options("RStata.StataPath"="\"C:\\Program Files\\Stata16\\StataIC-64\"")
+  options("RStata.StataVersion"=16.1)
 } else if (Sys.info()[["user"]]=="Bialek-S") {
   options("RStata.StataPath"="\"C:\\Program Files\\Stata16\\StataSE-64\"")
   options("RStata.StataVersion"=16.1)

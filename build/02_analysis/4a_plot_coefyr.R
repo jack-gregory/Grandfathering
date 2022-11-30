@@ -12,14 +12,16 @@
 # DEFINE ------------------------------------------------------------------------------------------
 
 ## Create output folder
-# date <- format(Sys.Date(), "%Y%m%d")
-date <- "20211123"
+date <- format(Sys.Date(), "%Y%m%d")
+# date <- "20211123"
 dir_create(path(l.path$out, date))
 
 
 # YEARLY COEFFICIENT PLOTS ------------------------------------------------------------------------
 
 ## Build specifications -------------------------------------------------------
+## NB - Here we use the Column (5) specification within the "main" regression 
+##      table.  This is an IV reg restricted to ut_type ∈ [2,4,5].
 
 ## Left-hand side vars
 l.lhs <- list(
@@ -40,12 +42,12 @@ l.rhs <- list(
 
 ## Regression conditions
 l.cond <- list(
-  ""
+  "if (ut_type==4 | ut_type==5 | ut_type==2)"
 )
 
 ## Regression type
 l.type <- list(
-  "reg"
+  "iv"
 )
 
 
@@ -64,7 +66,8 @@ df.reg <- tibble(l.type, l.rhs, l.cond) %>%
   ## Include market controls
   mutate(ctrl = ifelse(lhs!="SO2", ctrl_mkt, ""),
          cond = as.character(cond),
-         fml = paste(lhs, rhs, ctrl, cond, sep=" ")) %>%
+         sample = ifelse(lhs=="survive", "& max_boi_nameplate>0.075 & year<=2017", ""),
+         fml = paste(lhs, rhs, ctrl, cond, sample, sep=" ")) %>%
   
   ## Exclude market controls
   # mutate(cond = as.character(cond),
@@ -72,8 +75,9 @@ df.reg <- tibble(l.type, l.rhs, l.cond) %>%
   
   ## Run regressions
   mutate_at(vars(-model_id), as.character) %>%
-  mutate(model = map2(fml, type,
-                      ~stata_reg(.x, df.gf, .y)),
+  mutate(bs = ifelse(type=="iv", TRUE, FALSE)) %>%
+  mutate(model = pmap(list(fml, type, bs),
+                      ~stata_reg(fml=..1, df=df.gf, type=..2, bootstrap=..3)),
          model = map(model, 
                      ~select(.x, var, coef, stderr, tstat, pval, ci_lower, ci_upper, 
                              N, r2, r2_a))) %>%
@@ -88,7 +92,7 @@ l.name <- list("utilization","survival","emissions")
 ## Build yearly regression plots
 p.coef_yr <- map2(
   l.lhs,
-  list("Hours under load ['000 hrs]","Survival probability [pct pts]","Emissions [SO2 lbs/MWh]"),
+  list("Hours under load ['000 hrs]","Survival probability [pct pts]","Emissions [SO2 lbs per MW of capacity\nper hour run]"),
   ~df.reg %>%
     filter(lhs==.x) %>%
     filter(str_detect(var, "^1.grand_NSR_const.*#[0-9]{4}")) %>%

@@ -13,7 +13,7 @@
 
 ## Create output folder
 # date <- format(Sys.Date(), "%Y%m%d")
-date <- "20211123"
+date <- "20221130"
 dir_create(path(l.path$out, date))
 
 ## Create list of hourly CEMS files
@@ -32,7 +32,7 @@ l.cems <- path(l.path$data, "epa") %>%
 ## hr = hour as a two-digit string (i.e. "00", "01", etc.)
 
 ## Method set & use function
-itr_hr <- function(fml, df, type, hr) {
+itr_hr <- function(fml, df, type, hr, bootstrap=FALSE) {
   
   ## Assertions
   if (!exists("l.path")) {
@@ -44,7 +44,8 @@ itr_hr <- function(fml, df, type, hr) {
     is.character(type),
     type %in% c("reg","iv"),
     is.character(hr),
-    hr %in% (seq(0,23) %>% formatC(format="d", width=2, flag="0"))
+    hr %in% (seq(0,23) %>% formatC(format="d", width=2, flag="0")),
+    is.logical(bootstrap)
   )
   
   cat("\nHOUR ", hr, " ...\n", sep="")
@@ -62,11 +63,13 @@ itr_hr <- function(fml, df, type, hr) {
     mutate(SO2 = SO2_MASS / (DURATION * max_boi_nameplate * 10^3)) %>%
     
     ## Perform regression
-    {stata_reg(fml, ., type)}
+    {stata_reg(fml=fml, df=., type=type, bootstrap=bootstrap)}
 }
 
 
 ## Build specifications -------------------------------------------------------
+## NB - Here we use the Column (5) specification within the "main" regression 
+##      table.  This is an IV reg restricted to ut_type ∈ [2,4,5].
 
 ## Left-hand side vars
 l.lhs <- list(
@@ -86,7 +89,7 @@ l.rhs <- list(
 
 ## Regression conditions
 l.cond <- list(
-  ""
+  "if (ut_type==4 | ut_type==5 | ut_type==2)"
 )
 
 ## Regression type
@@ -115,9 +118,9 @@ df.reg_hr <- tibble(l.type, l.rhs, l.cond) %>%
   
   ## Run regressions
   mutate_all(as.character) %>%
-  # slice(2:3) %>%
-  mutate(model = pmap(list(fml, type, hr),
-                      ~itr_hr(..1, df.gf, ..2, ..3)),
+  mutate(bs = ifelse(type=="iv", TRUE, FALSE)) %>%
+  mutate(model = pmap(list(fml, type, hr, bs),
+                      ~itr_hr(fml=..1, df=df.gf, type=..2, hr=..3, bootstrap=..4)),
          model = map(model, 
                      ~select(.x, var, coef, stderr, tstat, pval, ci_lower, ci_upper, 
                              N, r2, r2_a))) %>%

@@ -45,7 +45,7 @@ source(here("src/text_colour.R"))
 ## ... Files
 l.file <- list(
   gf_raw = path(l.path$data, "gf_original/in_regression_vars_BP.csv"),
-  gf_cln = path(l.path$data, "gf_original/regressions_ready_data.dta"),
+  gf_cln = path(l.path$data, "gf_original/regressions_ready_data2.dta"),
   epa_eia_xwalk = path(l.path$data, "epa/epa_eia_crosswalk.csv"),
   gf_cems_xwalk = path(l.path$data, "gf_cems_xwalk.csv"),
   epa = path(l.path$data, "epa/Facility_Attributes.zip"),
@@ -323,7 +323,7 @@ ggplot() +
        size="Boilers") +
   theme_maps() +
   guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
-         size = guide_legend(order=2), override.aes=list(alpha=0.5))
+         size = guide_legend(order=2, override.aes=list(shape=1, alpha=0.5)))
 
 ggplot() +
   geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
@@ -336,7 +336,7 @@ ggplot() +
        size="Boilers") +
   theme_maps() +
   guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
-         size = guide_legend(order=2), override.aes=list(alpha=0.5))
+         size = guide_legend(order=2, override.aes=list(shape=1, alpha=0.5)))
 
 ggplot() +
   geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
@@ -349,9 +349,9 @@ ggplot() +
        size="Boilers") +
   theme_maps() +
   guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
-         size = guide_legend(order=2), override.aes=list(alpha=0.5))
+         size = guide_legend(order=2, override.aes=list(shape=1, alpha=0.5)))
 
-# ggsave(path(l.path$out, date, "fig.gf_share_map.png"),
+# ggsave(path(l.path$out, date, "fig.gf_share_map.pdf"),
 #        width=8, height=4.25, units="in")
 ```
 

@@ -45,10 +45,15 @@ source(here("src/text_colour.R"))
 
 ## ... Files
 l.file <- list(
-  gf = path(l.path$data, "gf_original/regressions_ready_data.dta"),
+  gf = path(l.path$data, "gf_original/regressions_ready_data2.dta"),
   state = path(l.path$data, "eia/shp/USA_States_Generalized.shp"),
   county = path(l.path$data, "eia/shp/USA_Counties_(Generalized).shp")
 )
+
+## ... Definitions
+date <- format(Sys.Date(), "%Y%m%d")
+# date <- "20211123"
+fs::dir_create(path(l.path$out, date))
 ```
 
 ```{r theme, include=FALSE}
@@ -238,8 +243,8 @@ df.gf_cent <- df.county %>%
 ## Plot
 ggplot() +
   geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
-  geom_sf(data=df.gf_cent, aes(color=INSERVICE_GRP, size=N_RET), alpha=0.4) +
-  scale_color_viridis_d(end=0.9, na.value="grey50") +
+  geom_sf(data=df.gf_cent, aes(color=INSERVICE_GRP, size=N_RET)) +
+  scale_color_viridis_d(end=0.9, alpha=0.4) +
   scale_size(breaks=c(5,10)) +
   coord_sf() +
   labs(#title="Boiler retirements by in-service year and size",
@@ -247,7 +252,9 @@ ggplot() +
        size="Number of\nboilers") +
   theme_maps() +
   guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
-         size = guide_legend(order=2), override.aes=list(alpha=0.5))
-  
+         size = guide_legend(order=2, override.aes=list(shape=1, alpha=0.5)))
+
+# ggsave(path(l.path$out, date, "fig.retire_map.pdf"),
+#        width=8, height=4.25, units="in")
 ```
 
