@@ -56,7 +56,7 @@ l.file <- list(
   epa_eia_xwalk = path(l.path$data, "epa/epa_eia_crosswalk.csv"),
   gf_cems_xwalk = path(l.path$data, "gf_cems_xwalk.xlsx"),
   epa = path(l.path$data, "epa/Facility_Attributes.zip"),
-  gf= path(l.path$data, "gf_original/regressions_ready_data.dta"),
+  gf= path(l.path$data, "gf_original/regressions_ready_data2.dta"),
   netgen = path(l.path$data, "eia_netgen.csv"),
   netgen_unit = path(l.path$data, "eia_netgen_unit.csv")
 )
@@ -285,12 +285,12 @@ query_cems <- function(yr, con) {
 
 ## (4b) Query MySQL epa.cems table
 ## Connect to MySQL
-con <- DBI::dbConnect(RMySQL::MySQL(), 
-                      user="root", 
-                      password="blackberries22-", 
-                      dbname="epa", 
-                      host="localhost")
-
+# con <- DBI::dbConnect(RMySQL::MySQL(), 
+#                       user="root", 
+#                       password="blackberries22-", 
+#                       dbname="epa", 
+#                       host="localhost")
+con <- DBI::dbConnect(odbc::odbc(), "local_epa")
 
 ## Query CEMS
 df.cems <- map_dfr(l.yrs, ~query_cems(yr=.x, con=con))
@@ -328,9 +328,11 @@ df.gr <- df.cems %>%
          GLOAD, SLOAD, NETGEN, GR, OWNER, AGE, CAP, HEAT, SULFUR, SULFUR_DIST) %>%
   arrange(ORISPL, GF_BOILER_ID, YR, MTH)
 
+## Save dataframe
+# saveRDS(df.gr, here::here("data/df_gr.rds"))
+
 
 # (5) ANALYSIS ------------------------------------------------------------------------------------
-
 
 ## (5a) Check GR weighted average by DURATION
 df.gr %>%
@@ -345,10 +347,11 @@ df.gr %>%
 l.spec <- list(
   Base = as.formula(GR ~ GF),
   `+Chars` = as.formula(GR ~ GF + AGE + CAP),
-  `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + factor(YR) + factor(MTH)),
+  # `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + factor(YR) + factor(MTH)),
   `+Heat` = as.formula(GR ~ GF + AGE + CAP + HEAT),
   `+Sulfur` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR),
-  `+OwnerFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER))
+  `+OwnerFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER)),
+  `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER) + factor(YR) + factor(MTH))
 )
 
 ## Display regressions
@@ -406,7 +409,7 @@ regtbl <- function(df, tbl.type="text") {
             label = label,
             style = "aer",
             out = out,
-            covariate.labels = c("Grandfathering"),
+            covariate.labels = c("Constant","Grandfathering"),
             dep.var.labels = NULL,
             dep.var.labels.include = FALSE,
             add.lines = add.lines,
@@ -417,7 +420,7 @@ regtbl <- function(df, tbl.type="text") {
             digits.extra = 3,
             font.size = "scriptsize",
             header = FALSE,
-            keep = c("^GF$"),
+            keep = c("^Constant$","^GF$"),
             keep.stat = c("n", "rsq", "adj.rsq"),
             model.names = FALSE,
             model.numbers = TRUE,
@@ -425,7 +428,7 @@ regtbl <- function(df, tbl.type="text") {
             notes = c("*** p$<$0.001;  ** p$<$0.01;  * p$<$0.05;",
                       "t-statistics in parentheses."),
             notes.append = FALSE,
-            order = c("GF"),
+            order = c("Constant","GF"),
             report = "vc*t",
             star.cutoffs = c(0.05, 0.01, 0.001),
             table.layout = "=#m-t-as=n",
@@ -436,6 +439,15 @@ regtbl <- function(df, tbl.type="text") {
 ## Build regtbl
 regtbl(df.reg %>% slice(1:2))
 regtbl(df.reg %>% slice(1:2), tbl.type="latex")
+
+## Caption
+# This table reports results from two weighted least squares regressions based on 
+# Equation (\ref{Eq:net-to-gross}).  The dependent variable is net-to-gross 
+# generation ratio, while the weights are based on monthly durations.  Column (1)
+# essentially represents the pure weighted average, while Column (2) presents one
+# conditional on age and size. They rely on CEMS and EIA-861 data from 2008 to 2017.  
+# Significance is represented as *** for p$<$0.001, ** for p$<$0.01, and * for 
+# p$<$0.05; while, \textit{t}-statistics are in parentheses.
 
 
 ## (5d) Perform fe regressions
