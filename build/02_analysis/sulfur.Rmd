@@ -1,7 +1,7 @@
 ---
 title:  "Sulfur instrumental variable"
 author: "Jack Gregory"
-date:   "25 August 2021"
+date:   "2 March 2024"
 output:
   bookdown::html_document2:
     toc:          yes
@@ -35,46 +35,36 @@ knitr::opts_chunk$set(
 ## ... Packages
 source(here::here("src/preamble.R"))
 
-install.packages(setdiff(c("sf"), rownames(installed.packages())))
-library(sf)
+pkgs <- c(
+  "sf",                               # Spatial data
+  "sfnetworks","tidygraph",           # Network data
+  "plotly","ggrepel"                  # Plots
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
 
 ## ... Functions
 source(here("src/def_paths.R"))
 source(here("src/text_colour.R"))
+source(here("src/plots.R"))
+source(here("src/networks.R"))
 
 ## ... Files
 l.file <- list(
   sulfur = path(l.path$data, "eia_sulfur.rds"),
-  gf = path(l.path$data, "gf_original/in_regression_vars_BP.csv"),
+  # gf = path(l.path$data, "gf_original/in_regression_vars_BP.csv"),
+  gf = path(l.path$data, "gf_original/regression_vars.csv"),
   epa = path(l.path$data, "epa/Facility_Attributes.zip"),
   state = path(l.path$data, "eia/shp/USA_States_Generalized.shp"),
   county = path(l.path$data, "eia/shp/USA_Counties_(Generalized).shp"),
+  rail = path(l.path$data, "bts/North_American_Rail_Network_Lines.zip"),
+  rail1 = path(l.path$data, "bts/North_American_Rail_Network_Lines_-_Class_I_Freight_Railroads_View.zip"),
+  marine = path(l.path$data, "bts/Marine_Highways.zip"),
   out = path(l.path$data, "sulfur_iv.csv")
 )
 ```
 
-```{r theme, include=FALSE}
-
-theme_sulfur <- function() {
-  theme_classic() +
-  theme(strip.background = element_rect(fill="grey85", color=NA),
-        axis.line.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        panel.grid.major.y = element_line(colour="grey85", size=0.3),
-        panel.grid.minor.y = element_line(colour="grey85", size=0.3),
-        axis.line.x = element_line(size=0.4),
-        axis.ticks.x = element_line(size=0.4),
-        legend.position = "right",
-        plot.caption = element_text(hjust=0))
-}
-
-theme_maps <- function() {
-  theme_void() +
-  theme(legend.position = "right",
-        legend.text = element_text(size=7),
-        plot.caption = element_text(hjust=0))
-} 
-```
 
 # Objective
 
@@ -190,7 +180,7 @@ st_crs(df.state)
 ## Plot
 ggplot(data=df.state) +
   geom_sf(color="grey40", fill="grey90", size=0.3) +
-  coord_sf()
+  coord_sf(crs=sf::st_crs(2163))
 ```
 
 
@@ -210,19 +200,101 @@ st_crs(df.county)
 ## Plot
 ggplot(data=df.county) +
   geom_sf(color="grey40", fill="grey90", size=0.3) +
-  coord_sf()
+  coord_sf(crs=sf::st_crs(2163))
+```
+
+
+## Rail network
+
+The rail spatial data is sourced from the [BTS](https://geodata.bts.gov/maps/north-american-rail-network-lines).  We restrict the dataset to the continental US.
+<!-- , to only Class I railways, and to the top seven rail freight firms which account for around 94% of rail freight revenues (Preonas, 2023). -->
+
+```{r sf-rail, fig.cap="Rail network shapefile"}
+
+## Unzip BTS rail network data
+bts_rail_files <- zip::zip_list(l.file$rail) %>%
+  pull(filename)
+zip::unzip(l.file$rail, file=bts_rail_files, exdir=path(l.path$data, "bts"))
+
+## Import rail shapefile
+df.rail <- fs::path(l.path$data, "bts") %>%
+  fs::dir_ls(regexp="\\.shp$") %>%
+  read_sf() %>%
+  filter(country=="US") %>%
+  filter(!(stateab %in% c("AK","HI"))) %>%
+  filter(stfips!="99") #%>%
+  # filter(RROWNER1 %in% c("BNSF","CN","CPRS","CSXT","KCS","NS","UP"))
+
+## Remove BTS rail network data
+purrr::map(
+  bts_rail_files,
+  ~fs::file_delete(fs::path(l.path$data, "bts", .x))
+)
+
+## Display coordinate reference system
+st_crs(df.rail)
+
+## Plot
+ggplot(df.rail) +
+  geom_sf(color="grey40", fill="grey90", size=0.3) +
+  coord_sf(crs=sf::st_crs(2163))
+```
+
+
+## Marine highways
+
+The marine spatial data is sourced from the [BTS](https://geodata.bts.gov/maps/marine-highways).  We restrict the dataset to the continental US and the Great Lakes.
+
+```{r sf-marine, fig.cap="Marine highway shapefile"}
+
+## Unzip BTS marine highway data
+bts_marine_files <- zip::zip_list(l.file$marine) %>%
+  pull(filename)
+zip::unzip(l.file$marine, file=bts_marine_files, exdir=path(l.path$data, "bts"))
+
+## Import marine shapefile
+df.marine <- fs::path(l.path$data, "bts") %>%
+  fs::dir_ls(regexp="\\.shp$")  %>%
+  read_sf() %>%
+  filter(!(st_usps %in% c("AK","HI","PR","XX"))) %>%
+  filter(!is.na(st_usps)) #%>%
+  # filter(!(ww_name %in% c("Gulf Intracoastal Waterway"))) %>%
+  # filter(!stringr::str_detect(ww_name, "Deep Water Access"))
+
+## Remove BTS rail network data
+purrr::map(
+  bts_marine_files,
+  ~fs::file_delete(fs::path(l.path$data, "bts", .x))
+)
+
+## Display coordinate reference system
+st_crs(df.marine)
+
+## Plot
+ggplot(df.marine) +
+  geom_sf(color="grey40", fill="grey90", size=0.3) +
+  coord_sf(crs=sf::st_crs(2163))
 ```
 
 
 # Construction
 
-We now construct the metric by:
+We now construct the various metrics:
 
-1. Building a complete set of plant coordinates;
-2. Merging county spatial data with its corresponding sulfur data; and,
-3. ...
+- Weighted by straight-line distance;
+- Nearest low-sulfur coal; and,
+- Weighted by network distance.
 
-## Plant coordinates
+We proceed by:
+
+1. [Building a complete set of plant coordinates](#coords);
+2. [Merging county spatial data with its corresponding sulfur data](#sulfur); 
+3. [Building a sample network](#sample);
+4. [Building a blended network of rail and waterways](#network); and,
+5. [Generating the metrics](#metrics).
+
+
+## Plant coordinates {#coords}
 
 We first construct the plant latitude and longitude coordinates using the following concordance:
 
@@ -253,12 +325,13 @@ st_crs(df.plant)
 ggplot() +
   geom_sf(data=df.state, fill="grey75", color="grey90", size=0.3) +
   geom_sf(data=df.plant, color="#20A387", size=1.5) +
-  coord_sf() +
+  coord_sf(crs=sf::st_crs(2163)) +
   labs(title="Coal-fired power plants") +
   theme_maps()
 ```
 
-## County sulfur merge
+
+## Sulfur by county {#sulfur}
 
 Next, we merge county sulfur data with the county geometries.
 
@@ -275,7 +348,7 @@ ggplot() +
           color="grey90", size=0.3) +
   scale_fill_viridis_d(option="viridis", direction=-1, begin=0.15, end=0.6, na.value="grey70") +
   geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
-  coord_sf() +
+  coord_sf(crs=sf::st_crs(2163)) +
   labs(title="Low sulfur content by county",
        fill="Low Sulfur") +
   theme_maps()
@@ -284,7 +357,7 @@ ggplot() +
   geom_sf(data=df.county, aes(fill=SULFUR_MEDIAN), color="grey90", size=0.3) +
   scale_fill_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey70") +
   geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
-  coord_sf() +
+  coord_sf(crs=sf::st_crs(2163)) +
   labs(title="Median sulfur content by county",
        fill="Sulfur content\n[% by weight]") +
   theme_maps()
@@ -313,7 +386,7 @@ ggplot() +
   geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
   geom_sf(data=df.sulfur_cnty, aes(color=factor(SULFUR_LOW, levels=c("TRUE","FALSE"))), size=1.5) +
   scale_color_viridis_d(option="viridis", direction=-1, begin=0.15, end=0.6, na.value="grey70") +
-  coord_sf() +
+  coord_sf(crs=sf::st_crs(2163)) +
   labs(title="Low sulfur content by county",
        color="Low Sulfur") +
   theme_maps()
@@ -323,25 +396,685 @@ ggplot() +
   geom_sf(data=df.state, fill=NA, color="grey40", size=0.3) +
   geom_sf(data=df.sulfur_cnty, aes(color=SULFUR_MEDIAN), size=1.5) +
   scale_color_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey70") +
-  coord_sf() +
+  coord_sf(crs=sf::st_crs(2163)) +
   labs(title="Median sulfur content by county",
        color="Sulfur content\n[% by weight]") +
   theme_maps()
 ```
 
-## IV metrics
+
+## Sample network {#sample}
+
+To test the network methods, we build a sample network based on New York state.  This involves a number of steps, including:
+
+1. Restricting the rail and marine networks;
+2. Cleaning the rail and marine networks;
+3. Joining the networks; and,
+4. Blending the joined network.
+
+To begin, we establish the network samples based on New York state.
+
+```{r samples}
+
+df.rail_sample <- df.rail |>
+  filter(stateab %in% c("NY"))
+
+df.marine_sample <- df.marine |>
+  filter(st_usps %in% c("NJ","NY"))
+```
+
+We then plot the network map prior to any cleaning or blending.
+
+```{r initial-sample-network-map}
+
+ggplot() +
+  geom_sf(data=filter(df.state, STATE_ABBR=="NY"), fill="grey75", color="grey40", size=0.3) +
+  geom_sf(data=df.rail_sample, aes(colour="Rail"), size=0.6) +
+  geom_sf(data=df.marine_sample, aes(colour="Waterway"), size=0.6) +
+  geom_sf(data=st_intersection(df.plant, st_buffer(df.rail_sample, 2e4)),
+          aes(colour="Plant"), size=1.5) +
+  geom_sf(data=st_intersection(df.plant, st_buffer(df.marine_sample, 2e4)),
+          aes(colour="Plant"), size=1.5) +
+  geom_sf(data=st_intersection(df.sulfur_cnty, st_buffer(df.rail_sample, 2e4)),
+          aes(color="Coal"), size=1.5) +
+  geom_sf(data=st_intersection(df.sulfur_cnty, st_buffer(df.marine_sample, 2e4)),
+          aes(color="Coal"), size=1.5) +
+  scale_color_manual(values=c("black","gold3","darkred","darkblue")) +
+  coord_sf(crs=sf::st_crs(2163)) +
+  labs(title="Sample plants, mines and networks",
+       colour="") +
+  theme_maps() #+
+  # guides(colour = guide_legend(override.aes=list(size=2.5, linewidth=1.2,
+  #                                                linetype=c(NA,NA,1,1),
+  #                                                shape=c(19,19,NA,NA))))
+```
+
+
+### Rail
+
+Next, we clean the rail network by:
+
+- Smoothing the imported network;
+- Building a uni-directed network; and,
+- Creating a bi-directed network.
+
+These tasks are accomplished through the `sfnetworks` and `tidygraph` packages.
+
+```{r rail-sample-network}
+
+rail_net <- df.rail_sample |>
+  select(geometry) |>
+  as_sfnetwork() |>
+  build_network()
+```
+
+We assess the effectiveness of our cleaning procedure by visually inspecting the spatial neighbourhood of a set of nodes.
+
+```{r assess-sample-rail-neighborhoods}
+
+purrr::map(
+  # seq(1,nrow(st_as_sf(net, "nodes"))),
+  seq(1,10),
+  ~{nbh <- rail_net %>%
+      activate("edges") %>%
+      tidygraph::convert(
+        to_spatial_neighborhood,
+        st_as_sf(rail_net, "nodes") |> slice(.x),
+        threshold=1e20
+      )
+    
+    ggplot() +
+      geom_sf(data=filter(df.state, STATE_ABBR=="NY"), fill="grey75", color="grey40", linewidth=0.3) +
+      geom_sf(data=st_as_sf(rail_net, "edges"), col="black", linewidth=1.0) +
+      geom_sf(data=st_as_sf(rail_net, "nodes"), col="black", size=2.0) +
+      geom_text_repel(data=st_as_sf(rail_net, "nodes"), aes(label=ID, geometry=geometry),
+        stat = "sf_coordinates", min.segment.length = 0, size=3, hjust=-0.5) +
+      geom_sf(data=st_as_sf(nbh, "edges"), col="red", linewidth=1.0) +
+      geom_sf(data=st_as_sf(nbh, "nodes"), col="red", size=2.0) +
+      coord_sf(crs=sf::st_crs(2163)) +
+      labs(title=paste("Node", .x)) +
+      theme_maps()
+  }
+)
+```
+
+
+### Marine
+
+Next, we clean the marine network using a similar procedure to rail network above.
+
+```{r sample-marine-network}
+
+marine_net <- df.marine_sample |>
+  select(geometry) |>
+  st_cast("LINESTRING") |>
+  st_zm(drop=TRUE, what="ZM") |>
+  as_sfnetwork() |>
+  build_network()
+```
+
+Again, we assess the effectiveness of our cleaning procedure by visually inspecting the spatial neighbourhood of a set of nodes.
+
+```{r assess-sample-marine-neighborhoods}
+
+purrr::map(
+  seq(1,nrow(st_as_sf(marine_net, "nodes"))),
+  ~{nbh <- marine_net %>%
+      activate("edges") %>%
+      tidygraph::convert(
+        to_spatial_neighborhood,
+        st_as_sf(marine_net, "nodes") |> slice(.x),
+        threshold=1e20
+      )
+    
+    ggplot() +
+      geom_sf(data=filter(df.state, STATE_ABBR=="NY"), fill="grey75", color="grey40", linewidth=0.3) +
+      geom_sf(data=st_as_sf(marine_net, "edges"), col="black", linewidth=1.0) +
+      geom_sf(data=st_as_sf(marine_net, "nodes"), col="black", size=2.0) +
+      geom_text_repel(data=st_as_sf(marine_net, "nodes"), aes(label=ID, geometry=geometry),
+        stat = "sf_coordinates", min.segment.length = 0, size=3, hjust=-0.5) +
+      geom_sf(data=st_as_sf(nbh, "edges"), col="red", linewidth=1.0) +
+      geom_sf(data=st_as_sf(nbh, "nodes"), col="red", size=2.0) +
+      coord_sf(crs=sf::st_crs(2163)) +
+      labs(title=paste("Node", .x)) +
+      theme_maps()
+  }
+)
+```
+
+
+### Join
+
+Next, we join the cleaned rail and marine networks.  After the joining is complete, we simplify the network by smoothing pseudo nodes.  We also attempted to subdivide edges and simplify intersections; however, these tended to oversimplify the network.
+
+```{r merge-sample-networks}
+
+## See <https://luukvdmeer.github.io/sfnetworks/articles/sfn02_preprocess_clean.html#network-cleaning-functions>
+##  x Subdivide edges
+##  + Smooth pseudo nodes
+##  x Simplify intersections
+
+## Merge and smooth rail and marine networks
+net <- rbind(
+    rail_net |>
+      st_as_sf("edges") |>
+      select(geometry), 
+    marine_net |>
+      st_as_sf("edges") |>
+      select(geometry)
+  ) |>
+  as_sfnetwork() |>
+  
+  # tidygraph::convert(to_spatial_subdivision, .clean = TRUE) |>
+  tidygraph::convert(to_spatial_smooth, .clean=TRUE) |>
+  activate("nodes") |>
+  mutate(ID = row_number())
+
+# ## Simplify intersections
+# ## ... retrieve node coordinates
+# net_coords <- net |>
+#   activate("nodes") |>
+#   st_coordinates()
+# 
+# ## ... cluster nodes using the DBSCAN spatial clustering algorithm
+# ## NB - We set eps = 0.5 such that nodes within a distance of 0.5 from each other will be in the same cluster.
+# ##      We set minPts = 1 such that a node is assigned a cluster even if it is the only member of that cluster.
+# library(dbscan)
+# clusters = dbscan(net_coords, eps=1e-1, minPts=1)$cluster
+# 
+# ## ... add cluster information to the nodes of the network.
+# net <- net |>
+#   activate("nodes") |>
+#   mutate(cls = clusters,
+#          cmp = tidygraph::group_components())
+# net
+# 
+# ## ... perform the contraction
+# net <- net  |>
+#   tidygraph::convert(to_spatial_contracted, cls, cmp, simplify=TRUE) |>
+#   # tidygraph::convert(to_spatial_smooth, .clean=TRUE) |>
+#   activate("nodes") |>
+#   mutate(ID = row_number())
+# net
+# 
+# ggplot() +
+#   geom_sf(data=filter(df.state, STATE_ABBR=="NY"), fill="grey75", color="grey40", linewidth=0.3) +
+#   geom_sf(data=st_as_sf(net, "edges"), col="black", linewidth=1.0) +
+#   geom_sf(data=st_as_sf(net, "nodes"), col="black", size=2.0) +
+#   geom_text_repel(data=st_as_sf(net, "nodes"), aes(label=ID, geometry=geometry),
+#     stat = "sf_coordinates", min.segment.length = 0, size=3, hjust=-0.5) +
+#   coord_sf(crs=sf::st_crs(2163)) +
+#   theme_maps()
+```
+
+We assess the effectiveness of our joining procedure by visually inspecting the spatial neighbourhood of a set of nodes.
+
+```{r assess-sample-neighborhoods}
+
+purrr::map(
+  # seq(1,nrow(st_as_sf(net, "nodes"))),
+  c(seq(1,5), 283),
+  ~{nbh <- net %>%
+      activate("edges") %>%
+      tidygraph::convert(
+        to_spatial_neighborhood,
+        st_as_sf(net, "nodes") |> slice(.x),
+        threshold=1e20
+      )
+    
+    ggplot() +
+      geom_sf(data=filter(df.state, STATE_ABBR=="NY"), fill="grey75", color="grey40", linewidth=0.3) +
+      geom_sf(data=st_as_sf(net, "edges"), col="black", linewidth=1.0) +
+      geom_sf(data=st_as_sf(net, "nodes"), col="black", size=2.0) +
+      geom_text_repel(data=st_as_sf(net, "nodes"), aes(label=ID, geometry=geometry),
+        stat="sf_coordinates", min.segment.length=0, size=3, hjust=-0.5) +
+      geom_sf(data=st_as_sf(nbh, "edges"), col="red", linewidth=1.0) +
+      geom_sf(data=st_as_sf(nbh, "nodes"), col="red", size=2.0) +
+      coord_sf(crs=sf::st_crs(2163)) +
+      labs(title=paste("Node", .x)) +
+      theme_maps()
+  }
+)
+```
+
+We also visually inspect a specific path to assess whether they are traveling via the least-resistance principle.
+
+```{r assess-sample-paths}
+
+path = st_network_paths(net, from=351, to=305)
+path
+
+plot_path = function(node_path) {
+  net %>%
+    sfnetworks::activate("nodes") |>
+    dplyr::slice(node_path) |>
+    plot(cex = 1.5, lwd = 1.5, add = TRUE)
+}
+
+plot(net, col = "grey")
+path |>
+  pull(node_paths) |>
+  walk(plot_path)
+```
+
+
+### Blend
+
+Next, we blend the plants and coal mines into the network.  We begin by plotting all the elements on the same map.
+
+```{r merged-sample-network-map}
+
+ggplot() +
+  geom_sf(data=filter(df.state, STATE_ABBR=="NY"), fill="grey75", color="grey40", size=0.3) +
+  geom_sf(data=st_as_sf(net, "edges"), aes(color="Network")) +
+  geom_sf(data=st_as_sf(net, "nodes"), aes(color="Network")) +
+  geom_sf(data=st_intersection(df.plant, st_buffer(df.marine_sample, 2e4)), 
+          aes(color="Plant"), size=1.5) +
+  geom_sf(data=st_intersection(df.sulfur_cnty, st_buffer(df.marine_sample, 2e4)), 
+          aes(color="Coal"), size=1.5) +
+  scale_color_manual(values=c("black","grey40","gold3")) +
+  coord_sf(crs=sf::st_crs(2163)) +
+  labs(title="Plants, mines and merged networks",
+       color="") +
+  theme_maps() +
+  guides(color = guide_legend(override.aes=list(size=2.5, linewidth=0.8, 
+                                                linetype=c(NA,1,NA))))
+```
+
+We use the sfnetworks package to perform the blending of both plants and mines.
+
+```{r blend-sample-plants}
+
+net_plt <- st_buffer(df.marine_sample, 2e4) %>%
+  st_intersection(df.plant, .) %>%
+  mutate(PLANT = 1) %>%
+  select(PLANT, ORISPL, geometry) %>% 
+  distinct() %>%
+  st_network_blend(net, .)
+net_plt
+```
+
+```{r blend-sample-sulfur-counties}
+
+net_all <- st_buffer(df.marine_sample, 2e4) %>%
+  st_intersection(df.sulfur_cnty, .) %>%
+  mutate(SULFUR = 1) %>%
+  select(SULFUR, FID, SULFUR_MEDIAN, geometry) %>% 
+  distinct() %>%
+  st_network_blend(net_plt, .)
+net_all
+```
+
+We visually inspect the blending procedure using the map below.  To more easily identify the individual plants, their ORISPL numbers are provided as labels.
+
+```{r blended-sample-network-map}
+
+ggplot() +
+  geom_sf(data=filter(df.state, STATE_ABBR=="NY"), fill="grey75", color="grey40", size=0.3) +
+  geom_sf(data=st_as_sf(net_all, "edges"), aes(color="Network")) +
+  geom_sf(data=st_as_sf(net_all, "nodes") |> filter(is.na(PLANT) & is.na(SULFUR)), 
+          aes(color="Network")) +
+  geom_sf(data=st_as_sf(net_all, "nodes") |> filter(PLANT==1), aes(color="Plant")) +
+  geom_sf(data=st_as_sf(net_all, "nodes") |> filter(SULFUR==1), aes(color="Coal")) +
+  # geom_sf_text(
+  #   data=st_as_sf(net_all, "nodes") |> mutate(ID = row_number()),
+  #   aes(label=ID),
+  #   size=3, hjust=-0.5
+  # ) +
+  geom_sf(data=st_intersection(df.plant, st_buffer(df.marine_sample, 2e4)),
+          aes(color="Plant"), size=1.5, shape=1) +
+  geom_sf_text(
+    data=st_intersection(df.plant, st_buffer(df.marine_sample, 2e4)),
+    aes(label=ORISPL),
+    size=3, hjust=0
+  ) +
+  geom_sf(data=st_intersection(df.sulfur_cnty, st_buffer(df.marine_sample, 2e4)),
+          aes(color="Coal"), size=1.5, shape=1) +
+  # geom_text_repel(data=st_as_sf(net, "nodes"), aes(label=ID, geometry=geometry),
+  #       stat="sf_coordinates", min.segment.length=0, size=3, hjust=-0.5) +
+  # geom_sf_text(
+  #   data=st_intersection(df.sulfur_cnty, st_buffer(df.marine_sample, 2e4)),
+  #   aes(label=FID),
+  #   size=3, hjust=0
+  # ) +
+  scale_color_manual(values=c("black","grey40","gold3")) +
+  coord_sf(crs=sf::st_crs(2163)) +
+  labs(title="Blended network",
+       color="") +
+  theme_maps() +
+  guides(color = guide_legend(override.aes=list(size=2.5, linewidth=0.8, 
+                                                linetype=c(NA,1,NA))))
+```
+
+
+### Distances
+
+Finally, we calculate distances over the blended network.
+
+```{r}
+
+st_network_cost(
+  net_all,
+  from=st_as_sf(net_all, "nodes") |> filter(PLANT==1),
+  to=st_as_sf(net_all, "nodes") |> filter(SULFUR==1),
+  direction="all"
+)
+```
+
+
+## Full network {#network}
+
+We now implement the sample procedure above to the full network.  We first plot the network map prior to any cleaning or blending.
+
+```{r initial-network-map}
+
+ggplot() +
+  # geom_sf(data=df.county, fill="grey75", color="grey90", size=0.3) +
+  geom_sf(data=df.state, fill="grey75", color="grey40", size=0.3) +
+  geom_sf(data=df.rail, aes(colour="Rail"), size=0.4) +
+  geom_sf(data=df.marine, aes(colour="Waterway"), size=0.4) +
+  geom_sf(data=df.plant, aes(color="Plant"), size=1.5) +
+  geom_sf(data=df.sulfur_cnty, aes(color="Coal"), size=1.5) +
+  scale_color_manual(values=c("black","gold3","darkred","darkblue")) +
+  coord_sf(crs=sf::st_crs(2163)) +
+  labs(title="Plants, mines and networks",
+       colour="") +
+  theme_maps() +
+  guides(color = guide_legend(override.aes=list(size=2.5, linewidth=1.2, 
+                                                linetype=c(NA,NA,1,1), 
+                                                shape=c(19,19,NA,NA))))
+```
+
+
+### Rail
+
+Next, we clean the rail network.
+
+`r text_colour(colour="red", text="NB - Consider removing unconnected rail sections.  See assessment plots below.")`
+
+```{r rail-network}
+
+rail_net <- df.rail |>
+  select(geometry) |>
+  as_sfnetwork() |>
+  build_network()
+```
+
+Before moving to the next step, we assess the effectiveness of our cleaning procedure by visually inspecting the spatial neighbourhood of a set of nodes.
+
+```{r assess-rail-neighborhoods}
+
+purrr::map(
+  # seq(1,nrow(st_as_sf(net, "nodes"))),
+  seq(1,5),
+  ~{nbh <- rail_net %>%
+      activate("edges") %>%
+      tidygraph::convert(
+        to_spatial_neighborhood,
+        st_as_sf(rail_net, "nodes") |> slice(.x),
+        threshold=1e20
+      )
+    
+    ggplot() +
+      geom_sf(data=df.state, fill="grey75", color="grey40", size=0.3) +
+      geom_sf(data=st_as_sf(rail_net, "edges"), col="black", linewidth=0.8) +
+      geom_sf(data=st_as_sf(rail_net, "nodes"), col="black", size=1.0) +
+      # geom_text_repel(data=st_as_sf(rail_net, "nodes"), aes(label=ID, geometry=geometry),
+      #   stat = "sf_coordinates", min.segment.length = 0, size=3, hjust=-0.5) +
+      geom_sf(data=st_as_sf(nbh, "edges"), col="red", linewidth=0.8) +
+      geom_sf(data=st_as_sf(nbh, "nodes"), col="red", size=1.0) +
+      coord_sf(crs=sf::st_crs(2163)) +
+      labs(title=paste("Node", .x)) +
+      theme_maps()
+  }
+)
+```
+
+
+### Marine
+
+Next, we clean the rail network.
+
+`r text_colour(colour="red", text="NB - Consider fixing unlinked marine highways.  See assessment plots below.")`
+
+```{r marine-network}
+
+marine_net <- df.marine |>
+  select(geometry) |>
+  st_cast("LINESTRING") |>
+  st_zm(drop=TRUE, what="ZM") |>
+  as_sfnetwork() |>
+  build_network()
+```
+
+We assess the effectiveness of our cleaning procedure by visually inspecting the spatial neighbourhood of a set of nodes.
+
+```{r assess-marine-neighborhoods}
+
+purrr::map(
+  c(44,95,58,55,63,52,86,43,105,15,23,46,92,71,79),
+  ~{nbh <- marine_net %>%
+      activate("edges") %>%
+      tidygraph::convert(
+        to_spatial_neighborhood,
+        st_as_sf(marine_net, "nodes") |> slice(.x),
+        threshold=1e20
+      )
+    
+    p <- ggplot() +
+      geom_sf(data=df.state, fill="grey75", color="grey40", size=0.3) +
+      geom_sf(data=st_as_sf(marine_net, "edges"), col="black", linewidth=1.0) +
+      geom_sf(data=st_as_sf(marine_net, "nodes"), col="black", size=2.0) +
+      geom_text_repel(data=st_as_sf(marine_net, "nodes"), aes(label=ID, geometry=geometry),
+        stat = "sf_coordinates", min.segment.length = 0, size=3, hjust=-0.5) +
+      geom_sf(data=st_as_sf(nbh, "edges"), col="red", linewidth=1.0) +
+      geom_sf(data=st_as_sf(nbh, "nodes"), col="red", size=2.0) +
+      coord_sf(crs=sf::st_crs(2163)) +
+      labs(title=paste("Node", .x)) +
+      theme_maps()
+  }
+)
+```
+
+We also provide a plotly graph in order to better assess the linkages between the marine network.
+
+```{r}
+
+
+p <- ggplot() +
+  geom_sf(data=df.state, fill="grey75", color="grey40", size=0.3) +
+  geom_sf(data=st_as_sf(marine_net, "edges"), col="black", linewidth=0.5) +
+  geom_sf(data=st_as_sf(marine_net, "nodes"), col="black", size=0.5) +
+  geom_sf_text(data=st_as_sf(marine_net, "nodes"), aes(label=ID, geometry=geometry),
+    stat="sf_coordinates", size=3) +
+  coord_sf(crs=sf::st_crs(2163)) +
+  labs(title="Marine network") +
+  theme_maps()
+
+plotly::ggplotly(p)
+rm(p)
+```
+
+
+### Join
+
+Next, we join the cleaned rail and marine networks.  After the joining is complete, we simplify the network by smoothing pseudo nodes.
+
+```{r merge-networks}
+
+## Merge and smooth rail and marine networks
+net <- rbind(
+    rail_net |>
+      st_as_sf("edges") |>
+      select(geometry), 
+    marine_net |>
+      st_as_sf("edges") |>
+      select(geometry)
+  ) |>
+  as_sfnetwork() |>
+  
+  # tidygraph::convert(to_spatial_subdivision, .clean = TRUE) |>
+  tidygraph::convert(to_spatial_smooth, .clean=TRUE) |>
+  activate("nodes") |>
+  mutate(ID = row_number())
+```
+
+We assess the effectiveness of our joining procedure by visually inspecting the spatial neighbourhood of a set of nodes.
+
+```{r assess-neighborhoods}
+
+purrr::map(
+  # seq(1,nrow(st_as_sf(net, "nodes"))),
+  c(seq(1,5)),
+  ~{nbh <- net %>%
+      activate("edges") %>%
+      tidygraph::convert(
+        to_spatial_neighborhood,
+        st_as_sf(net, "nodes") |> slice(.x),
+        threshold=1e20
+      )
+    
+    ggplot() +
+      geom_sf(data=df.state, fill="grey75", color="grey40", size=0.3) +
+      geom_sf(data=st_as_sf(net, "edges"), col="black", linewidth=0.8) +
+      geom_sf(data=st_as_sf(net, "nodes"), col="black", size=1.0) +
+      geom_text_repel(data=st_as_sf(net, "nodes"), aes(label=ID, geometry=geometry),
+        stat="sf_coordinates", min.segment.length=0, size=3, hjust=-0.5) +
+      geom_sf(data=st_as_sf(nbh, "edges"), col="red", linewidth=0.8) +
+      geom_sf(data=st_as_sf(nbh, "nodes"), col="red", size=1.0) +
+      coord_sf(crs=sf::st_crs(2163)) +
+      labs(title=paste("Node", .x)) +
+      theme_maps()
+  }
+)
+```
+
+We also visually inspect a specific path to assess whether they are traveling via the least-resistance principle.
+
+```{r assess-paths}
+
+path = st_network_paths(net, from=50, to=12500)
+path
+
+plot_path = function(node_path) {
+  net %>%
+    sfnetworks::activate("nodes") |>
+    dplyr::slice(node_path) |>
+    plot(cex = 1.5, lwd = 1.5, add = TRUE)
+}
+
+plot(net, col = "grey")
+path |>
+  pull(node_paths) |>
+  walk(plot_path)
+```
+
+
+### Blend
+
+Next, we blend the plants and coal mines into the network.  We begin by plotting all the elements on the same map.
+
+```{r merged-network-map}
+
+ggplot() +
+  geom_sf(data=df.state, fill="grey75", color="grey40", size=0.3) +
+  geom_sf(data=st_as_sf(net, "edges"), aes(color="Network"), size=0.8) +
+  geom_sf(data=st_as_sf(net, "nodes"), aes(color="Network"), size=1.0) +
+  geom_sf(data=df.plant, aes(color="Plant"), size=1.5) +
+  geom_sf(data=df.sulfur_cnty, aes(color="Coal"), size=1.5) +
+  scale_color_manual(values=c("black","mediumpurple4","gold3")) +
+  coord_sf(crs=sf::st_crs(2163)) +
+  labs(title="Plants, mines and merged networks",
+       color="") +
+  theme_maps() +
+  guides(color = guide_legend(override.aes=list(size=2.5, linewidth=0.8, 
+                                                linetype=c(NA,1,NA))))
+```
+
+We use the sfnetworks package to perform the blending of both plants and mines.
+
+```{r blend-plants}
+
+net_plt <- df.plant %>%
+  mutate(PLANT = 1) %>%
+  select(PLANT, ORISPL, geometry) %>% 
+  distinct() %>%
+  st_network_blend(net, .)
+net_plt
+```
+
+```{r blend-sulfur-counties}
+
+net_all <- df.sulfur_cnty %>%
+  mutate(SULFUR = 1) %>%
+  select(SULFUR, FID, SULFUR_MEDIAN, geometry) %>% 
+  distinct() %>%
+  st_network_blend(net_plt, .)
+net_all
+```
+
+Before proceeding, we save the network to ensure we have a backup.
+
+```{r}
+
+saveRDS(net_all, file=here::here("data/net_all.rds"))
+```
+
+We visually inspect the blending procedure using the map below.
+
+```{r blended-network-map}
+
+ggplot() +
+  geom_sf(data=df.state, fill="grey75", color="grey40", size=0.3) +
+  geom_sf(data=st_as_sf(net_all, "edges"), aes(color="Network"), size=0.8) +
+  geom_sf(data=st_as_sf(net_all, "nodes") |> filter(is.na(PLANT) & is.na(SULFUR)), 
+          aes(color="Network"), size=1.0) +
+  geom_sf(data=st_as_sf(net_all, "nodes") |> filter(PLANT==1), aes(color="Plant"), size=1.0) +
+  geom_sf(data=st_as_sf(net_all, "nodes") |> filter(SULFUR==1), aes(color="Coal"), size=1.0) +
+  # geom_sf_text(
+  #   data=st_as_sf(net_all, "nodes") |> mutate(ID = row_number()),
+  #   aes(label=ID),
+  #   size=3, hjust=-0.5
+  # ) +
+  # geom_sf(data=st_intersection(df.plant, st_buffer(net, 2e4)),
+  #         aes(color="Plant"), size=2.0, shape=1) +
+  # geom_sf_text(
+  #   data=st_intersection(df.plant, st_buffer(net, 2e4)),
+  #   aes(label=ORISPL),
+  #   size=3, hjust=0
+  # ) +
+  # geom_sf(data=st_intersection(df.sulfur_cnty, st_buffer(net, 2e4)),
+  #         aes(color="Coal"), size=2.0, shape=1) +
+  # geom_text_repel(data=st_as_sf(net, "nodes"), aes(label=ID, geometry=geometry),
+  #       stat="sf_coordinates", min.segment.length=0, size=3, hjust=-0.5) +
+  # geom_sf_text(
+  #   data=st_intersection(df.sulfur_cnty, st_buffer(df.marine_sample, 2e4)),
+  #   aes(label=FID),
+  #   size=3, hjust=0
+  # ) +
+  scale_color_manual(values=c("black","mediumpurple4","gold3")) +
+  coord_sf(crs=sf::st_crs(2163)) +
+  labs(title="Blended network",
+       color="") +
+  theme_maps() +
+  guides(color = guide_legend(override.aes=list(size=2.5, linewidth=0.8, 
+                                                linetype=c(NA,1,NA))))
+```
+
+
+## IV metrics {#metrics}
 
 Now, we are ready to build the sulfur IV metrics:
 
-- Weighted average of county sulfur medians by inverse distance;
-- Weighted average of county sulfur medians by inverse square distance; and,
+- Weighted average of county sulfur medians by inverse straight-line distance;
+- Weighted average of county sulfur medians by inverse square straight-line distance;
 - Distance to nearest county with low sulfur coal.
+- Weighted average of county sulfur medians by inverse network distance; and,
+- Weighted average of county sulfur medians by inverse square network distance.
 
-`r text_colour(colour="red", text="Other possible metrics could include: (1) using the plant-county data but calculating [distance around a barrier](https://www.r-bloggers.com/2020/02/three-ways-to-calculate-distances-in-r); (2) using plant-mine data with regular or barrier distances; or, (3) using plant-mine data with distances calculated over railroads.")`
+First, we calculate distances between all plants and county centroids.  
 
-First, we calculate distances between all plants and county centroids.  After reorganizing the dataset, we generate the metrics described above.  Finally, we convert the resultant dataframe to an sf object.
-
-```{r sulfur-metrics}
+```{r sulfur-distance}
 
 ## Calculate matrix of distances and convert to tibble
 df.distance <- st_distance(df.plant, df.sulfur_cnty) %>%
@@ -360,6 +1093,11 @@ df.distance <- st_distance(df.plant, df.sulfur_cnty) %>%
               rowid_to_column(var="COUNTY") %>% 
               select(-FID, -OBJECTID, -geometry), 
             by=c("COUNTY"))
+```
+
+Next, we use these distances to generate the first two metrics described above based on straight-line distances.
+
+```{r sulfur-straighline-metrics}
 
 ## Generate median-based distance metrics
 df.distance_med <- df.distance %>%
@@ -367,6 +1105,11 @@ df.distance_med <- df.distance %>%
   summarise(SULFUR_DIST = sum(SULFUR_MEDIAN*(1/DISTANCE), na.rm=TRUE)/sum(1/DISTANCE, na.rm=TRUE),
             SULFUR_DIST2 = sum(SULFUR_MEDIAN*(1/DISTANCE^2), na.rm=TRUE)/sum(1/DISTANCE^2, na.rm=TRUE)) %>%
   ungroup()
+```
+
+We then use the distances to generate the third metric.
+
+```{r sulfur-low-metric}
 
 ## Generate low-sulfur-coal distance metric
 df.distance_low <- df.distance %>%
@@ -376,15 +1119,56 @@ df.distance_low <- df.distance %>%
   mutate(SULFUR_DISTLOW = SULFUR_DISTLOW/10^3) %>%
   ungroup()
 
+```
+
+Second, we calculate network distances between all plants and county centroids.  We use these distances to generate the last two metrics described above based on network distances.
+
+```{r sulfur-network-metrics}
+
+df.distance_net <- st_network_cost(
+    net_all,
+    from=st_as_sf(net_all, "nodes") |> filter(PLANT==1),
+    to=st_as_sf(net_all, "nodes") |> filter(SULFUR==1),
+    direction="all"
+  ) |>
+  as_tibble() |>
+  rowid_to_column(var="PLANT_ID") |>
+  pivot_longer(cols=starts_with("V"), names_to="SULFUR_ID", names_prefix="V", values_to="DISTANCE") |>
+  mutate(SULFUR_ID = as.integer(SULFUR_ID),
+         DISTANCE = as.numeric(DISTANCE)) |>
+  left_join(st_as_sf(net_all, "nodes") |>
+              st_drop_geometry() |>
+              filter(PLANT==1) |>
+              rowid_to_column(var="PLANT_ID") |>
+              select(PLANT_ID, ORISPL), 
+            by=c("PLANT_ID")) |>
+  left_join(st_as_sf(net_all, "nodes") |>
+              st_drop_geometry() |> 
+              filter(SULFUR==1) |>
+              rowid_to_column(var="SULFUR_ID") |> 
+              select(SULFUR_ID, FID, SULFUR_MEDIAN), 
+            by=c("SULFUR_ID")) |>
+  
+  group_by(ORISPL) |>
+  mutate(DISTANCE = ifelse(DISTANCE==0, 1, DISTANCE)) |>
+  summarise(SULFUR_NET = sum(SULFUR_MEDIAN*(1/DISTANCE), na.rm=TRUE)/sum(1/DISTANCE, na.rm=TRUE),
+            SULFUR_NET2 = sum(SULFUR_MEDIAN*(1/DISTANCE^2), na.rm=TRUE)/sum(1/DISTANCE^2, na.rm=TRUE),
+            .groups="drop")
+```
+
+Finally, we convert the resultant dataframes to an `sf` object.
+
+```{r}
+
 ## Combine metrics and and convert to sf object
 df.distance <- df.distance_med %>%
   full_join(df.distance_low, by=c("ORISPL")) %>%
+  full_join(df.distance_net, by=c("ORISPL")) %>%
   full_join(df.plant, by=c("ORISPL")) %>%
   st_as_sf(crs=st_crs(df.plant), agr="constant")
   
 ## Display coordinate reference system
 st_crs(df.distance)
-
 ```
 
 We now plot the resultant metrics.
@@ -392,20 +1176,34 @@ We now plot the resultant metrics.
 ```{r sulfur-metrics-plot}
 
 ## Plot
-map2(list(expr(SULFUR_DIST), expr(SULFUR_DIST2), expr(SULFUR_DISTLOW)),
+map2(list(expr(SULFUR_DIST), expr(SULFUR_DIST2), expr(SULFUR_DISTLOW),
+          expr(SULFUR_NET), expr(SULFUR_NET2)),
      list("Weighted average of sulfur by inverse distance",
           "Weighted average of sulfur by inverse square distance",
-          "Distance to nearest low sulfur coal"),
+          "Distance to nearest low sulfur coal",
+          "Weighted average of sulfur by inverse network",
+          "Weighted average of sulfur by inverse square network"),
      ~ggplot() +
        geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
        geom_sf(data=df.distance, aes(color=!!.x), size=1.5) +
        scale_color_viridis_c(option="viridis", direction=-1, begin=0.1, end=0.85, na.value="grey50") +
-       coord_sf() +
-       labs(#title="Coal-fired power plants",
-            #subtitle=.y
+       coord_sf(crs=sf::st_crs(2163)) +
+       labs(title="Coal-fired power plants",
+            subtitle=.y,
             color="Sulfur IV") +
        theme_maps()
 )
+```
+
+We also calculate the correlations between each of the metrics.
+
+```{r sulfur-correlations}
+
+df.distance |>
+  st_drop_geometry() |>
+  select(-ORISPL) |>
+  filter(!is.na(SULFUR_NET2)) |>
+  cor()
 ```
 
 
@@ -430,4 +1228,6 @@ The following table describes the columns in the exported dataset.
 | SULFUR_DIST || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse distance. |
 | SULFUR_DIST2 || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse square distance. |
 | SULFUR_DISTLOW || Sulfur IV metric based on the distance to the nearest county with low sulfur coal. |
+| SULFUR_NET || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse network distance. |
+| SULFUR_NET2 || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse square network distance. |
 

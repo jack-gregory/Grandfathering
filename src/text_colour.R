@@ -1,5 +1,5 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-## GII Data Audits
+## Grandfathering
 ## src/text_colour.R
 ## Jack Gregory
 ## 25 March 2021
