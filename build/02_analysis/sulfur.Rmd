@@ -1007,7 +1007,7 @@ net_plt
 
 net_all <- df.sulfur_cnty %>%
   mutate(SULFUR = 1) %>%
-  select(SULFUR, FID, SULFUR_MEDIAN, geometry) %>% 
+  select(SULFUR, FID, SULFUR_MEDIAN, SULFUR_LOW, geometry) %>% 
   distinct() %>%
   st_network_blend(net_plt, .)
 net_all
@@ -1069,8 +1069,9 @@ Now, we are ready to build the sulfur IV metrics:
 - Weighted average of county sulfur medians by inverse straight-line distance;
 - Weighted average of county sulfur medians by inverse square straight-line distance;
 - Distance to nearest county with low sulfur coal.
-- Weighted average of county sulfur medians by inverse network distance; and,
-- Weighted average of county sulfur medians by inverse square network distance.
+- Weighted average of county sulfur medians by inverse network distance;
+- Weighted average of county sulfur medians by inverse square network distance; and,
+- Network distance to nearest county with low sulfur coal.
 
 First, we calculate distances between all plants and county centroids.  
 
@@ -1097,7 +1098,7 @@ df.distance <- st_distance(df.plant, df.sulfur_cnty) %>%
 
 Next, we use these distances to generate the first two metrics described above based on straight-line distances.
 
-```{r sulfur-straighline-metrics}
+```{r sulfur-straightline-metrics}
 
 ## Generate median-based distance metrics
 df.distance_med <- df.distance %>%
@@ -1118,12 +1119,11 @@ df.distance_low <- df.distance %>%
   summarise(SULFUR_DISTLOW = min(DISTANCE, na.rm=TRUE)) %>%
   mutate(SULFUR_DISTLOW = SULFUR_DISTLOW/10^3) %>%
   ungroup()
-
 ```
 
-Second, we calculate network distances between all plants and county centroids.  We use these distances to generate the last two metrics described above based on network distances.
+Second, we calculate network distances between all plants and county centroids.
 
-```{r sulfur-network-metrics}
+```{r sulfur-network-distances}
 
 df.distance_net <- st_network_cost(
     net_all,
@@ -1146,14 +1146,35 @@ df.distance_net <- st_network_cost(
               st_drop_geometry() |> 
               filter(SULFUR==1) |>
               rowid_to_column(var="SULFUR_ID") |> 
-              select(SULFUR_ID, FID, SULFUR_MEDIAN), 
-            by=c("SULFUR_ID")) |>
-  
+              select(SULFUR_ID, FID, SULFUR_MEDIAN, SULFUR_LOW), 
+            by=c("SULFUR_ID"))
+```
+
+Next, we use these network distances to generate the fourth and fifth metrics described above.
+
+```{r sulfur-network-metrics}
+
+## Generate median-based network distance metrics
+df.distance_nmed <- df.distance_net |>
   group_by(ORISPL) |>
   mutate(DISTANCE = ifelse(DISTANCE==0, 1, DISTANCE)) |>
   summarise(SULFUR_NET = sum(SULFUR_MEDIAN*(1/DISTANCE), na.rm=TRUE)/sum(1/DISTANCE, na.rm=TRUE),
             SULFUR_NET2 = sum(SULFUR_MEDIAN*(1/DISTANCE^2), na.rm=TRUE)/sum(1/DISTANCE^2, na.rm=TRUE),
             .groups="drop")
+```
+
+We then use the network distances to generate the final metric.
+
+```{r sulfur-network-low-metric}
+
+## Generate low-sulfur-coal network distance metric
+df.distance_nlow <- df.distance_net |>
+  # left_join(select(df.sulfur_cnty, FID, SULFUR_LOW), by="FID") |>
+  filter(SULFUR_LOW==TRUE) |>
+  group_by(ORISPL) |>
+  summarise(SULFUR_NETLOW = min(DISTANCE, na.rm=TRUE)) |>
+  mutate(SULFUR_NETLOW = SULFUR_NETLOW/10^3) |>
+  ungroup()
 ```
 
 Finally, we convert the resultant dataframes to an `sf` object.
@@ -1163,7 +1184,8 @@ Finally, we convert the resultant dataframes to an `sf` object.
 ## Combine metrics and and convert to sf object
 df.distance <- df.distance_med %>%
   full_join(df.distance_low, by=c("ORISPL")) %>%
-  full_join(df.distance_net, by=c("ORISPL")) %>%
+  full_join(df.distance_nmed, by=c("ORISPL")) %>%
+  full_join(df.distance_nlow, by=c("ORISPL")) %>%
   full_join(df.plant, by=c("ORISPL")) %>%
   st_as_sf(crs=st_crs(df.plant), agr="constant")
   
@@ -1177,12 +1199,13 @@ We now plot the resultant metrics.
 
 ## Plot
 map2(list(expr(SULFUR_DIST), expr(SULFUR_DIST2), expr(SULFUR_DISTLOW),
-          expr(SULFUR_NET), expr(SULFUR_NET2)),
+          expr(SULFUR_NET), expr(SULFUR_NET2), expr(SULFUR_NETLOW)),
      list("Weighted average of sulfur by inverse distance",
           "Weighted average of sulfur by inverse square distance",
           "Distance to nearest low sulfur coal",
           "Weighted average of sulfur by inverse network",
-          "Weighted average of sulfur by inverse square network"),
+          "Weighted average of sulfur by inverse square network",
+          "Network distance to nearest low sulfur coal"),
      ~ggplot() +
        geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
        geom_sf(data=df.distance, aes(color=!!.x), size=1.5) +
@@ -1203,6 +1226,7 @@ df.distance |>
   st_drop_geometry() |>
   select(-ORISPL) |>
   filter(!is.na(SULFUR_NET2)) |>
+  filter(!(is.na(SULFUR_NETLOW) | SULFUR_NETLOW==Inf)) |>
   cor()
 ```
 
@@ -1230,4 +1254,6 @@ The following table describes the columns in the exported dataset.
 | SULFUR_DISTLOW || Sulfur IV metric based on the distance to the nearest county with low sulfur coal. |
 | SULFUR_NET || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse network distance. |
 | SULFUR_NET2 || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse square network distance. |
+| SULFUR_NETTLOW || Sulfur IV metric based on the network distance to the nearest county with low sulfur coal. |
+
 
