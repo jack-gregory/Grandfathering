@@ -68,14 +68,15 @@ source(fs::path(here::here(), "src/preamble.R"))
 
 ## ... Paths
 source(fs::path(here::here(), "src/def_paths.R"))
-l.path <- append(l.path, list(cems = "E:/My Data/EPA/CEMS"))
+l.path <- append(l.path, list(cems = "D:/My Data/EPA/CEMS"))
 
 ## ... Functions
 source(fs::path(l.path$src, "find_newfiles.R"))
 source(fs::path(l.path$src, "sql_data_transfer.R"))
 
 ## ... Data
-df.gf <- read_csv(path(l.path$data, "all_years_all_plants_and_features.csv")) %>%
+# df.gf <- read_csv(path(l.path$data, "all_years_all_plants_and_features.csv")) %>%
+df.gf <- read_csv(path(l.path$data, "gf_original/regression_vars.csv")) %>%
   distinct(ORISPL = plant_code) %>%
   arrange(ORISPL)
 

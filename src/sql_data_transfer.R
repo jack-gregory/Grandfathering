@@ -105,13 +105,13 @@ cems_write <- function(con, zip, df) {
   df.filelog <- 
     glue::glue("
       SELECT  ID, 
-              PATH
+              FILE
       FROM    epa.filelog
-      WHERE   PATH='{zip}'
+      WHERE   FILE='{fs::path_file(zip)}'
       ;
     ") %>% DBI::SQL() %>% {DBI::dbGetQuery(con, .)}
   if (nrow(df.filelog)!=1) {
-    stop(glue::glue("Write filelog record for {zip} first."))
+    stop(glue::glue("Write filelog record for {fs::path_file(zip)} first."))
   }
   
   ## Add FILEID to df
@@ -198,7 +198,7 @@ cems_sql <- function(con, zip, filter) {
     cat(" empty")
   } else {
     ## Process data into various tables
-    cat("\n    Process ...\n")
+    cat("\n    Process ...")
     
     ## CEMS data
     df.cems <- df %>%
@@ -212,46 +212,50 @@ cems_sql <- function(con, zip, filter) {
              CO2_MASS, SO2_MASS, NOX_MASS) %>%
       inner_join(filter, by=c("ORISPL"))
     
-    ## EPA IDs
-    if (any(names(df)=="FAC_ID")) {
-      df.epa_id <- df %>%
-        distinct(CAMD_PLANT_ID = ORISPL_CODE,
-                 CAMD_UNIT_ID = UNITID,
-                 EPA_FACILITY_ID = FAC_ID,
-                 EPA_UNIT_ID = UNIT_ID)
-    }
-    
-
-    ## Write data
-    cat("    Write ...")
-    tryCatch({
-      ## Commit write on success
-      DBI::dbBegin(con)
-      
-      cat(" filelog")
-      filelog_write(con, zip)
-      
-      cat(" ... cems")
-      cems_write(con, zip, df.cems)
-      
-      if (exists("df.epa_id")) {
-        cat(" ... xwalk")
-        xwalk_write(con, zip, df.epa_id)
+    if (nrow(df.cems)==0) {
+      cat(" no plants")
+    } else {
+      ## EPA IDs
+      if (any(names(df)=="FAC_ID")) {
+        df.epa_id <- df %>%
+          distinct(CAMD_PLANT_ID = ORISPL_CODE,
+                   CAMD_UNIT_ID = UNITID,
+                   EPA_FACILITY_ID = FAC_ID,
+                   EPA_UNIT_ID = UNIT_ID)
       }
       
-      DBI::dbCommit(con)
-    },
-    ## Rollback on failure
-    error = function(e) {
-      DBI::dbRollback(con)
-      stop(glue::glue("ERROR: Upload failed for {zip}"), call.=TRUE)
-    },
-    finally = {
-      glue::glue("
+      
+      ## Write data
+      cat("\n    Write ...")
+      tryCatch({
+        ## Commit write on success
+        DBI::dbBegin(con)
+        
+        cat(" filelog")
+        filelog_write(con, zip)
+        
+        cat(" ... cems")
+        cems_write(con, zip, df.cems)
+        
+        if (exists("df.epa_id")) {
+          cat(" ... xwalk")
+          xwalk_write(con, zip, df.epa_id)
+        }
+        
+        DBI::dbCommit(con)
+      },
+      ## Rollback on failure
+      error = function(e) {
+        DBI::dbRollback(con)
+        stop(glue::glue("ERROR: Upload failed for {fs::path_file(zip)}\n{e}"), call.=TRUE)
+      },
+      finally = {
+        glue::glue("
         DROP TABLE IF EXISTS epa.xwalk_tmp
         ;
       ") %>% DBI::SQL() %>% {DBI::dbExecute(con, .)}
-    })
+      })
+    }
   }
 }
 

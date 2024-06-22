@@ -54,7 +54,8 @@ source(fs::path(l.path$src, "find_newfiles.R"))
 source(fs::path(l.path$src, "sql_data_transfer.R"))
 
 ## ... Data
-df.gf <- read_csv(path(l.path$data, "all_years_all_plants_and_features.csv")) %>%
+# df.gf <- read_csv(path(l.path$data, "all_years_all_plants_and_features.csv")) %>%
+df.gf <- read_csv(path(l.path$data, "gf_original/regression_vars.csv")) %>%
   distinct(ORISPL = plant_code) %>%
   arrange(ORISPL)
 
@@ -142,15 +143,16 @@ DBI::dbClearResult(res)
 # ## (3b) Join GF & CEMS units
 # ## Import grandfathering dataset and check ORISPL & UNIT matches
 # df.gf <- read_csv(path(l.path$data, "gf_original/in_regression_vars_BP.csv"), guess_max=50000) %>%
+# df.gf <- read_csv(path(l.path$data, "gf_original/regression_vars.csv"), guess_max=50000) %>%
 #   select(plant_code, boiler_id, year, plant_name, plt_county) %>%
 #   filter(year>=1995) %>%
 #   mutate_at(vars(plant_name, plt_county), str_to_upper) %>%
 #   group_by(plant_code, boiler_id) %>%
 #   fill(plant_name, plt_county, .direction="downup") %>%
 #   ungroup() %>%
-#   distinct(ORISPL = plant_code, 
-#            BOILER = boiler_id, 
-#            PLANT_NAME = plant_name, 
+#   distinct(ORISPL = plant_code,
+#            BOILER = boiler_id,
+#            PLANT_NAME = plant_name,
 #            COUNTY = plt_county) %>%
 #   arrange(ORISPL, BOILER) %>%
 #   group_by(ORISPL, BOILER, COUNTY) %>%
@@ -161,8 +163,8 @@ DBI::dbClearResult(res)
 #   full_join(df.cems_yr %>% distinct(ORISPL, BOILER = UNIT) %>% mutate(SOURCE = "CEMS"),
 #             by=c("ORISPL","BOILER")) %>%
 #   mutate(MATCH = (!is.na(SOURCE.x) & !is.na(SOURCE.y))) %>%
-#   left_join(df.xwalk %>% 
-#               select(-ID, -starts_with("EPA")) %>% 
+#   left_join(df.xwalk_epa_eia %>%
+#               select(-ID, -starts_with("EPA")) %>%
 #               rename(ORISPL = CAMD_PLANT_ID, BOILER = CAMD_UNIT_ID),
 #             by=c("ORISPL","BOILER")) %>%
 #   arrange(ORISPL, BOILER) #%>%
@@ -267,7 +269,7 @@ itr_hour <- function(hr) {
   cat("  Save query\n")
   hr_label <- ifelse(str_length(hr)==1, paste0("0", hr), hr)
   saveRDS(df, fs::path(here::here(), glue::glue("data/epa/cems_hr{hr_label}.rds")))
-  write.csv(df, fs::path(here::here(), glue::glue("data/epa/cems_hr{hr_label}.csv")))
+  # write.csv(df, fs::path(here::here(), glue::glue("data/epa/cems_hr{hr_label}.csv")))
   return(df)
 }
 

@@ -1256,4 +1256,3 @@ The following table describes the columns in the exported dataset.
 | SULFUR_NET2 || Sulfur IV metric based on a weighted average of county median sulfur medians by inverse square network distance. |
 | SULFUR_NETTLOW || Sulfur IV metric based on the network distance to the nearest county with low sulfur coal. |
 
-
