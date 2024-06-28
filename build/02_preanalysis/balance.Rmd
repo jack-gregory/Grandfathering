@@ -398,20 +398,20 @@ levels <- c("NONATTAIN","ARP","LOCALREG","LAT","LON","AGE","INSERVICE","RETIREME
             "MT_CE","MT_FW","MT_RS","MT_OTH","N")
 labels <- c("Nonattainment",
             "Acid Rain Program",
-            "Applicable Non-NSR Emission Standard [lbs/mmBTu]",
+            "Applicable Non-NSR Emission Standard [lbs/MMBtu]",
             "Latitude",
             "Longitude",
             "Age",
-            "Inservice Year",
-            "Retirement Year",
+            "Inservice year",
+            "Retirement year",
             "Retire",
             "Capacity",
             "Efficiency",
             "Duration$^{\\dagger}$ [hr/yr]",
             "Generation$^{\\dagger}$ [GWh/yr]",
-            "Heat Rate [mmBTu/MW]",
-            "SO2 Emissions$^{\\dagger}$ [lbs/mmBTu]",
-            "Weighted Average Mine Sulfur Content [\\% weight]",
+            "Heat rate [mmBTu/MW]",
+            "SO2 emissions$^{\\dagger}$ [lbs/MMBtu]",
+            "Weighted average mine sulfur content [\\% weight]",
             "Commercial \\& industrial utility share",
             "Investor-owned utility share",
             "Other utility share",
@@ -470,14 +470,18 @@ df.bal <- df.boiler %>%
   mutate(VAR = factor(VAR, levels=levels, labels=labels)) %>%
   arrange(VAR, ORDER) %>%
   mutate(VAR = as.character(VAR),
-         VAR = case_when(VAR=="Applicable Non-NSR Emission Standard [lbs/mmBTu]" & ORDER==1 ~ 
+         VAR = case_when(VAR=="Applicable Non-NSR Emission Standard [lbs/MMBtu]" & ORDER==1 ~ 
                            "Applicable Non-NSR Emission",
-                         VAR=="Applicable Non-NSR Emission Standard [lbs/mmBTu]" & ORDER==2 ~ 
-                           " Standard [lbs/mmBTu]",
-                         VAR=="Weighted Average Mine Sulfur Content [\\% weight]" & ORDER==1 ~ 
-                           "Weighted Average Mine Sulfur",
-                         VAR=="Weighted Average Mine Sulfur Content [\\% weight]" & ORDER==2 ~ 
-                           " Content [\\% weight]",
+                         VAR=="Applicable Non-NSR Emission Standard [lbs/MMBtu]" & ORDER==2 ~ 
+                           " Standard [lbs/MMBtu]",
+                         VAR=="Weighted average mine sulfur content [\\% weight]" & ORDER==1 ~ 
+                           "Weighted average mine sulfur",
+                         VAR=="Weighted average mine sulfur content [\\% weight]" & ORDER==2 ~ 
+                           " content [\\% weight]",
+                         VAR=="Commercial \\& industrial utility share" & ORDER==1 ~ 
+                           "Commercial \\& industrial utility",
+                         VAR=="Commercial \\& industrial utility share" & ORDER==2 ~ 
+                           " share",
                          ORDER==2 ~ as.character(NA),
                          TRUE ~ VAR)) %>%
   mutate_all(~ifelse(is.na(.), "", .)) %>%
@@ -545,7 +549,7 @@ tbl_header <- c("\\begin{center}",
                 "\\endhead")
 tbl_midder <- c("\\midrule")
 tbl_footer <- c("\\hline\\hline",
-                paste0("\\multicolumn{4}{p{14cm}}{\\textit{Notes}:  This table displays average ",
+                paste0("\\multicolumn{4}{p{14.1cm}}{\\textit{Notes}:  This table displays average ",
                        "characteristics by NSR grandfathering status.  Standard deviations are in ",
                        "parentheses, with \\textit{t}-statistics of the difference between ",
                        "`grandfathered' and `non-grandfathered' boilers in brackets where ",
@@ -570,7 +574,7 @@ tbl_footer %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=TRU
 ```
 
 
-## Local reg < 1.1
+## Local reg > 1.1
 
 ...
 
@@ -627,14 +631,18 @@ df.bal <- df.boiler11 %>%
   mutate(VAR = factor(VAR, levels=levels, labels=labels)) %>%
   arrange(VAR, ORDER) %>%
   mutate(VAR = as.character(VAR),
-         VAR = case_when(VAR=="Applicable Non-NSR Emission Standard [lbs/mmBTu]" & ORDER==1 ~ 
+         VAR = case_when(VAR=="Applicable Non-NSR Emission Standard [lbs/MMBtu]" & ORDER==1 ~ 
                            "Applicable Non-NSR Emission",
-                         VAR=="Applicable Non-NSR Emission Standard [lbs/mmBTu]" & ORDER==2 ~ 
-                           " Standard [lbs/mmBTu]",
-                         VAR=="Weighted Average Mine Sulfur Content [\\% weight]" & ORDER==1 ~ 
-                           "Weighted Average Mine Sulfur",
-                         VAR=="Weighted Average Mine Sulfur Content [\\% weight]" & ORDER==2 ~ 
-                           " Content [\\% weight]",
+                         VAR=="Applicable Non-NSR Emission Standard [lbs/MMBtu]" & ORDER==2 ~ 
+                           " Standard [lbs/MMBtu]",
+                         VAR=="Weighted average mine sulfur content [\\% weight]" & ORDER==1 ~ 
+                           "Weighted average mine sulfur",
+                         VAR=="Weighted average mine sulfur content [\\% weight]" & ORDER==2 ~ 
+                           " content [\\% weight]",
+                         VAR=="Commercial \\& industrial utility share" & ORDER==1 ~ 
+                           "Commercial \\& industrial utility",
+                         VAR=="Commercial \\& industrial utility share" & ORDER==2 ~ 
+                           " share",
                          ORDER==2 ~ as.character(NA),
                          TRUE ~ VAR)) %>%
   mutate_all(~ifelse(is.na(.), "", .)) %>%
@@ -646,8 +654,8 @@ df.bal <- df.boiler11 %>%
 if (knitr::is_html_output()) {
   df.bal %>%
     kable(format="html", align="lrrr", booktabs=TRUE, linesep=c(""),
-          caption="Average characteristics of boilers by local regulation < 1.1",
-          col.names=c("","Local regulation < 1.1","Local regulation >= 1.1.","Difference")) 
+          caption="Average characteristics of boilers by local regulation",
+          col.names=c("","Local regulation > 1.1","Local regulation <= 1.1.","Difference")) 
 } else {
   df.bal
 }
@@ -685,25 +693,25 @@ tbl_header <- c("\\begin{center}",
                 "\\begin{singlespace}",
                 "\\begin{footnotesize}\n",
                 "\\begin{longtable}[c]{@{\\extracolsep{0.7ex}}l*{3}{D{.}{.}{-2}}@{}}",
-                "\t\\caption{Average characteristics of boilers by local regulation < 1.1}",
-                "\t\\label{tbl:balance}\n",
+                "\t\\caption{Average characteristics of boilers by local regulation}",
+                "\t\\label{tbl:balance_lr11}\n",
                 "\\\\",
                 "\\hline\\hline",
-                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{Local regulation < 1.1}} & ",
-                       "\\multicolumn{1}{c}{\\textbf{Local regulation $\\geq$ 1.1}} & ",
+                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\> 1.1}}} & ",
+                       "\\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\$\\leq$ 1.1}}} & ",
                        "\\multicolumn{1}{c}{\\textbf{Difference}} \\\\ [1.0ex]"),
                 "\\midrule",
                 "\\endfirsthead",
                 "\\hline\\hline",
-                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{Local regulation < 1.1}} & ",
-                       "\\multicolumn{1}{c}{\\textbf{Local regulation $\\geq$ 1.1}} & ",
+                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\> 1.1}}} & ",
+                       "\\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\$\\leq$ 1.1}}} & ",
                        "\\multicolumn{1}{c}{\\textbf{Difference}} \\\\ [1.0ex]"),
                 "\\midrule",
                 "\\endhead")
 tbl_midder <- c("\\midrule")
 tbl_footer <- c("\\hline\\hline",
-                paste0("\\multicolumn{4}{p{14cm}}{\\textit{Notes}:  This table displays average ",
-                       "characteristics by local regulation at a cutoff of 1.1 [units?].  Standard deviations are in ",
+                paste0("\\multicolumn{4}{p{14.1cm}}{\\textit{Notes}:  This table displays average ",
+                       "characteristics by local regulation at a cutoff of 1.1 lbs/MMBtu.  Standard deviations are in ",
                        "parentheses, with \\textit{t}-statistics of the difference between ",
                        "`grandfathered' and `non-grandfathered' boilers in brackets where ",
                        "*** p<0.001;  ** p<0.01;  * p<0.05.  All variables utilize the full extent ",
@@ -727,7 +735,7 @@ tbl_footer %>% write_lines(path(l.path$out, date, "tbl.balance_lr11.tex"), appen
 ```
 
 
-## Local reg < 1.2
+## Local reg > 1.2
 
 ...
 
@@ -784,14 +792,18 @@ df.bal <- df.boiler12 %>%
   mutate(VAR = factor(VAR, levels=levels, labels=labels)) %>%
   arrange(VAR, ORDER) %>%
   mutate(VAR = as.character(VAR),
-         VAR = case_when(VAR=="Applicable Non-NSR Emission Standard [lbs/mmBTu]" & ORDER==1 ~ 
+         VAR = case_when(VAR=="Applicable Non-NSR Emission Standard [lbs/MMBtu]" & ORDER==1 ~ 
                            "Applicable Non-NSR Emission",
-                         VAR=="Applicable Non-NSR Emission Standard [lbs/mmBTu]" & ORDER==2 ~ 
-                           " Standard [lbs/mmBTu]",
-                         VAR=="Weighted Average Mine Sulfur Content [\\% weight]" & ORDER==1 ~ 
-                           "Weighted Average Mine Sulfur",
-                         VAR=="Weighted Average Mine Sulfur Content [\\% weight]" & ORDER==2 ~ 
-                           " Content [\\% weight]",
+                         VAR=="Applicable Non-NSR Emission Standard [lbs/MMBtu]" & ORDER==2 ~ 
+                           " Standard [lbs/MMBtu]",
+                         VAR=="Weighted average mine sulfur content [\\% weight]" & ORDER==1 ~ 
+                           "Weighted average mine sulfur",
+                         VAR=="Weighted average mine sulfur content [\\% weight]" & ORDER==2 ~ 
+                           " content [\\% weight]",
+                         VAR=="Commercial \\& industrial utility share" & ORDER==1 ~ 
+                           "Commercial \\& industrial utility",
+                         VAR=="Commercial \\& industrial utility share" & ORDER==2 ~ 
+                           " share",
                          ORDER==2 ~ as.character(NA),
                          TRUE ~ VAR)) %>%
   mutate_all(~ifelse(is.na(.), "", .)) %>%
@@ -803,8 +815,8 @@ df.bal <- df.boiler12 %>%
 if (knitr::is_html_output()) {
   df.bal %>%
     kable(format="html", align="lrrr", booktabs=TRUE, linesep=c(""),
-          caption="Average characteristics of boilers by local regulation < 1.2",
-          col.names=c("","Local regulation < 1.2","Local regulation >= 1.2.","Difference")) 
+          caption="Average characteristics of boilers by local regulation",
+          col.names=c("","Local regulation > 1.2","Local regulation <= 1.2.","Difference")) 
 } else {
   df.bal
 }
@@ -842,25 +854,25 @@ tbl_header <- c("\\begin{center}",
                 "\\begin{singlespace}",
                 "\\begin{footnotesize}\n",
                 "\\begin{longtable}[c]{@{\\extracolsep{0.7ex}}l*{3}{D{.}{.}{-2}}@{}}",
-                "\t\\caption{Average characteristics of boilers by local regulation < 1.2}",
-                "\t\\label{tbl:balance}\n",
+                "\t\\caption{Average characteristics of boilers by local regulation}",
+                "\t\\label{tbl:balance_lr12}\n",
                 "\\\\",
                 "\\hline\\hline",
-                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{Local regulation < 1.2}} & ",
-                       "\\multicolumn{1}{c}{\\textbf{Local regulation $\\geq$ 1.2}} & ",
+                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\> 1.2}}} & ",
+                       "\\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\$\\leq$ 1.2}}} & ",
                        "\\multicolumn{1}{c}{\\textbf{Difference}} \\\\ [1.0ex]"),
                 "\\midrule",
                 "\\endfirsthead",
                 "\\hline\\hline",
-                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{Local regulation < 1.2}} & ",
-                       "\\multicolumn{1}{c}{\\textbf{Local regulation $\\geq$ 1.2}} & ",
+                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\> 1.2}}} & ",
+                       "\\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\$\\leq$ 1.2}}} & ",
                        "\\multicolumn{1}{c}{\\textbf{Difference}} \\\\ [1.0ex]"),
                 "\\midrule",
                 "\\endhead")
 tbl_midder <- c("\\midrule")
 tbl_footer <- c("\\hline\\hline",
-                paste0("\\multicolumn{4}{p{14cm}}{\\textit{Notes}:  This table displays average ",
-                       "characteristics by local regulation at a cutoff of 1.2 [units?].  Standard deviations are in ",
+                paste0("\\multicolumn{4}{p{14.1cm}}{\\textit{Notes}:  This table displays average ",
+                       "characteristics by local regulation at a cutoff of 1.2 lbs/MMBtu.  Standard deviations are in ",
                        "parentheses, with \\textit{t}-statistics of the difference between ",
                        "`grandfathered' and `non-grandfathered' boilers in brackets where ",
                        "*** p<0.001;  ** p<0.01;  * p<0.05.  All variables utilize the full extent ",
