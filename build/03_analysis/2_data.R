@@ -2,7 +2,7 @@
 ## Grandfathering
 ## Analysis -- Data
 ## Jack Gregory
-## 26 September 2021
+## 25 June 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -14,7 +14,7 @@
 
 ## Define import files
 l.file <- list(
-  gf = path(l.path$data, "gf_original/regressions_ready_data2.dta")
+  gf = path(l.path$data, "gf_original/regressions_ready_data3.dta")
 )
 
 ## Import GF dataset
@@ -25,44 +25,43 @@ df.gf <- read_dta(l.file$gf) %>%
   filter(plant_code!=10673) %>%
   
   ## Select relevant variables
-  select(plant_code,
+  select(ID,
+         plant_code,
          boiler_id,
          UNIT,
          year,
          states,
          ut_type,
+         manufact,
          DURATION,
          survive,
          SO2,
-         grand_NSR_const,
-         grand_NSR_alt,
+         Gf,
+         GfA,
          so2_nonattain,
-         grand_NSR_in_nonnat_const,
-         grand_NSR_in_nonnat_alt,
+         so2_nonat_Gf,
          applic_reg,
-         applic_reg_const,
+         applic_reg_Gf,
          ARP_subject,
-         ARPprice_sp,
+         ARPprice,
          age,
          inservice_y,
-         max_boi_nameplate,
+         capacity,
+         capacity_gf,
+         efficiency_100_pct_load,
          state_cap_growth,
          coal2gas_price,
          d_growth,
          sulfur_content_tot,
-         sulfur_dist,
-         incomePC,
-         share_white) %>%
+         sulfur_net_iv) %>%
   
   ## Create additional variables
   mutate(UNIT = ifelse(UNIT=="", NA, UNIT),
          # DURATION = DURATION / 10^3,
          survive = survive * 10^2,
-         max_boi_nameplate = max_boi_nameplate / 10^3,
-         capacity_gf = max_boi_nameplate * grand_NSR_const,
-         share_nonwhite = 1 - share_white,
-         NSR_nonwhite = share_nonwhite * grand_NSR_const,
-         NSR_income = incomePC * grand_NSR_const)
+         capacity = capacity / 10^3,
+         capacity_gf = capacity_gf / 10^3
+         )
 
 
 ### END CODE ###
