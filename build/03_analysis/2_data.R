@@ -25,7 +25,8 @@ df.gf <- read_dta(l.file$gf) %>%
   filter(plant_code!=10673) %>%
   
   ## Select relevant variables
-  select(ID,
+  select(## ... General
+         ID,
          plant_code,
          boiler_id,
          UNIT,
@@ -53,15 +54,33 @@ df.gf <- read_dta(l.file$gf) %>%
          coal2gas_price,
          d_growth,
          sulfur_content_tot,
-         sulfur_net_iv) %>%
+         sulfur_net_iv,
+         ## ... Anticipation
+         pre_1963,
+         post_1963_Gf,
+         capacity_pre_1963,
+         capacity_post_1963_GF,
+         pre1963_in_nonnat_GF,
+         post1963_GF_in_nonnat_const,
+         applic_reg_pre1963,
+         applic_reg_post1963GF,
+         ## ... Non-linear
+         age_sq,
+         capacity_sq,
+         ## ... GF vs GF
+         applic_regT) %>%
   
   ## Create additional variables
+  mutate(across(contains("capacity"), \(x) x/1e3)) %>%
   mutate(UNIT = ifelse(UNIT=="", NA, UNIT),
          # DURATION = DURATION / 10^3,
-         survive = survive * 10^2,
-         capacity = capacity / 10^3,
-         capacity_gf = capacity_gf / 10^3
-         )
+         survive = survive * 1e2,
+         capacity_sq = capacity_sq / 1e3,
+         
+         AR = 1 - applic_regT,
+         capacity_AR = so2_nonattain * AR,
+         so2_nonat_AR = applic_reg * AR,
+         applic_reg_AR = capacity * AR)
 
 
 ### END CODE ###

@@ -69,7 +69,7 @@ stata_reg.reg <- function(fml, df, ...) {
   
   ## Create Stata call
   stata_do <- 
-    glue('eststo: reg {fml}, vce(robust)
+    glue('eststo: reg {fml}, vce(cluster ID)
           regsave, tstat pval ci detail(scalars)
          ')
   
@@ -110,7 +110,7 @@ stata_reg.iv <- function(fml, df, ..., bootstrap) {
             
             end
             
-            bootstrap _b, reps(100) seed(100): gf_bs
+            bootstrap _b, reps(100) seed(100) cluster(ID): gf_bs
             regsave, tstat pval ci detail(scalars)
            ")
   } else {

@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## Analysis -- Regressions
+## Analysis -- Regs -- Main
 ## Jack Gregory
 ## 25 June 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -42,15 +42,16 @@ ctrl_mkt <- "state_cap_growth coal2gas_price d_growth"
 l.rhs <- list(
   glue("Gf {ctrl_boiler} {fes}"),
   glue("Gf {ctrl_boiler} {ctrl_env} {fes}"),
+  glue("Gf {ctrl_boiler} so2_nonattain so2_nonat_Gf applic_reg applic_reg_Gf {fes}"),
   glue("Gf {ctrl_boiler} {ctrl_env_gf} sulfur_content_tot c.sulfur_content_tot#c.ARPprice {fes}"),
   glue("Gf {ctrl_boiler} {ctrl_env_gf} {fes}"),
-  glue("Gf {ctrl_boiler} {ctrl_env_gf} {fes}"),
+  glue("Gf {ctrl_boiler} so2_nonattain so2_nonat_Gf applic_reg applic_reg_Gf {fes}"),
   glue("Gf {ctrl_boiler} {ctrl_env_gf} {fes}")
 )
 
 ## Market controls
 l.ctrl <- list(
-  1,1,1,1,1,1
+  1,1,1,1,1,1,1
 )
 
 ## Regression conditions
@@ -59,13 +60,15 @@ l.cond <- list(
   "if (ut_type==4 | ut_type==5 | ut_type==2) & (inservice_y>=1950 & inservice_y<=2006)",
   "if (ut_type==4 | ut_type==5 | ut_type==2) & (inservice_y>=1950 & inservice_y<=2006)",
   "if (ut_type==4 | ut_type==5 | ut_type==2) & (inservice_y>=1950 & inservice_y<=2006)",
+  "if (ut_type==4 | ut_type==5 | ut_type==2) & (inservice_y>=1950 & inservice_y<=2006)",
   "if ut_type!=. & (inservice_y>=1950 & inservice_y<=2006)",
-  "if ut_type==4 & (inservice_y>=1950 & inservice_y<=2006)"
+  "if ut_type!=. & (inservice_y>=1950 & inservice_y<=2006)"
 )
+cond_survive <- "& ((capacity>0.075 & ut_type==4) | ((ut_type==5|ut_type==2) & year>=1990)) & year<=2017"
 
 ## Regression type
 l.type <- list(
-  "reg","reg","reg","iv","iv","iv"
+  "reg","reg","reg","reg","iv","reg","iv"
 )
 
 
@@ -82,7 +85,7 @@ df.reg <- tibble(l.type, l.rhs, l.ctrl, l.cond) %>%
   rename_with(.fn=~str_replace(., "l\\.", "")) %>%
   mutate(ctrl = ifelse(lhs!="SO2" & ctrl==1, ctrl_mkt, ""),
          cond = as.character(cond),
-         sample = ifelse(lhs=="survive", "& capacity>0.075 & year<=2017", ""),
+         sample = ifelse(lhs=="survive", cond_survive, ""),
          fml = paste(lhs, rhs, ctrl, cond, sample, sep=" ")) %>%
   mutate_at(vars(-model_id), as.character) %>%
   mutate(bs = ifelse(type=="iv", TRUE, FALSE)) %>%
@@ -98,9 +101,9 @@ df.reg <- tibble(l.type, l.rhs, l.ctrl, l.cond) %>%
 
 ## Construct column names
 tbl_colnames <- df.reg %>%
-  mutate(owner = case_when(str_detect(fml, "ut_type==5") ~ "IOU+",
-                           str_detect(fml, "ut_type==4") ~ "IOU",
-                           TRUE ~ "All")) %>%
+  mutate(owner = case_when(str_detect(fml, "\\(ut_type==4 | ut_type==5 | ut_type==2\\)") ~ "IOU+",
+                           str_detect(fml, "ut_type!=.") ~ "All",
+                           TRUE ~ "IOU")) %>%
   distinct(model_id, type, owner) %>%
   mutate(model_id = paste0("\\multicolumn{1}{c}{(", model_id, ")}"),
          type = ifelse(type=="reg", "OLS", "IV"),
@@ -114,16 +117,17 @@ tbl_colnames <- df.reg %>%
   mutate_at(vars(last_col(offset=1)), ~str_replace(., " &$", ""))
 
 ## Construct table coefficients
-l.var <- list("Gf","capacity","capacity_gf","so2_nonattain","so2_nonat_Gf","applic_reg","applic_reg_Gf")
-l.var_labs <- list("GF","size","GF $\\times$ size","NAAQS","GF $\\times$ NAAQS",
-                     "MMBTU","GF $\\times$ MMBTU")
+l.var <- list("Gf","capacity","capacity_gf","so2_nonattain","so2_nonat_Gf","applic_reg","applic_reg_Gf",
+              "ARPprice","sulf_cont_iv","ARP_iv_sulf_cont")
+l.var_labs <- list("GF","size","GF $\\times$ size","NAAQS","GF $\\times$ NAAQS","MMBTU","GF $\\times$ MMBTU",
+                   "ARP price","Sulfur IV","ARP price $\\times$ sulfur IV")
 tbl_coef <- df.reg %>%
   filter(var %in% unlist(l.var)) %>%
   mutate_at(vars(coef, tstat), ~formatC(round(., digits=2), format="f", digits=2)) %>%
   mutate(coef = case_when(
-    pval<0.001 ~ paste0(coef, "^{***}"),
-    pval<0.01 ~ paste0(coef, "^{**}"),
-    pval<0.05 ~ paste0(coef, "^{*}"),
+    pval<0.01 ~ paste0(coef, "^{***}"),
+    pval<0.05 ~ paste0(coef, "^{**}"),
+    pval<0.10 ~ paste0(coef, "^{*}"),
     TRUE ~ as.character(coef)),
     tstat = paste0("(", tstat, ")")) %>%
   select(lhs, model_id, var, coef, tstat) %>%
@@ -152,12 +156,12 @@ tbl_summary <- df.reg %>%
   distinct(lhs, model_id, type, fml, N, r2) %>%
   mutate_at(vars(N), ~formatC(., format="d", digits=0, big.mark=",")) %>%
   mutate_at(vars(r2), ~formatC(round(., digits=3), format="f", digits=3)) %>%
-  mutate(#fe_yr = ifelse(str_detect(fml, "i.year"), "X", ""),
-         #fe_st = ifelse(str_detect(fml, "i.states"), "X", ""),
-         #fe_ut = ifelse(str_detect(fml, "i.ut_type"), "X", ""),
-         #fe_man = ifelse(str_detect(fml, "i.manufact"), "X", ""),
-         ctrl_mkt = ifelse(str_detect(fml, ctrl_mkt), "X", ""),
-         ctrl_so2 = ifelse((type=="iv"|str_detect(fml, "sulfur_content_tot")), "X", "")) %>%
+  # mutate(fe_yr = ifelse(str_detect(fml, "i.year"), "X", ""),
+  #        fe_st = ifelse(str_detect(fml, "i.states"), "X", ""),
+  #        fe_ut = ifelse(str_detect(fml, "i.ut_type"), "X", ""),
+  #        fe_man = ifelse(str_detect(fml, "i.manufact"), "X", ""),
+  #        ctrl_mkt = ifelse(str_detect(fml, ctrl_mkt), "X", ""),
+  #        ctrl_so2 = ifelse((type=="iv"|str_detect(fml, "sulfur_content_tot")), "X", "")) %>%
   select(lhs, model_id, starts_with("fe"), starts_with("ctrl"), N, r2) %>%
   mutate_at(vars(starts_with("fe"), starts_with("ctrl")), 
             ~case_when(is.na(.) ~ "\\textit{}",
@@ -180,8 +184,8 @@ f_header <- c("%% Grandfathering Project",
 tbl_header1 <- c("\\begin{center}",
                  "\\begin{singlespace}",
                  "\\begin{scriptsize}\n",
-                 paste0("\\begin{longtable}[c]{@{\\extracolsep{2.5ex}}l*{", 
-                        ncol(tbl_colnames)-2, "}{D{.}{.}{-2}}@{\\extracolsep{2.5ex}}}"),
+                 paste0("\\begin{longtable}[c]{@{\\extracolsep{0ex}}l*{", 
+                        ncol(tbl_colnames)-2, "}{D{.}{.}{-2}}@{\\extracolsep{-0.3ex}}}"),
                  "\t\\caption{Main regression results}",
                  "\t\\label{tbl:reg_main}\n",
                  "\\\\",
@@ -206,20 +210,19 @@ subtbl_headerC <- c("\\hline \\\\",
 tbl_midder <- c("\\hline \\\\ [-1.8ex]")
 txt_footer <- c("This table presents our main regression results for our three channels, namely: ",
             "utilization, survival and emissions. ",
-            "Specifications (1)-(3) are estimated using OLS, while specifications (4)-(6) use ",
+            "Specifications (1)-(4) and (6) are estimated using OLS, while specifications (5) and (7) use ",
             "2SLS and leverage sulfur content of the available coal weighted by network distance as an instrument ",
             "for sulfur content of the combusted coal. The unit of observation is boiler-year. ",
             "The sample is restricted to those boilers with inservice years between 1950 and 2006, inclusive. ",
-            "The $IOU$ column restricts the sample to boilers belonging to IOUs; ",
-            "the $IOU+$ columns expand to include commercial, industrial and IOU boilers; while, ",
+            "The $IOU+$ columns include independently-owned utilities as well as commercial and industrial boilers; while, ",
             "the $All$ column uses all types of available boilers. ",
             "All regressions include boiler controls as well as year, state, utility type and manufacture type fixed effects. ",
-            "Utilization and emissions estimations use data from 1995-2018, ",
+            "Utilization and emissions regressions also include market controls and use data from 1995-2018, ",
             "while survival estimations use 1985-2017.")
 tbl_footer <- c("\\hline\\hline",
                 paste0("\\multicolumn{", ncol(tbl_colnames)-1, "}{p{16cm}}{\\textit{Notes:} ", 
                        paste(txt_footer, collapse=""), " Boiler-level clustered standard errors used, with ",
-                       "*** p$<$0.001,  ** p$<$0.01,  * p$<$0.05 and ",
+                       "*** p$<$0.01,  ** p$<$0.05,  * p$<$0.10 and ",
                        "\\textit{t}-statistics in parentheses.} \\\\"),
                 "\\\\",
                 "\\end{longtable}\n",
@@ -274,7 +277,7 @@ tbl_footer %>% write_lines(file, append=TRUE)
 
 ## Clean environment ----------------------------------------------------------
 rm(list=ls(pattern="^(f|tbl|subtbl|txt)_"))
-rm(l.lhs, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
+rm(l.lhs, l.var, l.var_labs, l.sum, l.sum_labs)
 
 
 # MAIN REGRESSIONS (fixest) -----------------------------------------------------------------------
@@ -284,7 +287,7 @@ rm(l.lhs, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
 # ## Stata global definitions
 # # global controls_env so2_nonattain applic_reg ARPprice_sp
 # # global controls_env_interact grand_NSR_in_nonnat_const applic_reg_const
-# # global controls_gen_common age max_boi_nameplate 
+# # global controls_gen_common age max_boi_nameplate
 # 
 # ## fixest conversions of Stata commands
 # # (1) reg `i' grand_NSR_const $controls_gen_common i.year i.states i.ut_type, vce(robust)
@@ -295,19 +298,45 @@ rm(l.lhs, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
 # 
 # # (2) reg `i' grand_NSR_const capacity_gf $controls_env $controls_env_interact $controls_gen_common \\\
 # #       i.year i.states i.ut_type, vce(robust)
-# feols(fml=DURATION ~ grand_NSR_const + age + max_boi_nameplate + 
-#         i(grand_NSR_const, max_boi_nameplate, 0) + so2_nonattain + applic_reg + ARPprice_sp + 
+# feols(fml=DURATION ~ grand_NSR_const + age + max_boi_nameplate +
+#         i(grand_NSR_const, max_boi_nameplate, 0) + so2_nonattain + applic_reg + ARPprice_sp +
 #         grand_NSR_in_nonnat_const + applic_reg_const | year + states + ut_type,
 #       data=df.gf,
 #       se="hetero") %>%
 #   summary()
 # 
-# feols(fml=DURATION ~ grand_NSR_const + age + max_boi_nameplate + 
-#         i(grand_NSR_const, max_boi_nameplate, 0) + so2_nonattain + applic_reg + ARPprice_sp + 
-#         i(grand_NSR_const, so2_nonattain, 0) + i(grand_NSR_const, applic_reg, 0) | 
+# feols(fml=DURATION ~ grand_NSR_const + age + max_boi_nameplate +
+#         i(grand_NSR_const, max_boi_nameplate, 0) + so2_nonattain + applic_reg + ARPprice_sp +
+#         i(grand_NSR_const, so2_nonattain, 0) + i(grand_NSR_const, applic_reg, 0) |
 #         year + states + ut_type,
 #       data=df.gf,
 #       se="hetero") %>%
+#   summary()
+# 
+# 
+# # DURATION Gf age capacity capacity_gf efficiency_100_pct_load so2_nonattain so2_nonat_Gf applic_reg applic_reg_Gf ARPprice
+# # i.year i.states i.ut_type i.manufact state_cap_growth coal2gas_price d_growth 
+# #if (ut_type==4 | ut_type==5 | ut_type==2) & (inservice_y>=1950 & inservice_y<=2006)
+# s1 <- feols(fml=sulfur_content_tot ~ sulfur_net_iv + Gf + age + capacity + capacity_gf + efficiency_100_pct_load +
+#         so2_nonattain + so2_nonat_Gf + applic_reg + applic_reg_Gf + ARPprice +
+#         state_cap_growth + coal2gas_price + d_growth |
+#         year + states + ut_type + manufact,
+#       data=df.gf |>
+#         filter(ut_type %in% c(2,4,5)) |>
+#         filter(inservice_y>=1950 & inservice_y<=2006),
+#       vcov=cluster ~ ID)
+# df.gf_test <- df.gf |>
+#   filter(ut_type %in% c(2,4,5)) |>
+#   filter(inservice_y>=1950 & inservice_y<=2006) |>
+#   slice(s1[["obs_selection"]][["obsRemoved"]]) |>
+#   bind_cols(fitted_values = fitted(s1)) |>
+#   mutate(interaction_term = fitted_values * ARPprice)
+# feols(fml=DURATION ~ fitted_values + Gf + age + capacity + capacity_gf + efficiency_100_pct_load +
+#         so2_nonattain + so2_nonat_Gf + applic_reg + applic_reg_Gf + ARPprice + interaction_term +
+#         state_cap_growth + coal2gas_price + d_growth |
+#         year + states + ut_type + manufact,
+#       data=df.gf_test,
+#       vcov=cluster ~ ID) %>%
 #   summary()
 
 
@@ -316,17 +345,17 @@ rm(l.lhs, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
 ## Build specifications -------------------------------------------------------
 
 ## Right-hand side vars
-l.rhs <- l.rhs[4:6]
+l.rhs <- l.rhs[l.type=="iv"]
 
 ## Market controls
-l.ctrl <- l.ctrl[4:6]
+l.ctrl <- l.ctrl[l.type=="iv"]
 
 ## Regression conditions
-l.cond <- l.cond[4:6]
+l.cond <- l.cond[l.type=="iv"]
 
 ## Regression type
 l.type <- list(
-  "reg","reg","reg"
+  "reg","reg"
 )
 
 
@@ -352,11 +381,11 @@ df.reg <- tibble(l.type, l.rhs, l.cond) %>%
 
 ## Construct column names
 tbl_colnames <- df.reg %>%
-  mutate(owner = case_when(str_detect(fml, "ut_type==5") ~ "IOU+",
-                           str_detect(fml, "if ut_type==4") ~ "IOU",
-                           TRUE ~ "All")) %>%
+  mutate(owner = case_when(str_detect(fml, "\\(ut_type==4 | ut_type==5 | ut_type==2\\)") ~ "IOU+",
+                           str_detect(fml, "ut_type!=.") ~ "All",
+                           TRUE ~ "IOU")) %>%
   distinct(model_id, type, owner) %>%
-  mutate(model_id = model_id + 3,
+  mutate(model_id = ifelse(model_id==1, 5, 7),
          model_id = paste0("\\multicolumn{1}{c}{(", model_id, ")}"),
          type = ifelse(type=="reg", "OLS", "IV"),
          type = paste0("\\multicolumn{1}{c}{\\textit{", type, "}}"),
@@ -371,14 +400,14 @@ tbl_colnames <- df.reg %>%
 ## Construct table coefficients
 l.var <- list("sulfur_net_iv","Gf","capacity","capacity_gf","so2_nonattain","so2_nonat_Gf",
               "applic_reg","applic_reg_Gf")
-l.var_labs <- list("sulfur","GF","size","GF $\\times$ size","NAAQS","GF $\\times$ NAAQS",
+l.var_labs <- list("Sulfur distance","GF","size","GF $\\times$ size","NAAQS","GF $\\times$ NAAQS",
                    "MMBTU","GF $\\times$ MMBTU")
 tbl_coef <- df.reg %>%
   filter(var %in% unlist(l.var)) %>%
   mutate_at(vars(coef, tstat), ~formatC(round(., digits=2), format="f", digits=2)) %>%
-  mutate(coef = case_when(pval<0.001 ~ paste0(coef, "^{***}"),
-                          pval<0.01 ~ paste0(coef, "^{**}"),
-                          pval<0.05 ~ paste0(coef, "^{*}"),
+  mutate(coef = case_when(pval<0.01 ~ paste0(coef, "^{***}"),
+                          pval<0.05 ~ paste0(coef, "^{**}"),
+                          pval<0.10 ~ paste0(coef, "^{*}"),
                           TRUE ~ as.character(coef)),
          tstat = paste0("(", tstat, ")")) %>%
   select(model_id, var, coef, tstat) %>%
@@ -403,11 +432,11 @@ tbl_summary <- df.reg %>%
   distinct(model_id, type, fml, N, r2) %>%
   mutate_at(vars(N), ~formatC(., format="d", digits=0, big.mark=",")) %>%
   mutate_at(vars(r2), ~formatC(round(., digits=3), format="f", digits=3)) %>%
-  mutate(#fe_yr = ifelse(str_detect(fml, "i.year"), "X", ""),
-         #fe_st = ifelse(str_detect(fml, "i.states"), "X", ""),
-         #fe_ut = ifelse(str_detect(fml, "i.ut_type"), "X", ""),
-         #fe_man = ifelse(str_detect(fml, "i.manufact"), "X", ""),
-         ctrl_mkt = ifelse(str_detect(fml, ctrl_mkt), "X", "")) %>%
+  # mutate(fe_yr = ifelse(str_detect(fml, "i.year"), "X", ""),
+  #        fe_st = ifelse(str_detect(fml, "i.states"), "X", ""),
+  #        fe_ut = ifelse(str_detect(fml, "i.ut_type"), "X", ""),
+  #        fe_man = ifelse(str_detect(fml, "i.manufact"), "X", ""),
+  #        ctrl_mkt = ifelse(str_detect(fml, ctrl_mkt), "X", "")) %>%
   select(model_id, starts_with("fe"), starts_with("ctrl"), N, r2) %>%
   mutate_at(vars(starts_with("fe"), starts_with("ctrl")),
             ~case_when(is.na(.) ~ "\\textit{}",
@@ -437,20 +466,20 @@ tbl_header <- c("\\begin{table}[ht]",
                 "\\hline \\\\[-1.8ex]")
 tbl_midder <- c("\\hline \\\\[-1.8ex]")
 txt_footer <- c("This table presents the first-stage results for our main regressions, corresponding to ",
-                "specifications (4)-(6) in Table 1. ",
+                "specifications (5) and (7) in Table 1. ",
                 "The three channels each produce similar results, so we report those for utilization only. ",
                 "The dependent variable is the SO$_2$ content of combusted coal. ",
                 "All specifications are estimated using OLS and data from 1995-2018. The unit of observation is boiler-year. ",
                 "The sample is restricted to those boilers with inservice years between 1950 and 2006, inclusive. ",
-                "The $IOU$ column restricts the sample to boilers belonging to IOUs; ",
-                "the $IOU+$ column expands to include commercial, industrial and IOU boilers; while, ",
+                "The $IOU+$ column includes independently-owned utilities as well as commercial and industrial boilers; while, ",
                 "the $All$ column uses all types of available boilers. ",
-                "All regressions include boiler controls as well as year, state, utility type and manufacture type fixed effects. ")
+                "All regressions above include boiler and market controls as well as year, state, utility type and ",
+                "manufacture type fixed effects. ")
 tbl_footer <- c("\\hline",
                 "\\hline \\\\[-1.8ex]",
                 paste0("\\multicolumn{", ncol(tbl_colnames)-1, "}{p{9cm}}{\\textit{Notes:} ", 
                        paste(txt_footer, collapse=""), " Boiler-level clustered standard errors used, with ",
-                       "*** p$<$0.001,  ** p$<$0.01,  * p$<$0.05 and ",
+                       "*** p$<$0.01,  ** p$<$0.05,  * p$<$0.10 and ",
                        "\\textit{t}-statistics in parentheses.} \\\\"),
                 "\\end{tabular}",
                 "\\end{table}")
