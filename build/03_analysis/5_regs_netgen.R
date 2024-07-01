@@ -1,8 +1,8 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 02_analysis/netgen.R
+## Analysis -- Regs -- Netgen
 ## Jack Gregory
-## 23 September 2021
+## 25 June 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -20,20 +20,12 @@
 ##      and EIA-923 data.
 
 ##  (2) EIA-923 -- Page 4 Generator Data -- 2008-present
-##      This worksheet report net generation by ORISPL, generator and month.  This allows units
+##      This worksheet reports net generation by ORISPL, generator and month.  This allows units
 ##      to be uniquely identified across the EPA CEMS and EIA-923 datasets through the EPA-EIA 
 ##      crosswalk.  Nevertheless, difficulties can arise here due to non-sequential generator-
 ##      boiler setups.
 
-## Below we mainly focus on option (2); although, we highlight script that is meant for option (1).
-
-
-# VERSION HISTORY ---------------------------------------------------------------------------------
-## V    DATE      EDITOR        NOTES
-## 1.0  23Sep2021 Jack Gregory  Initial version
-## ...
-## 2.0  05Aug2020 Jack Gregory  New version; ...
-## 2.1  26Aug2020 Jack Gregory  New draft; ...
+## Below we mainly focus on option (2); although, we highlight code that is meant for option (1).
 
 
 ### START CODE ###
