@@ -33,9 +33,15 @@
 
 # (1) PREAMBLE ------------------------------------------------------------------------------------
 
-## Initiate 
+## Initiate
 ## ... Packages
 source(here::here("src/preamble.R"))
+
+install.packages(setdiff(c("sandwich"), rownames(installed.packages())))
+library(sandwich)
+
+install.packages(setdiff(c("lmtest"), rownames(installed.packages())))
+library(lmtest)
 
 install.packages(setdiff(c("stargazer"), rownames(installed.packages())))
 library(stargazer)
@@ -48,9 +54,10 @@ l.file <- list(
   epa_eia_xwalk = path(l.path$data, "epa/epa_eia_crosswalk.csv"),
   gf_cems_xwalk = path(l.path$data, "gf_cems_xwalk.xlsx"),
   epa = path(l.path$data, "epa/Facility_Attributes.zip"),
-  gf= path(l.path$data, "gf_original/regressions_ready_data2.dta"),
+  gf= path(l.path$data, "gf_original/regressions_ready_data3.dta"),
   netgen = path(l.path$data, "eia_netgen.csv"),
-  netgen_unit = path(l.path$data, "eia_netgen_unit.csv")
+  netgen_unit = path(l.path$data, "eia_netgen_unit.csv"),
+  plant = path(l.path$data, "eia_plant.csv")
 )
 
 
@@ -98,13 +105,13 @@ df.gf <- read_dta(l.file$gf) %>%
   select(ORISPL = plant_code,
          GF_BOILER_ID = boiler_id,
          YR = year,
-         GF = grand_NSR_const,
+         GF = Gf,
          OWNER_CODE = ut_type,
          INSERVICE = inservice_y,
          AGE = age,
-         CAP = max_boi_nameplate,
+         CAP = capacity,
          SULFUR = sulfur_content_tot,
-         SULFUR_DIST = sulfur_dist)
+         SULFUR_DIST = sulfur_net_iv)
 
 ## Extract utility type definitions
 owner_type <- attributes(df.gf$OWNER_CODE)$labels
@@ -132,6 +139,12 @@ if (!all(distinct(df.gf, GF) %>% pull() %in% c(0,1))) {
 ## Import EIA-923 netgen-unit data
 df.netgen_unit <- readRDS(fs::path_ext_set(l.file$netgen_unit, "rds")) %>%
   rename(EIA_GENERATOR_ID = GENERATOR_ID)
+
+
+## (2e) Import plant data
+## Import EIA-923 reporting frequency data (see sheet "Page 6 Plant Frame")
+df.plant <- read_csv(l.file$plant) |>
+  select(ORISPL, YR=YEAR, REPORTING)
 
 
 # (3) BUILD XWALK ---------------------------------------------------------------------------------
@@ -193,6 +206,8 @@ df.xwalk <- l.xwalk$Clean %>%
   left_join(df.epa %>%
               select(ORISPL, EPA_UNIT_ID, YR, FUEL), 
             by=c("ORISPL","EPA_UNIT_ID")) %>%
+  left_join(df.plant, by=c("ORISPL","YR")) %>%
+  fill(REPORTING, .direction="updown") %>%
   filter(FUEL=="Coal")
 
 # ## Cleaning for Multiple???
@@ -262,15 +277,16 @@ query_cems <- function(yr, con) {
   ## Aggregate over months
   cat("  Aggregate to yr-mths\n")
   df %>%
+    mutate(YR = as.numeric(YR)) %>%
     
     ## Filter on GF boilers
     inner_join(df.xwalk %>% 
-                 select(ORISPL, EPA_UNIT_ID, GF_BOILER_ID, EIA_GENERATOR_ID, YR), 
+                 select(ORISPL, EPA_UNIT_ID, GF_BOILER_ID, EIA_GENERATOR_ID, REPORTING, YR), 
                by=c("ORISPL","EPA_UNIT_ID","YR")) %>%
     
     ## Generate monthly CEMS  
     mutate(MTH = month(DATETIME)) %>%
-    group_by(ORISPL, EPA_UNIT_ID, GF_BOILER_ID, EIA_GENERATOR_ID, YR, MTH) %>%
+    group_by(ORISPL, EPA_UNIT_ID, GF_BOILER_ID, EIA_GENERATOR_ID, REPORTING, YR, MTH) %>%
     summarise_at(vars(DURATION, GLOAD, SLOAD, HEAT), sum, na.rm=TRUE)
 }
 
@@ -315,8 +331,12 @@ df.gr <- df.cems %>%
   mutate(GR = NETGEN/GLOAD,
          GR = ifelse(GR>0 & GR<1, GR, NA)) %>%
   
+  ## Create clustering ID
+  mutate(ID = paste0(ORISPL, "|", GF_BOILER_ID)) %>%
+  relocate(ID) %>%
+  
   ## Finalize dataframe
-  select(ORISPL, GF_BOILER_ID, EPA_UNIT_ID, EIA_GENERATOR_ID, GF, YR, MTH, DURATION, 
+  select(ID, ORISPL, GF_BOILER_ID, EPA_UNIT_ID, EIA_GENERATOR_ID, REPORTING, GF, YR, MTH, DURATION, 
          GLOAD, SLOAD, NETGEN, GR, OWNER, AGE, CAP, HEAT, SULFUR, SULFUR_DIST) %>%
   arrange(ORISPL, GF_BOILER_ID, YR, MTH)
 
@@ -324,7 +344,7 @@ df.gr <- df.cems %>%
 # saveRDS(df.gr, here::here("data/df_gr.rds"))
 
 
-# (5) ANALYSIS ------------------------------------------------------------------------------------
+# (5) MONTHLY ANALYSIS ----------------------------------------------------------------------------
 
 ## (5a) Check GR weighted average by DURATION
 df.gr %>%
@@ -346,22 +366,54 @@ l.spec <- list(
   `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER) + factor(YR) + factor(MTH))
 )
 
+## Regression function
+## NB - The "cluster" parameter switches between normal and clustered standard errors
+##    - The "print" parameter switches between printing the output and returning the model
+lm_gr <- function(formula, data, cluster=FALSE, print=FALSE) {
+  
+  ## Assertions
+  stopifnot(
+    is_formula(formula),
+    is.data.frame(data),
+    is.logical(cluster),
+    is.logical(print)
+  )
+  
+  ## Linear model
+  model <- lm(formula=formula, data=data, weights=DURATION)
+  
+  if (cluster) {
+    vcov_cluster <- vcovHC(model, type="HC0", cluster=df.gr$ID)
+    coef <- coeftest(model, vcov = vcov_cluster)
+  }
+  if (print) {
+    if (!cluster) {
+      summary(model)
+    } else {
+      print(coef)
+    }
+  } else {
+    return(model)
+  } 
+}
+
 ## Display regressions
-map(l.spec,
-    ~summary(lm(.x,
-                data=df.gr,
-                weights=DURATION)))
+map(
+  l.spec,
+  ~lm_gr(formula=.x, data=df.gr, cluster=TRUE, print=TRUE)
+)
 
 ## Capture regressions
 df.reg <- tibble(as.list(names(l.spec)),
                  l.spec) %>%
   select(name=`as.list(names(l.spec))`, formula=l.spec) %>%
-  mutate(model = map(formula, ~lm(.x, data=df.gr, weights=DURATION)))
+  mutate(model = map(formula, ~lm_gr(formula=.x, data=df.gr)),
+         vcov = map(model, ~vcovHC(.x, type="HC0", cluster=df.gr$ID)))
 
 
 ## (5c) Regression table
 ## Regression table function
-regtbl <- function(df, tbl.type="text") {
+regtbl <- function(df, cluster=FALSE, tbl.type="text") {
   
   ## Assertions  
   if (!exists("l.path")) {
@@ -369,6 +421,7 @@ regtbl <- function(df, tbl.type="text") {
   }
   stopifnot(
     is.data.frame(df),
+    is.logical(cluster),
     is.character(tbl.type),
     tbl.type %in% c("text","latex")
   )
@@ -394,6 +447,19 @@ regtbl <- function(df, tbl.type="text") {
             .before=1) %>%
     as.list()
   
+  if (cluster) {
+    t_stat <- df %>%
+      # Calculate clustered standard errors
+      transmute(coef = map(model, ~coef(.x)),
+                se_cluster = map(vcov, ~sqrt(diag(.x)))) %>%
+      # Calculate t-statistics using clustered standard errors
+      transmute(t = map2(coef, se_cluster, ~.x/.y)) %>%
+      as.list() %>%
+      flatten()
+  } else {
+    t_stat <- NULL
+  }
+  
   ## Build regression table
   stargazer(df$model,
             type = tbl.type,
@@ -406,6 +472,7 @@ regtbl <- function(df, tbl.type="text") {
             dep.var.labels.include = FALSE,
             add.lines = add.lines,
             align = TRUE,
+            t = t_stat,
             column.sep.width = "0.7ex",
             df = FALSE,
             digits = 3,
@@ -417,32 +484,50 @@ regtbl <- function(df, tbl.type="text") {
             model.names = FALSE,
             model.numbers = TRUE,
             multicolumn = FALSE,
-            notes = c("*** p$<$0.001;  ** p$<$0.01;  * p$<$0.05;",
+            notes = c("*** p$<$0.01;  ** p$<$0.05;  * p$<$0.10;",
                       "t-statistics in parentheses."),
             notes.append = FALSE,
             order = c("Constant","GF"),
             report = "vc*t",
-            star.cutoffs = c(0.05, 0.01, 0.001),
+            star.cutoffs = c(0.10, 0.05, 0.01),
             table.layout = "=#m-t-as=n",
             table.placement = "ht"
   )
 }
 
 ## Build regtbl
-regtbl(df.reg %>% slice(1:2))
-regtbl(df.reg %>% slice(1:2), tbl.type="latex")
+regtbl(df.reg %>% slice(1:2), cluster=TRUE)
+regtbl(df.reg %>% slice(1:2), cluster=TRUE, tbl.type="latex")
 
 ## Caption
 # This table reports results from two weighted least squares regressions based on 
 # Equation (\ref{Eq:net-to-gross}).  The dependent variable is net-to-gross 
 # generation ratio, while the weights are based on monthly durations.  Column (1)
 # essentially represents the pure weighted average, while Column (2) presents one
-# conditional on age and size. They rely on CEMS and EIA-861 data from 2008 to 2017.  
-# Significance is represented as *** for p$<$0.001, ** for p$<$0.01, and * for 
-# p$<$0.05; while, \textit{t}-statistics are in parentheses.
+# conditional on age and size. They rely on CEMS and EIA-923 data from 2008 to 2017.  
+# Boiler-level clustered standard errors used, with *** p$<$0.01,  ** p$<$0.05,  
+# * p$<$0.10 and \\textit{t}-statistics in parentheses.
 
 
-## (5d) Perform fe regressions
+## (5d) Perform regressions on monthly reporters only
+## NB - Regressions including only those plants with monthly reporting of form EIA-923
+
+## Check GR weighted average by DURATION
+df.gr %>%
+  filter(REPORTING=="M") %>%
+  filter(!is.na(GR)) %>%
+  group_by(GF) %>%
+  summarise(N = n(),
+            GR = sum(DURATION*GR)/sum(DURATION))
+
+## Display regressions
+map(
+  l.spec,
+  ~lm_gr(formula=.x, data=filter(df.gr, REPORTING=="M"), cluster=TRUE, print=TRUE)
+)
+
+
+## (5e) Perform fe regressions
 ## NB - Regressions with ORISPL FEs are not necessarily appropriate given that they are
 ##      likely to be collinear with initial GF status.  A time-varying GF indicator may
 ##      avoid these issues but reintroduce endogeneity, as GF status then becomes a 
@@ -462,6 +547,57 @@ regtbl(df.reg %>% slice(1:2), tbl.type="latex")
 #            data=df.gr %>% mutate(DATE = ydm(paste(YR, MTH, "01", sep="-"))),
 #            cluster="ORISPL",
 #            panel.id=c("ORISPL","DATE")))
+
+
+# (5) YEARLY ANALYSIS -----------------------------------------------------------------------------
+
+## (5a) Check GR weighted average by DURATION
+df.gr_yr <- df.gr %>%
+  group_by(ORISPL, GF_BOILER_ID, EPA_UNIT_ID, EIA_GENERATOR_ID, GF, YR) %>%
+  summarise(across(DURATION:NETGEN, sum), 
+            GR = NETGEN/GLOAD,
+            OWNER = first(OWNER),
+            across(AGE:CAP, mean),
+            HEAT = sum(HEAT),
+            across(SULFUR:SULFUR_DIST, mean),
+            .groups="drop") %>%
+  filter(!(is.na(GR) | abs(GR)==Inf))
+
+df.gr_yr %>%
+  group_by(GF) %>%
+  summarise(N = n(),
+            GR = sum(DURATION*GR)/sum(DURATION))
+
+
+## (5b) Perform naive linear regressions
+## List specifications
+l.spec <- list(
+  Base = as.formula(GR ~ GF),
+  `+Chars` = as.formula(GR ~ GF + AGE + CAP),
+  # `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + factor(YR),
+  `+Heat` = as.formula(GR ~ GF + AGE + CAP + HEAT),
+  `+Sulfur` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR),
+  `+OwnerFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER)),
+  `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER) + factor(YR))
+)
+
+## Display regressions
+map(
+  l.spec,
+  ~lm_gr(formula=.x, data=df.gr_yr, cluster=TRUE, print=TRUE)
+)
+
+## Capture regressions
+df.reg <- tibble(as.list(names(l.spec)),
+                 l.spec) %>%
+  select(name=`as.list(names(l.spec))`, formula=l.spec) %>%
+  mutate(model = map(formula, ~lm_gr(formula=.x, data=df.gr_yr)))
+
+
+## (5c) Regression table
+## Build regtbl
+regtbl(df.reg %>% slice(1:2), cluster=TRUE)
+regtbl(df.reg %>% slice(1:2), cluster=TRUE, tbl.type="latex")
 
 
 ### END CODE ###
