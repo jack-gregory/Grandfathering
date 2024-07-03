@@ -78,7 +78,7 @@ l.type <- list(
 df.reg <- tibble(l.type, l.rhs, l.ctrl, l.cond) %>%
   rowid_to_column(var="model_id") %>%
   nest(data=everything()) %>%
-  mutate(N = 3) %>%
+  mutate(N = length(l.lhs)) %>%
   uncount(N) %>%
   bind_cols(tibble(l.lhs), .) %>%
   unnest(cols=c(l.lhs, data)) %>%
