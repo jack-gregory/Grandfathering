@@ -41,7 +41,7 @@ fes <- "i.year 1.Gf#i.year i.states i.ut_type i.manufact"
 ctrl_mkt <- "state_cap_growth coal2gas_price d_growth"
 
 l.rhs <- list(
-  glue("Gf {ctrl_boiler} {ctrl_env} {fes}")
+  glue("{ctrl_boiler} {ctrl_env} {fes}")
 )
 
 ## Regression conditions
@@ -98,28 +98,28 @@ l.name <- list("utilization","survival","emissions")
 p.coef_yr <- map2(
   l.lhs,
   list("Hours under load ['000 hrs]","Survival probability [pct pts]","Emissions [SO2 lbs per MW of capacity\nper hour run]"),
-  ~df.reg %>%
-    filter(lhs==.x) %>%
-    filter(str_detect(var, "^1.Gf.*#[0-9]{4}")) %>%
-    mutate(year = str_extract(var, "[0-9]{4}") %>% as.numeric()) %>%
-    mutate_at(vars(coef, starts_with("ci_")), ~ifelse(lhs=="DURATION", ./10^3, .)) %>%
-    ggplot() +
-      geom_hline(yintercept=0, size=0.3, color="#1A1A1A") +
-      geom_ribbon(aes(x=year, ymin=ci_lower, ymax=ci_upper), alpha=0.2, fill="#2dCFAC") +
-      geom_line(aes(x=year, y=coef), linewidth=0.5, color="#20A387") +
-      geom_point(aes(x=year, y=coef), size=1.5, color="#20A387") +
-      labs(#title="Grandfathering yearly coefficients",
-           y=.y,
-           x="Year"#,
-           #caption="Shaded area represents the 95% confidence interval."
-           ) +
-      theme_classic() +
-      theme(axis.line.y = element_blank(),
-            axis.ticks.y = element_blank(),
-            panel.grid.major.y = element_line(color="grey85", size=0.3),
-            panel.grid.minor.y = element_line(color="grey85", size=0.3),
-            plot.caption = element_text(hjust=0))
-  ) %>%
+  ~{df.reg %>%
+      filter(lhs==.x) %>%
+      filter(str_detect(var, "^1.Gf.*#[0-9]{4}")) %>%
+      mutate(year = str_extract(var, "[0-9]{4}") %>% as.numeric()) %>%
+      mutate_at(vars(coef, starts_with("ci_")), ~ifelse(lhs=="DURATION", ./10^3, .)) %>%
+      ggplot() +
+        geom_hline(yintercept=0, size=0.3, color="#1A1A1A") +
+        geom_ribbon(aes(x=year, ymin=ci_lower, ymax=ci_upper), alpha=0.2, fill="#2dCFAC") +
+        geom_line(aes(x=year, y=coef), linewidth=0.5, color="#20A387") +
+        geom_point(aes(x=year, y=coef), size=1.5, color="#20A387") +
+        labs(#title="Grandfathering yearly coefficients",
+             y=.y,
+             x="Year"#,
+             #caption="Shaded area represents the 95% confidence interval."
+             ) +
+        theme_classic() +
+        theme(axis.line.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              panel.grid.major.y = element_line(color="grey85", size=0.3),
+              # panel.grid.minor.y = element_line(color="grey85", size=0.3),
+              plot.caption = element_text(hjust=0))
+  }) %>%
   set_names(nm=unlist(l.name))
 
 ## Save plots
