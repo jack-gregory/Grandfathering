@@ -101,7 +101,7 @@ l.type <- list(
 df.reg <- tibble(l.name, l.type, l.rhs, l.ctrl, l.cond) %>%
   rowid_to_column(var="model_id") %>%
   nest(data=everything()) %>%
-  mutate(N = 3) %>%
+  mutate(N = length(l.lhs)) %>%
   uncount(N) %>%
   bind_cols(tibble(l.lhs), .) %>%
   unnest(cols=c(l.lhs, data)) %>%
@@ -628,6 +628,122 @@ tbl_footer %>% write_lines(file, append=TRUE)
 rm(list=ls(pattern="^(f|tbl|subtbl|txt)_"))
 rm(list=ls(pattern="^ctrl_"), fes, file)
 rm(l.lhs, l.name, l.rhs, l.ctrl, l.cond, cond_survive, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
+
+
+# ANTICIPATION PLACEBOS ---------------------------------------------------------------------------
+
+## Add variables ----------------------------------------------------------------------------------
+
+# yr <- 1957
+yr <- 1963
+# yr <- 1967
+
+df.placebo <- df.gf |>
+  mutate(pre_Gf = (inservice_y<yr) * Gf,
+         post_Gf = (inservice_y>=yr) * Gf,
+         capacity_pre_Gf = capacity * pre_Gf,
+         capacity_post_Gf = capacity * post_Gf,
+         so2_nonat_pre_Gf = so2_nonattain * pre_Gf,
+         so2_nonat_post_Gf = so2_nonattain * post_Gf,
+         applic_reg_pre_Gf = applic_reg * pre_Gf,
+         applic_reg_post_Gf = applic_reg * post_Gf)
+
+
+## Build specifications -------------------------------------------------------
+
+## Left-hand side vars
+l.lhs <- list(
+  "DURATION",
+  "survive",
+  "SO2"
+)
+
+## Model names
+l.name <- list(
+  "Anticipation"
+)
+
+## Right-hand side vars
+## ... General
+ctrl_boiler <- "age capacity efficiency_100_pct_load"
+ctrl_mkt <- "state_cap_growth coal2gas_price d_growth"
+ctrl_env <- "so2_nonattain applic_reg"
+fes <- "i.year i.states i.ut_type i.manufact"
+
+## ... Anticipation
+ctrl_ant <- paste("pre_Gf post_Gf",
+                  "capacity_pre_Gf capacity_post_Gf",
+                  "so2_nonat_pre_Gf so2_nonat_post_Gf",
+                  "applic_reg_pre_Gf applic_reg_post_Gf",
+                  sep=" ")
+
+## ... Build
+l.rhs <- list(glue("{ctrl_boiler} {ctrl_env} {ctrl_ant} {fes}"))
+
+## Market controls
+l.ctrl <- list(1)
+
+## Regression conditions
+l.cond <- list("if (ut_type==4 | ut_type==5 | ut_type==2) & (inservice_y>=1950 & inservice_y<=2006)")
+cond_survive <- "& ((capacity>0.075 & ut_type==4) | ((ut_type==5|ut_type==2) & year>=1990)) & year<=2017"
+
+## Regression type
+l.type <- list(
+  "reg"
+)
+
+
+## Perform regressions --------------------------------------------------------
+
+## Create bespoke regression function
+stata_reg_robust <- function(fml, df, ...) {
+  
+  cat("\nstata::reg  ", fml, "\n", sep="")
+  
+  ## Create Stata call
+  stata_do <- 
+    glue('eststo: reg {fml}, vce(cluster ID)
+          test pre_Gf=post_Gf
+          test capacity_pre_Gf=capacity_post_Gf
+          test so2_nonat_pre_Gf=so2_nonat_post_Gf
+          test applic_reg_pre_Gf=applic_reg_post_Gf
+          regsave, tstat pval ci detail(scalars)
+         ')
+  
+  ## Create filter based on LHS var
+  if (str_detect(fml, "^survive")) {
+    filter_survive <- expr(year<=2017)
+  } else {
+    filter_survive <- expr(TRUE)
+  }
+  
+  ## Perform regression
+  stata(stata_do,
+        data.in = filter(df, !!filter_survive),
+        data.out = TRUE)
+}
+
+## Build regression dataframe
+df.reg <- tibble(l.name, l.type, l.rhs, l.ctrl, l.cond) %>%
+  rowid_to_column(var="model_id") %>%
+  nest(data=everything()) %>%
+  mutate(N = length(l.lhs)) %>%
+  uncount(N) %>%
+  bind_cols(tibble(l.lhs), .) %>%
+  unnest(cols=c(l.lhs, data)) %>%
+  rename_with(.fn=~str_replace(., "l\\.", "")) %>%
+  mutate(ctrl = ifelse(lhs!="SO2" & ctrl==1, ctrl_mkt, ""),
+         cond = as.character(cond),
+         sample = ifelse(lhs=="survive", cond_survive, ""),
+         fml = paste(lhs, rhs, ctrl, cond, sample, sep=" ")) %>%
+  mutate_at(vars(-model_id), as.character) %>%
+  mutate(bs = ifelse(type=="iv", TRUE, FALSE)) %>%
+  mutate(model = pmap(list(fml, type, bs),
+                      ~stata_reg_robust(fml=..1, df=df.placebo)),
+         model = map(model, 
+                     ~select(.x, var, coef, stderr, tstat, pval, ci_lower, ci_upper, 
+                             N, r2, r2_a))) %>%
+  unnest(model)
 
 
 ### END CODE ###
