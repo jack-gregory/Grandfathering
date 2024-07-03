@@ -11,17 +11,21 @@
 
 # DEFINE ------------------------------------------------------------------------------------------
 
+## Initiate regression functions
+source(here("src/stata_regs.R"))
+
+
 ## Create output folder
 date <- format(Sys.Date(), "%Y%m%d")
-# date <- "20211123"
+# date <- "20240629"
 dir_create(path(l.path$out, date))
 
 
 # YEARLY COEFFICIENT PLOTS ------------------------------------------------------------------------
 
 ## Build specifications -------------------------------------------------------
-## NB - Here we use the Column (5) specification within the "main" regression 
-##      table.  This is an IV reg restricted to ut_type ∈ [2,4,5].
+## NB - Here we use the Column (3) specification within the "main" regression 
+##      table.  This is an OLS reg restricted to ut_type ∈ [2,4,5].
 
 ## Left-hand side vars
 l.lhs <- list(
@@ -32,22 +36,23 @@ l.lhs <- list(
 
 ## Right-hand side vars
 ctrl_boiler <- "age capacity capacity_gf efficiency_100_pct_load"
-ctrl_env <- "so2_nonattain so2_nonat_Gf applic_reg applic_reg_Gf ARPprice"
-ctrl_mkt <- "state_cap_growth coal2gas_price d_growth"
+ctrl_env <- "so2_nonattain so2_nonat_Gf applic_reg applic_reg_Gf"
 fes <- "i.year 1.Gf#i.year i.states i.ut_type i.manufact"
+ctrl_mkt <- "state_cap_growth coal2gas_price d_growth"
 
 l.rhs <- list(
-  glue("Gf {ctrl_env} {ctrl_boiler} {fes}")
+  glue("Gf {ctrl_boiler} {ctrl_env} {fes}")
 )
 
 ## Regression conditions
 l.cond <- list(
-  "if ((ut_type==2 | ut_type==4 | ut_type==5) & (inservice_y>=1950 & inservice_y<=2004))"
+  "if (ut_type==4 | ut_type==5 | ut_type==2) & (inservice_y>=1950 & inservice_y<=2006)"
 )
+cond_survive <- "& ((capacity>0.075 & ut_type==4) | ((ut_type==5|ut_type==2) & year>=1990)) & year<=2017"
 
 ## Regression type
 l.type <- list(
-  "iv"
+  "reg"
 )
 
 
@@ -57,7 +62,7 @@ l.type <- list(
 df.reg <- tibble(l.type, l.rhs, l.cond) %>%
   rowid_to_column(var="model_id") %>%
   nest(data=everything()) %>%
-  mutate(N = 3) %>%
+  mutate(N = length(l.lhs)) %>%
   uncount(N) %>%
   bind_cols(tibble(l.lhs), .) %>%
   unnest(cols=c(l.lhs, data)) %>%
@@ -66,7 +71,7 @@ df.reg <- tibble(l.type, l.rhs, l.cond) %>%
   ## Include market controls
   mutate(ctrl = ifelse(lhs!="SO2", ctrl_mkt, ""),
          cond = as.character(cond),
-         sample = ifelse(lhs=="survive", "& capacity>0.075 & year<=2017", ""),
+         sample = ifelse(lhs=="survive", cond_survive, ""),
          fml = paste(lhs, rhs, ctrl, cond, sample, sep=" ")) %>%
   
   ## Exclude market controls
@@ -101,7 +106,7 @@ p.coef_yr <- map2(
     ggplot() +
       geom_hline(yintercept=0, size=0.3, color="#1A1A1A") +
       geom_ribbon(aes(x=year, ymin=ci_lower, ymax=ci_upper), alpha=0.2, fill="#2dCFAC") +
-      geom_line(aes(x=year, y=coef), size=0.5, color="#20A387") +
+      geom_line(aes(x=year, y=coef), linewidth=0.5, color="#20A387") +
       geom_point(aes(x=year, y=coef), size=1.5, color="#20A387") +
       labs(#title="Grandfathering yearly coefficients",
            y=.y,
