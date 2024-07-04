@@ -2,7 +2,7 @@
 ## Grandfathering
 ## 02_analysis/survival_share.R
 ## Jack Gregory
-## 19 September 2021
+## 29 June 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -13,6 +13,7 @@
 # VERSION HISTORY ---------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
 ## 1.0  19Sep2021 Jack Gregory  Initial version
+## 1.1  29Jun2024 Jack Gregory  New draft; Update for JAERE R&R submission
 ## ...
 ## 2.0  05Aug2020 Jack Gregory  New version; ...
 ## 2.1  26Aug2020 Jack Gregory  New draft; ...
@@ -32,12 +33,12 @@ source(fs::path(here::here(), "src/def_paths.R"))
 
 ## ... Files
 l.file <- list(
-  gf = path(l.path$data, "gf_original/regressions_ready_data2.dta")
+  gf = path(l.path$data, "gf_original/regressions_ready_data3.dta")
 )
 
 ## ... Definitions
 date <- format(Sys.Date(), "%Y%m%d")
-# date <- "20210918"
+# date <- "20240629"
 fs::dir_create(path(l.path$out, date))
 
 

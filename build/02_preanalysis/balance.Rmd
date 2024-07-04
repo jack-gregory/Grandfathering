@@ -54,7 +54,7 @@ l.file <- list(
 
 ## ... Definitions
 date <- format(Sys.Date(), "%Y%m%d")
-# date <- "20211123"
+# date <- "20240629"
 fs::dir_create(path(l.path$out, date))
 ```
 
@@ -103,13 +103,6 @@ Grandfathering ...
 df.gf_cln <- read_dta(l.file$gf_cln) %>%
   filter(!(year<1985 | year==2006 | year>2017)) %>%
   filter(plant_code!=10673) %>%                        ## Unit is in HI
-  # filter(!(plant_code==6639 & boiler_id=="G2")) %>%
-  # filter(!(plant_code==6823 & boiler_id=="W1")) %>%
-  # filter(!(plant_code==10495 & boiler_id=="CRECV")) %>%
-  # filter(!(plant_code==50397 & boiler_id=="5PB036")) %>%
-  # filter(!(plant_code==50407 & boiler_id=="7PB")) %>%
-  # filter(!(plant_code==50481 & boiler_id=="325-31")) %>%
-  # filter(!(plant_code==57919 & boiler_id=="09")) %>%
   select(year,
          states,
          ORISPL = plant_code,

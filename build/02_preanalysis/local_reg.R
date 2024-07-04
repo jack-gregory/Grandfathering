@@ -2,7 +2,7 @@
 ## Grandfathering
 ## 02_analysis/local_reg.R
 ## Jack Gregory
-## 20 September 2021
+## 29 June 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -13,6 +13,7 @@
 # VERSION HISTORY ---------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
 ## 1.0  20Sep2021 Jack Gregory  Initial version
+## 1.1  29Jun2024 Jack Gregory  New draft; Update for JAERE R&R submission
 ## ...
 ## 2.0  05Aug2020 Jack Gregory  New version; ...
 ## 2.1  26Aug2020 Jack Gregory  New draft; ...
@@ -26,7 +27,11 @@
 ## (1a) Initiate 
 ## ... Packages
 source(fs::path(here::here(), "src/preamble.R"))
+
+# install.packages(setdiff(c("sf"), rownames(installed.packages())))
 # library(sf)
+
+install.packages(setdiff(c("geofacet"), rownames(installed.packages())))
 library(geofacet)
 
 ## ... Paths
@@ -34,13 +39,13 @@ source(fs::path(here::here(), "src/def_paths.R"))
 
 ## ... Files
 l.file <- list(
-  gf = path(l.path$data, "gf_original/regressions_ready_data.dta"),
+  gf = path(l.path$data, "gf_original/regressions_ready_data3.dta"),
   state = path(l.path$data, "eia/shp/USA_States_Generalized.shp")
 )
 
 ## ... Definitions
 date <- format(Sys.Date(), "%Y%m%d")
-# date <- "20210918"
+# date <- "20240629"
 fs::dir_create(path(l.path$out, date))
 
 
@@ -50,10 +55,10 @@ fs::dir_create(path(l.path$out, date))
 df.gf <- haven::read_dta(l.file$gf) %>%
   select(ORISPL = plant_code, 
          UNIT = boiler_id,
-         STATE_CODE = states,
+         STATE = plt_state,
          YEAR = year,
-         LOCALREG = leg_lbs_mmbtu_calc) %>%
-  arrange(ORISPL, UNIT, YEAR) 
+         LOCALREG = applic_reg) %>%
+  arrange(ORISPL, UNIT, YEAR)
 
 
 ## (2b) State spatial data
@@ -107,16 +112,15 @@ df.state_miss <- tribble(
   "Maine", 2017,
   "Ohio", 1985,
   "Ohio", 2017,
-  "Pennsylvania", 1985,
-  "Pennsylvania", 2017,
   "Vermont", 1985,
   "Vermont", 2017
 )
+states <- sort(unique(df.state_miss$STATE))
 
 
 ## (3c) Build local regulation plot
 df.gf %>%
-  left_join(df.state, by=c("STATE_CODE")) %>%
+  # left_join(df.state, by=c("STATE_CODE")) %>%
   filter(YEAR>=1985 & YEAR!=2006 & YEAR<=2017) %>%
   filter(STATE!="Hawaii") %>%
   group_by(STATE, YEAR) %>%
@@ -127,13 +131,13 @@ df.gf %>%
   complete(YEAR = seq(min(YEAR), max(YEAR))) %>%
   fill(LOCALREG, .direction="down") %>%
   ungroup() %>%
-  mutate(xmin = ifelse(STATE %in% c("California","District of Columbia","Idaho","Maine","Ohio","Pennsylvania","Vermont"), 
+  mutate(xmin = ifelse(STATE %in% states, 
                        -Inf, NA),
-         xmax = ifelse(STATE %in% c("California","District of Columbia","Idaho","Maine","Ohio","Pennsylvania","Vermont"), 
+         xmax = ifelse(STATE %in% states, 
                        Inf, NA),
-         ymin = ifelse(STATE %in% c("California","District of Columbia","Idaho","Maine","Ohio","Pennsylvania","Vermont"), 
+         ymin = ifelse(STATE %in% states, 
                        -Inf, NA),
-         ymax = ifelse(STATE %in% c("California","District of Columbia","Idaho","Maine","Ohio","Pennsylvania","Vermont"), 
+         ymax = ifelse(STATE %in% states, 
                        Inf, NA)) %>%
   mutate_at(vars(ymin, ymax), as.numeric) %>%
   ggplot() +
