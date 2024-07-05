@@ -439,9 +439,10 @@ tbl_header2 <- c("\\midrule \\\\",
 tbl_header3 <- c("\\midrule \\\\",
                  "\\endhead")
 tbl_midder <- c("\\hline \\\\ [-1.8ex]")
-txt_footer <- c("Robustness checks based on specification (3) from Table (1), including relevant sample. ",
+txt_footer <- c("Robustness checks based on modified specification (3) from Table (1), including relevant sample. ",
                 '"Non-linear Age" regressions additionally control for squared age, ',
-                'while "Spillover" regressions ???.')
+                'while the "Spillover" regression uses a sample in which direct interactions ",
+                "between non-grandfathered and grandfathered boilers are limited.')
 tbl_footer <- c("\\hline\\hline",
                 paste0("\\multicolumn{", ncol(tbl_colnames)-1, "}{p{10cm}}{\\textit{Notes:} ", 
                        paste(txt_footer, collapse=""), " Boiler-level clustered standard errors used, with ",
@@ -757,9 +758,9 @@ tbl_header2 <- c("\\midrule \\\\",
 tbl_header3 <- c("\\midrule \\\\",
                  "\\endhead")
 tbl_midder <- c("\\hline \\\\ [-1.8ex]")
-txt_footer <- c("Robustness checks based on specification (3) from Table (1), including relevant sample. ",
+txt_footer <- c("Robustness checks based on modified specification (3) from Table (1), including relevant sample. ",
                 '"Anticipation" regressions allow the grandfathering effects to differ between boilers ',
-                "with an inservice year before and after the specific cutoff year. ")
+                "with an inservice year before and after the 1963 cutoff year. ")
 tbl_footer <- c("\\hline\\hline",
                 paste0("\\multicolumn{", ncol(tbl_colnames)-1, "}{p{10cm}}{\\textit{Notes:} ", 
                        paste(txt_footer, collapse=""), " Boiler-level clustered standard errors used, with ",
