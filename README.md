@@ -4,7 +4,7 @@ This R project and GitHub repository contributes to the NSR grandfathering proje
 
 - Dr Sylwia Bialek
 - Jack Gregory
-- Bridget Plas
+- Bridget Pals
 - Prof Richard Revesz
 
 The remainder of this readme file is organized as follows.  First, we discuss the research objective.  We then discuss the structure of the repository.  Finally, we describe the code and its operation.
