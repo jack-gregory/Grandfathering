@@ -2,8 +2,8 @@
 
 This R project and GitHub repository contributes to the NSR grandfathering project.  It is authored by:
 
-- Dr Sylwia Bialek
-- Jack Gregory
+- Sylwia Bialek, PhD
+- Jack Gregory, PhD
 - Bridget Plas
 - Prof Richard Revesz
 
@@ -30,12 +30,13 @@ The following table lists and describes the structure of the repository.
 |------------|-----------------|
 | <../build> | Contains all build code. |
 | <../build/01_data> | Contains all code related to data collection, ingestion, and cleaning. |
-| <../build/02_analysis> | Contains all code related to project analysis. |
+| <../build/02_preanalysis> | Contains all code related to project preanalysis and setup. |
+| <../build/03_analysis> | Contains all code related to project analysis. |
 | <../data> | Contains cleaned data related to the GitHub portion of the project.  Its subfolders contain raw data, including but not limited to: EIA, EPA, and IPUMS. |
 | <../lit> | Contains relevant literature, as well as a database and a companion script for generating an associated BibTex file. |
 | <../out> | Contains all project outputs arranged in subfolders by date of generation, including plots and regression tables. |
 | <../report> | Contains project documents in LaTeX and pdf formats. |
-| <../src> | Contains all source code. |
+| <../src> | Contains all source code and functions. |
 
 
 ## Code
