@@ -43,6 +43,9 @@ library(rvest)
 source(here("src/def_paths.R"))
 source(here("src/text_colour.R"))
 
+## ... Paths
+l.path$f861 <- path(l.path$data, "eia/f861")
+
 ## ... Files
 l.file <- list(
   clean = path(l.path$data, "eia_sales.csv")
@@ -77,22 +80,29 @@ The remainder of this workbook is organized as follows.  First, we download and 
 
 We first download the set of publicly available zip archives storing the data to Dropbox here:
 
-- `r path(l.path$data, "eia/f861")`
+- `r l.path$f861`
+
+Prior to the download, we ensure that the folder above exists, and if not, we create it.
+
+```{r folder}
+
+if (!fs::dir_exists(l.path$f861)) {
+  fs::dir_create(l.path$f861)
+}
+```
 
 Note that the following code only runs if the number of online zips exceeds the number previously downloaded.
 
 ```{r download-zip-fn, include=FALSE}
 
 ## Define download function
-download_zip <- function(url) {
+download_861 <- function(url, dir) {
 
   ## Assertions
-  if (!exists("l.path")) {
-    stop("List l.path does not exist.")
-  }
   stopifnot(
     stringr::str_detect(url, "https://www.eia.gov/electricity/data/eia861/"),
-    fs::path_ext(url)=="zip"
+    fs::path_ext(url)=="zip",
+    fs::dir_exists(dir)
   )
 
   ## Define destination file name
@@ -118,7 +128,7 @@ download_zip <- function(url) {
   cat(file, "\n", sep="")
 
   ## Define destination
-  file <- path(l.path$data, "eia/f861", file)
+  file <- path(dir, file)
 
   ## Download zip
   httr::RETRY("GET", url=url, times=5) %>%
@@ -141,8 +151,8 @@ l.zip_url <- l.url$data %>%
   map(~xml2::url_absolute(.x, l.url$data))
 
 ## Perform download, if necessary
-if (length(l.zip_url)>length(fs::dir_ls(path(l.path$data, "eia/f861"), regexp="\\.zip$"))) {
-  walk(l.zip_url, download_zip)
+if (length(l.zip_url)>length(fs::dir_ls(l.path$f861, regexp="\\.zip$"))) {
+  walk(l.zip_url, ~download_861(.x, l.path$f861))
 }
 ```
 
@@ -340,7 +350,7 @@ extract_zip <- function(zip, file) {
   
   ## IMPORT DATA
   ## Unzip data
-  unzip(zip, files=file, exdir=path(l.path$data, "eia/f861"))
+  unzip(zip, files=file, exdir=l.path$f861)
   
   ## Import data
   df <- read_excel(path(l.path$data, "eia/f861", file), guess_max=5000)
@@ -380,7 +390,7 @@ extract_zip <- function(zip, file) {
 ``` {r import}
 
 ## Build zip list
-l.zip_dir <- fs::dir_ls(path(l.path$data, "eia/f861"), regexp="f861_\\d{4}\\.zip$")
+l.zip_dir <- fs::dir_ls(l.path$f861, regexp="f861_\\d{4}\\.zip$")
 
 ## Build zip & file dataframe
 df.zip_dir <- l.zip_dir %>%

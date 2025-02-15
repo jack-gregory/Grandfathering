@@ -1,0 +1,128 @@
+---
+title: "EIA-860 Data"
+subtitle: "Electric generators"
+author: "Jack Gregory"
+date: "18 September 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    fig_caption: yes
+    highlight: textmate
+  #   keep_md: true
+  # pdf_document:
+  #   latex_engine: pdflatex
+  #   highlight: haddock
+  #   keep_md: true
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+source(here::here("src/preamble.R"))
+
+install.packages(setdiff(c("httr","rvest"), rownames(installed.packages())))
+library(httr)
+library(rvest)
+
+## ... Functions
+source(here("src/def_paths.R"))
+source(here("src/text_colour.R"))
+
+## ... Paths
+l.path$f860 <- path(l.path$data, "eia/f860")
+
+## ... URLs
+l.url <- list(
+  data = "https://www.eia.gov/electricity/data/eia860/"
+)
+```
+
+
+# Objective
+
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It downloads annual electricity data from the Energy Information Administration (EIA).  Specifically, it scrapes historical form EIA-860 "Electric generators".  The data are available from 1990 to the present, though we will restrict our collection between 2007 to 2018.  The data along with additional information can be found at the following link:
+
+- [www.eia.gov/electricity/data/eia767](https://www.eia.gov/electricity/data/eia767).
+
+
+# Download
+
+We download the set of publicly available zip archives storing the data to the repository here:
+
+- `r l.path$f860`
+
+Prior to the download, we ensure that the folder above exists, and if not, we create it.
+
+```{r folder}
+
+if (!fs::dir_exists(l.path$f860)) {
+  fs::dir_create(l.path$f860)
+}
+```
+
+Finally, we perform the download.  Note that the following code only runs if the number of online zips exceeds the number previously downloaded.
+
+```{r download-zip-fn, include=FALSE}
+
+## Define download function
+download_860 <- function(url, dir) {
+
+  ## Assertions
+  stopifnot(
+    stringr::str_detect(url, "https://www.eia.gov/electricity/data/eia860/"),
+    fs::path_ext(url)=="zip",
+    fs::dir_exists(dir)
+  )
+
+  ## Define destination file name
+  file <- url %>%
+    stringr::str_extract("eia860[0-9]{4}\\.zip") %>%
+    stringr::str_replace("eia860", "f860_")
+
+  cat(file, "\n", sep="")
+
+  ## Define destination
+  file <- path(dir, file)
+
+  ## Download zip
+  httr::RETRY("GET", url=url, times=5) %>%
+    content("raw") %>%
+    writeBin(file)
+  # download.file(url, file, mode="wb", quiet=TRUE)
+}
+```
+
+```{r download}
+
+## Scrape list of zip archives
+l.zip_url <- l.url$data %>%
+  httr::RETRY("GET", url=., times=5) %>%
+  read_html() %>%
+  rvest::html_nodes("a") %>%
+  rvest::html_attr("href") %>%
+  as.list() %>%
+  purrr::keep(str_detect(., "eia860[0-9]{4}\\.zip$")) %>%
+  purrr::keep(str_detect(., paste0("(", paste(seq(2007,2018), collapse="|"), ")"))) %>%
+  map(~xml2::url_absolute(.x, l.url$data))
+
+## Perform download, if necessary
+if (length(l.zip_url)>length(fs::dir_ls(l.path$f860, regexp="\\.zip$"))) {
+  walk(l.zip_url, ~download_860(.x, l.path$f860))
+}
+```
+

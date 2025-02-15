@@ -46,6 +46,9 @@ library(writexl)
 source(here("src/def_paths.R"))
 source(here("src/text_colour.R"))
 
+## ... Paths
+l.path$f923 <- path(l.path$data, "eia/f923")
+
 ## ... Files
 l.file <- list(
   fuel = path(l.path$data, "eia923_fuel_dictionary.csv"),
@@ -95,22 +98,29 @@ The remainder of this workbook is organized as follows.  First, we download and 
 
 We first download the set of publicly available xls files and zip archives storing the data to Dropbox here:
 
-- `r path(l.path$data, "eia/f923")`
+- `r l.path$f923`
+
+Prior to the download, we ensure that the folder above exists, and if not, we create it.
+
+```{r folder}
+
+if (!fs::dir_exists(l.path$f923)) {
+  fs::dir_create(l.path$f923)
+}
+```
 
 Note that the following code only runs if the number of online files exceeds the number previously downloaded.
 
 ```{r download-zip-fn, include=FALSE}
 
 ## Define download function
-download_file <- function(url) {
+download_906923 <- function(url, dir) {
 
   ## Assertions
-  if (!exists("l.path")) {
-    stop("List l.path does not exist.")
-  }
   stopifnot(
     stringr::str_detect(url, "https://www.eia.gov/electricity/data/eia923/"),
-    fs::path_ext(url) %in% c("xls","zip")
+    fs::path_ext(url) %in% c("xls","zip"),
+    fs::dir_exists(dir)
   )
 
   ## Define destination file name
@@ -126,7 +136,7 @@ download_file <- function(url) {
   cat(fs::path_file(url), "\n", sep="")
 
   ## Define destination
-  file <- path(l.path$data, "eia/f923", fs::path_file(url))
+  file <- path(dir, fs::path_file(url))
 
   ## Download file
   httr::RETRY("GET", url=url, times=5) %>%
@@ -170,22 +180,22 @@ l.url_923 <- l.url$eia_923 %>%
 l.url_dl <- append(l.url_906, l.url_923)
 
 ## Perform download, if necessary
-nfiles <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="(906|906920|923)_")
+nfiles <- fs::dir_ls(l.path$f923, regexp="(906|906920|923)_")
 if (length(l.url_dl)>(length(nfiles) + 6)) {
-  walk(l.url_dl, download_file)
+  walk(l.url_dl, ~download_906923(.x, l.path$f923))
   
   # ## Unzip and delete early zips
-  # l.zip <- setdiff(fs::dir_ls(path(l.path$data, "eia/f923")),
-  #                  fs::dir_ls(path(l.path$data, "eia/f923"), regexp="_\\d{4}\\.zip$")) %>%
+  # l.zip <- setdiff(fs::dir_ls(l.path$f923),
+  #                  fs::dir_ls(l.path$f923, regexp="_\\d{4}\\.zip$")) %>%
   #   as.list() %>%
   #   keep(path_ext(path(.))=="zip")
-  # walk(l.zip, ~unzip(.x, exdir=path(l.path$data, "eia/f923")))
+  # walk(l.zip, ~unzip(.x, exdir=l.path$f923))
   # walk(l.zip, file_delete)
   # 
   # ## Rezip all annual EIA-906 files together
   # ## NB - This step does not work ... zipr continues to cause abort???
-  # df.file <- setdiff(fs::dir_ls(path(l.path$data, "eia/f923")),
-  #                   fs::dir_ls(path(l.path$data, "eia/f923"), regexp="_\\d{4}\\.zip$")) %>%
+  # df.file <- setdiff(fs::dir_ls(l.path$f923),
+  #                   fs::dir_ls(l.path$f923, regexp="_\\d{4}\\.zip$")) %>%
   #   as_tibble() %>%
   #   rename(FILE = value) %>%
   #   mutate(YEAR = str_extract(FILE, "(19|20)\\d{2}")) %>%
@@ -500,7 +510,7 @@ extract_zip.p1 <- function(zip, file, sheet) {
 ``` {r import-1}
 
 ## Build zip list
-l.zip1 <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="f(906|906920|923)_\\d{4}\\.zip$")
+l.zip1 <- fs::dir_ls(l.path$f923, regexp="f(906|906920|923)_\\d{4}\\.zip$")
 
 ## Build zip & file dataframe
 df.zip1 <- l.zip1 %>%
@@ -838,7 +848,7 @@ extract_zip.p4 <- function(zip, file) {
 ``` {r import-4}
 
 ## Build zip list
-l.zip4 <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="f923_\\d{4}\\.zip$")
+l.zip4 <- fs::dir_ls(l.path$f923, regexp="f923_\\d{4}\\.zip$")
 
 ## Build zip & file dataframe
 df.zip4 <- l.zip4 %>%

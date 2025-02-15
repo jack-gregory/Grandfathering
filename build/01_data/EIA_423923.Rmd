@@ -47,6 +47,9 @@ library(writexl)
 source(here("src/def_paths.R"))
 source(here("src/text_colour.R"))
 
+## ... Paths
+l.path$f923 <- path(l.path$data, "eia/f923")
+
 ## ... Files
 l.file <- list(
   fips = path(l.path$data, "cb/all-geocodes-v2020.xlsx"),
@@ -122,22 +125,29 @@ The remainder of this workbook is organized as follows.  First, we download and 
 
 We first download the set of publicly available xls files and zip archives storing the data to Dropbox here:
 
-- `r path(l.path$data, "eia/f923")`
+- `r l.path$f923`
+
+Prior to the download, we ensure that the folder above exists, and if not, we create it.
+
+```{r folder}
+
+if (!fs::dir_exists(l.path$f923)) {
+  fs::dir_create(l.path$f923)
+}
+```
 
 Note that the following code only runs if the number of online files exceeds the number previously downloaded.
 
 ```{r download-zip-fn, include=FALSE}
 
 ## Define download function
-download_file <- function(url) {
+download_423923 <- function(url, dir) {
 
   ## Assertions
-  if (!exists("l.path")) {
-    stop("List l.path does not exist.")
-  }
   stopifnot(
     stringr::str_detect(url, "https://www.eia.gov/electricity/data/eia(423|923)/"),
-    fs::path_ext(url) %in% c("xls","zip")
+    fs::path_ext(url) %in% c("xls","zip"),
+    fs::dir_exists(dir)
   )
 
   ## Define destination file name
@@ -153,7 +163,7 @@ download_file <- function(url) {
   cat(file, "\n", sep="")
 
   ## Define destination
-  file <- path(l.path$data, "eia/f923", file)
+  file <- path(dir, file)
 
   ## Download file
   httr::RETRY("GET", url=url, times=5) %>%
@@ -209,9 +219,9 @@ l.url_923 <- l.url$eia_923 %>%
 l.url_dl <- append(l.url_423, l.url_923)
 
 ## Perform download, if necessary
-nfiles <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="(423|923)_")
+nfiles <- fs::dir_ls(l.path$f923, regexp="(423|923)_")
 if (length(l.url_dl)>length(nfiles)) {
-  walk(l.url_dl, download_file)
+  walk(l.url_dl, ~download_423923(.x, l.path$f923))
 }
 ```
 
@@ -576,7 +586,7 @@ extract_zip <- function(zip, file, sheet) {
 ``` {r import}
 
 ## Build zip list
-l.zip <- fs::dir_ls(path(l.path$data, "eia/f923"), regexp="f(4|9)23_\\d{4}\\.zip$")
+l.zip <- fs::dir_ls(l.path$f923, regexp="f(4|9)23_\\d{4}\\.zip$")
 
 ## Build zip & file dataframe
 df.zip <- l.zip %>%
