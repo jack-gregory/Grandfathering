@@ -26,11 +26,11 @@
 # cems --------------------------------------------------------------------------------------------
 ## Cleaned EPA CEMS data.
 
-con <- DBI::dbConnect(RMySQL::MySQL(), 
-                      user="root", 
-                      password="blackberries22-", 
-                      dbname="epa", 
-                      host="localhost")
+con <- DBI::dbConnect(RMySQL::MySQL(),
+                      user = Sys.getenv("MYSQL_USER"),
+                      password = Sys.getenv("MYSQL_PASSWORD"),
+                      dbname = Sys.getenv("MYSQL_DB"),
+                      host = Sys.getenv("MYSQL_HOST"))
 
 DBI::SQL("
     CREATE TABLE IF NOT EXISTS `epa`.`cems` (

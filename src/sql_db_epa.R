@@ -26,10 +26,11 @@
 # epa ---------------------------------------------------------------------------------------------
 ## EPA schema for storage of CEMS data.
 
-con <- DBI::dbConnect(RMySQL::MySQL(), 
-                      user="root", 
-                      password="blackberries22-", 
-                      host="localhost")
+con <- DBI::dbConnect(RMySQL::MySQL(),
+                      user = Sys.getenv("MYSQL_USER"),
+                      password = Sys.getenv("MYSQL_PASSWORD"),
+                      dbname = Sys.getenv("MYSQL_DB"),
+                      host = Sys.getenv("MYSQL_HOST"))
 
 DBI::SQL("
   CREATE SCHEMA IF NOT EXISTS `epa`;

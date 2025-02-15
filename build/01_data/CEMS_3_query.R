@@ -61,11 +61,11 @@ df.gf <- read_csv(path(l.path$data, "gf_original/regression_vars.csv")) %>%
 
 
 ## (1b) Connect to MySQL burbank_com database
-con <- DBI::dbConnect(RMySQL::MySQL(), 
-                      user="root", 
-                      password="blackberries22-", 
-                      dbname="epa", 
-                      host="localhost")
+con <- DBI::dbConnect(RMySQL::MySQL(),
+                      user = Sys.getenv("MYSQL_USER"),
+                      password = Sys.getenv("MYSQL_PASSWORD"),
+                      dbname = Sys.getenv("MYSQL_DB"),
+                      host = Sys.getenv("MYSQL_HOST"))
 
 
 # (2) QUERY CEMS -- YEARS -------------------------------------------------------------------------
