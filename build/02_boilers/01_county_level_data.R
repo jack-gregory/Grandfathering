@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 00_county_level_data
+## 01_county_level_data
 ## Bridget Pals
 ## 17 March 2021
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -18,19 +18,10 @@
 # PREAMBLE ----------------------------------------------------------------------------------------
 
 ## Initiate
-## ... Packages
-pkgs <- c(
-  "fs","here","zip",                      # File system
-  "dplyr","purrr","reshape2",             # Data wrangling
-  "maptools","rgeos"                      # Spatial data
-)
-install.packages(setdiff(pkgs, rownames(installed.packages())))
-lapply(pkgs, library, character.only = TRUE)
-rm(pkgs)
-
 ## ... Paths
 l.file <- list(
-  xwalk = here::here("data/xwalk/state_fips_xwalk.csv"),
+  st_abbr = here::here("data/xwalk/state_code_xwalk.csv"),
+  st_fips = here::here("data/xwalk/xwalk_state_codes.csv"),
   cb = here::here("data/cb/cb_2018_us_county_500k.zip"),
   epa = here::here("data/epa/phistory.csv"),
   epa_old = here::here("data/epa/phistory_1978_1990.csv")
@@ -39,9 +30,11 @@ l.file <- list(
 
 # IMPORT ------------------------------------------------------------------------------------------
 
-statefips <- l.file$xwalk %>%
-  read.csv() %>% 
-  rename(st_abbr = state_Code, fips_st = fips)
+statefips <- l.file$st_fips %>%
+  read.csv() %>%
+  dplyr::mutate(state = stringr::str_trim(state)) %>%
+  dplyr::inner_join(read.csv(l.file$st_abbr), by="state") %>%
+  dplyr::rename(st_abbr = plt_state, fips_st = state_code)
 
 l.zip <- zip::zip_list(l.file$cb) %>%
   dplyr::pull(filename) %>%

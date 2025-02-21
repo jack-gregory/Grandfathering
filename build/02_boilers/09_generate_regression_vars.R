@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 07_generate_regression_vars
+## 09_generate_regression_vars
 ## Bridget Pals
 ## 08 February 2021
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -11,26 +11,6 @@
 
 
 ### START CODE ###
-
-
-# PREAMBLE ----------------------------------------------------------------------------------------
-
-## Initiate
-## ... Packages
-pkgs <- c(
-  "fs","here",                      # File system
-  "dplyr","Hmisc","zoo"             # Data wrangling
-)
-install.packages(setdiff(pkgs, rownames(installed.packages())))
-lapply(pkgs, library, character.only = TRUE)
-rm(pkgs)
-
-## ... Functions
-source(here::here("src/boilers.R"))
-
-## ... Definitions
-date <- format(Sys.Date(), "%Y%m%d")
-fs::dir_create(here::here("out", date))
 
 
 # IMPORT ------------------------------------------------------------------------------------------

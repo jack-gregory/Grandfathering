@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 05_merge_boilers_to_regulations
+## 07_merge_boilers_to_regulations
 ## Bridget Pals
 ## 23 February 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -11,23 +11,6 @@
 
 
 ### START CODE ###
-
-
-# PREAMBLE ----------------------------------------------------------------------------------------
-
-## Initiate
-## ... Packages
-pkgs <- c(
-  "fs","here",                      # File system
-  "readxl",                         # Data reading
-  "dplyr","tidyr","reshape2"        # Data wrangling
-)
-install.packages(setdiff(pkgs, rownames(installed.packages())))
-lapply(pkgs, library, character.only = TRUE)
-rm(pkgs)
-
-## ... Functions
-source(here::here("src/boilers.R"))
 
 
 # IMPORT ------------------------------------------------------------------------------------------

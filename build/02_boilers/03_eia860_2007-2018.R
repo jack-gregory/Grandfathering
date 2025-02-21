@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 02_eia860_2007-2018
+## 03_eia860_2007-2018
 ## Bridget Pals
 ## 27 July 2020
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -11,41 +11,6 @@
 
 
 ### START CODE ###
-
-
-# PREAMBLE ----------------------------------------------------------------------------------------
-
-## Initiate
-## ... Packages
-pkgs <- c(
-  "fs","here","zip",                                # File system
-  "readxl",                                         # Data reading
-  "dplyr","purrr","data.table","foreign","zoo"      # Data wrangling
-)
-install.packages(setdiff(pkgs, rownames(installed.packages())))
-lapply(pkgs, library, character.only = TRUE)
-rm(pkgs)
-
-## ... Functions
-source(here::here("src/boilers.R"))
-
-## ... Definitions
-scrubbers <- c("MA", "PA", "SP", "TR", "VE", "CD", "SD")
-xwalk <- c("util","gen","plant","boiler_generator","boiler_fgd_id",
-           "boiler_ctrl_info","boiler_sf_id","boiler_info","emission_stand",
-           "fgd","sf")
-
-## ... Crosswalks
-l.fs <- purrr::map(
-    seq(1,11),
-    \(x) read_excel(here::here("data/xwalk/eia860_file_structure.xlsx"), sheet=x)
-  ) %>%
-  purrr::set_names(nm=xwalk)
-l.vn <- purrr::map(
-    seq(1,11),
-    \(x) read_excel(here::here("data/xwalk/varname_xwalks.xlsx"), sheet=x)
-  ) %>%
-  purrr::set_names(nm=xwalk)
 
 
 # EIA-860 -----------------------------------------------------------------------------------------

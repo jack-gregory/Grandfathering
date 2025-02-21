@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 04a_coal_mine_data_eia923
+## 06_coal_mine_data_eia923
 ## Bridget Pals
 ## 01 February 2019
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -11,30 +11,6 @@
 
 
 ### START CODE ###
-
-
-# PREAMBLE ----------------------------------------------------------------------------------------
-
-## Initiate
-## ... Packages
-pkgs <- c(
-  "fs","here",              # File system
-  "readxl",                 # Data reading
-  "dplyr","tidyr"           # Data wrangling
-)
-install.packages(setdiff(pkgs, rownames(installed.packages())))
-lapply(pkgs, library, character.only = TRUE)
-rm(pkgs)
-
-## ... Functions
-source(here::here("src/boilers.R"))
-
-## ... Definitions
-months <- c("january", "february", "march", "april", "may", "june", "july", "august",
-            "september", "october", "november", "december")
-shortmonths <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
-monthnum <- c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12")
-coal <- c("COL", "BIT", "LIG", "SUB", "ANT", "RC", "WC")
 
 
 # COAL --------------------------------------------------------------------------------------------

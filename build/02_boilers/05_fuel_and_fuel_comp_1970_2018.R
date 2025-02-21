@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 04_fuel_and_fuel_comp_1970_2018
+## 05_fuel_and_fuel_comp_1970_2018
 ## Bridget Pals
 ## 30 December 2023
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12,30 +12,6 @@
 
 
 ### START CODE ###
-
-
-# PREAMBLE ----------------------------------------------------------------------------------------
-
-## Initiate
-## ... Packages
-pkgs <- c(
-  "fs","here",                    # File system
-  "readxl",                       # Data reading
-  "dplyr","tidyr","stringr"       # Data wrangling
-)
-install.packages(setdiff(pkgs, rownames(installed.packages())))
-lapply(pkgs, library, character.only = TRUE)
-rm(pkgs)
-
-## ... Functions
-source(here::here("src/boilers.R"))
-
-## ... Definitions
-months <- c("january", "february", "march", "april", "may", "june", "july", "august",
-            "september", "october", "november", "december")
-shortmonths <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
-monthnum <- c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12")
-coal <- c("COL", "BIT", "LIG", "SUB", "ANT", "RC", "WC")
 
 
 # COAL 1970-2000 ----------------------------------------------------------------------------------

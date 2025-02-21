@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 01_eia767_1985-2005
+## 02_eia767_1985-2005
 ## Bridget Pals
 ## 27 July 2020
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -12,23 +12,6 @@
 
 
 ### START CODE ###
-
-
-# PREAMBLE ----------------------------------------------------------------------------------------
-
-## Initiate
-## ... Packages
-pkgs <- c(
-  "fs","here","zip",                      # File system
-  "readxl",                               # Data reading
-  "dplyr","purrr","foreign"               # Data wrangling
-)
-install.packages(setdiff(pkgs, rownames(installed.packages())))
-lapply(pkgs, library, character.only = TRUE)
-rm(pkgs)
-
-## ... Functions
-source(here::here("src/boilers.R"))
 
 
 # EIA-767 -----------------------------------------------------------------------------------------

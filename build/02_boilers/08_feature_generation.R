@@ -1,6 +1,6 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 06_feature_generation
+## 08_feature_generation
 ## Bridget Pals
 ## 01 February 2019
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -11,28 +11,6 @@
 
 
 ### START CODE ###
-
-
-# PREAMBLE ----------------------------------------------------------------------------------------
-
-## Initiate
-## ... Packages
-pkgs <- c(
-  "fs","here",                      # File system
-  "readxl",                         # Data reading
-  "dplyr","lubridate","zoo"         # Data wrangling
-)
-install.packages(setdiff(pkgs, rownames(installed.packages())))
-lapply(pkgs, library, character.only = TRUE)
-rm(pkgs)
-
-## ... Functions
-source(here::here("src/boilers.R"))
-
-## ... Definitions
-scrubbers <- c("MA", "PA", "SP", "TR", "VE", "CD", "SD")
-date <- format(Sys.Date(), "%Y%m%d")
-fs::dir_create(here::here("out", date))
 
 
 # IMPORT ------------------------------------------------------------------------------------------
