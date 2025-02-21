@@ -1,54 +1,42 @@
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-# Create universe from 1985-2005                    #
-# Author: Bridget Pals                              #
-# Date: 7/27/2020                                  #
-# Purpose: Combine EIA-767                          #
-# get location, heat rate, nameplate, and scrubber  #
-# information about coal plants.                    #
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Grandfathering
+## 01_eia767_1985-2005
+## Bridget Pals
+## 27 July 2020
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-# libraries needed
-library(dplyr)    # basic data cleaning
-library(readxl) 
-library(foreign)
 
-setwd("~/Documents/law school/research/research_revesz/clone-2023")
+# INTRODUCTION ------------------------------------------------------------------------------------
+## This script combines data from form EIA-767 on coal plants, in particular location, heat rate, 
+## nameplate, and scrubbers.
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Functions -------------------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# credit to: devtools::install.github("edwinth/thatssorandom")
-## function to identify whether a group of variables create
-## a unique id
-unique_id <- function(x, ...) {
-  id_set <- x %>% select(...)
-  id_set_dist <- id_set %>% distinct
-  if (nrow(id_set) == nrow(id_set_dist)) {
-    TRUE
-  } else {
-    non_unique_ids <- id_set %>% 
-      filter(id_set %>% duplicated()) %>% 
-      distinct()
-    suppressMessages(
-      inner_join(non_unique_ids, x) %>% arrange(...)
-    )
-  }
-}
+### START CODE ###
 
-mysum <- function(x) (sum(as.numeric(x), na.rm = TRUE))
 
-mymean <- function(x) (mean(as.numeric(x), na.rm = TRUE))
+# PREAMBLE ----------------------------------------------------------------------------------------
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- EIA-767 ---------------------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Initiate
+## ... Packages
+pkgs <- c(
+  "fs","here","zip",                      # File system
+  "readxl",                               # Data reading
+  "dplyr","purrr","foreign"               # Data wrangling
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
 
-## first, we will load in the EIA-767 data, which covers 1985-2005 and contains
-## critical information such as whether a facility has a scrubber, year installed,
-## lat/long of facility, etc. We will begin by just retaining all data and will
-## pare down later (and/or generate further features for our model). We will then
-## use EIA-920 (and predecessors) to fill out 1970-1984 and 2006-present.
+## ... Functions
+source(here::here("src/boilers.R"))
+
+
+# EIA-767 -----------------------------------------------------------------------------------------
+
+## First, we read the EIA-767 data, which covers 1985-2005 and contains critical information such 
+## as whether a facility has a scrubber, year installed, lat/long of facility, etc. We will begin 
+## by retaining all data and pare down later (and/or generate further features for our model). We 
+## then use EIA-920 (and predecessors) to fill out 1970-1984 and 2006-present.
 
 ## we generate empty data.frames() which will fill in on the loops
 plants <- data.frame()
@@ -63,14 +51,22 @@ for (i in 1985:2005){
   print(paste0("~~~~      ", i, "      ~~~~"))
   print("~~~~~~~~~~~~~~~~~~~~~~~~~")
   
-  # -- plant information ----------------------------------------
+  ## Unzip --------------------------------------------------------------------
+  
+  zip_file <- here::here("data/eia/f767", paste0("f767_", i, ".zip"))
+  l.zip <- zip::zip_list(zip_file) %>%
+    dplyr::pull(filename) %>%
+    as.list()
+  zip::unzip(zip_file, exdir=fs::path_dir(zip_file))
+  
+  ## Plant information --------------------------------------------------------
   
   if (i %in% c(1985:2000)) {
-    plant_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/Plant.xls"), col_types = "text") %>% unique()
+    plant_sub <- read_excel(here::here("data/eia/f767/Plant.xls"), col_types = "text") %>% unique()
   } else if (i %in% c(2001:2003, 2005)) {
-    plant_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/F767_Plant.xls"), col_types = "text") %>% unique()
+    plant_sub <- read_excel(here::here("data/eia/f767/F767_Plant.xls"), col_types = "text") %>% unique()
   } else if (i == 2004) {
-    plant_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2004 F767_Plant.xls"), col_types = "text") %>% unique()
+    plant_sub <- read_excel(here::here("data/eia/f767/2004 F767_Plant.xls"), col_types = "text") %>% unique()
   }
 
   names(plant_sub) <- tolower(names(plant_sub))
@@ -100,26 +96,26 @@ for (i in 1985:2005){
   
   plant_sub <- plant_sub %>% select(year, utility_code, plant_code, everything())
 
-  # -- generator information -------------------------------------------------
+  ## Generator information ----------------------------------------------------
   
   if (i %in% c(1985:2000)) {
-    gen_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/Generator.xls"), col_types = "text") %>% unique()
+    gen_sub <- read_excel(here::here("data/eia/f767/Generator.xls"), col_types = "text") %>% unique()
   } else if (i %in% c(2001:2003)) {
-    gen_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/F767_Generator.xls"), col_types = "text") %>% unique()
+    gen_sub <- read_excel(here::here("data/eia/f767/F767_Generator.xls"), col_types = "text") %>% unique()
   } else if (i == 2004) {
-    gen_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2004 F767_Generator.xls"), col_types = "text") %>% unique()
+    gen_sub <- read_excel(here::here("data/eia/f767/2004 F767_Generator.xls"), col_types = "text") %>% unique()
   } else if (i == 2005) {
-    gen_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2005 EIA-767 Master Files/F767_GENERATOR.xls"), col_types = "text") %>% unique()
+    gen_sub <- read_excel(here::here("data/eia/f767/2005 EIA-767 Master Files/F767_GENERATOR.xls"), col_types = "text") %>% unique()
   }
 
     if (i %in% c(1985:2000)) {
-      gen_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/Boiler_Generator.xls"), col_types = "text") %>% unique()
+      gen_xwalk <- read_excel(here::here("data/eia/f767/Boiler_Generator.xls"), col_types = "text") %>% unique()
     } else if (i %in% c(2001:2003)) {
-      gen_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/F767_Boiler_Generator.xls"), col_types = "text") %>% unique()
+      gen_xwalk <- read_excel(here::here("data/eia/f767/F767_Boiler_Generator.xls"), col_types = "text") %>% unique()
     } else if (i == 2004) {
-      gen_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2004 F767_Boiler_Generator.xls"), col_types = "text") %>% unique()
+      gen_xwalk <- read_excel(here::here("data/eia/f767/2004 F767_Boiler_Generator.xls"), col_types = "text") %>% unique()
     } else if (i == 2005) {
-      gen_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2005 EIA-767 Master Files/F767_BOILER_GENERATOR.xls"), col_types = "text") %>% unique()
+      gen_xwalk <- read_excel(here::here("data/eia/f767/2005 EIA-767 Master Files/F767_BOILER_GENERATOR.xls"), col_types = "text") %>% unique()
     }
   
   names(gen_sub) <- tolower(names(gen_sub))
@@ -155,27 +151,26 @@ for (i in 1985:2005){
   # this is a perfect unique identifer
   print(gen_sub %>% unique_id(plant_code, utility_code, boiler_id, generator_id, year))
 
-  # -- flue-stack information -------------------------------------------------
+  ## Flue-stack information ---------------------------------------------------
   
   if (i %in% c(1985:2000)) {
-    flu_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/Stack_Flue.xls"), col_types = "text") %>% unique()
+    flu_sub <- read_excel(here::here("data/eia/f767/Stack_Flue.xls"), col_types = "text") %>% unique()
   } else if (i %in% c(2001:2003)) {
-    flu_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/F767_Stack_Flue.xls"), col_types = "text") %>% unique()
+    flu_sub <- read_excel(here::here("data/eia/f767/F767_Stack_Flue.xls"), col_types = "text") %>% unique()
   } else if (i == 2004) {
-    flu_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2004 F767_Stack_Flue.xls"), col_types = "text") %>% unique()
+    flu_sub <- read_excel(here::here("data/eia/f767/2004 F767_Stack_Flue.xls"), col_types = "text") %>% unique()
   } else if (i == 2005) {
-    flu_sub <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2005 EIA-767 Master Files/F767_STACK_FLUE.xls"), col_types = "text") %>% unique()
+    flu_sub <- read_excel(here::here("data/eia/f767/2005 EIA-767 Master Files/F767_STACK_FLUE.xls"), col_types = "text") %>% unique()
   }
 
-  
   if (i %in% c(1985:2000)) {
-    flu_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/Boiler_Stackflue.xls"), col_types = "text") %>% unique()
+    flu_xwalk <- read_excel(here::here("data/eia/f767/Boiler_Stackflue.xls"), col_types = "text") %>% unique()
   } else if (i %in% c(2001:2003)) {
-    flu_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/F767_Boiler_Stackflue.xls"), col_types = "text") %>% unique()
+    flu_xwalk <- read_excel(here::here("data/eia/f767/F767_Boiler_Stackflue.xls"), col_types = "text") %>% unique()
   } else if (i == 2004) {
-    flu_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2004 F767_Boiler_Stackflue.xls"), col_types = "text") %>% unique()
+    flu_xwalk <- read_excel(here::here("data/eia/f767/2004 F767_Boiler_Stackflue.xls"), col_types = "text") %>% unique()
   } else if (i == 2005) {
-    flu_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/2005 EIA-767 Master Files/F767_BOILER_STACKFLUE.xls"), col_types = "text") %>% unique()
+    flu_xwalk <- read_excel(here::here("data/eia/f767/2005 EIA-767 Master Files/F767_BOILER_STACKFLUE.xls"), col_types = "text") %>% unique()
   }
 
   names(flu_sub) <- tolower(names(flu_sub))
@@ -202,11 +197,12 @@ for (i in 1985:2005){
 
   flu_sub <- mutate(flu_sub, year = i)
   
-  # -- basic boiler information ----------------------------------------------
+  ## Basic boiler information -------------------------------------------------
+
   if (i %in% c(1985:2000)) {
-    boiler <- read_excel(paste0("orig_data/eia_767/f767_", i, "/Boiler.xls"), col_types = "text") %>% unique()
+    boiler <- read_excel(here::here("data/eia/f767/Boiler.xls"), col_types = "text") %>% unique()
   } else if (i %in% c(2001:2005)) {
-    boiler <- read_excel(paste0("orig_data/eia_767/f767_", i, "/", i, " F767_BOILER.xls"), col_types = "text") %>% unique()
+    boiler <- read_excel(here::here("data/eia/f767", paste0(i, " F767_BOILER.xls")), col_types = "text") %>% unique()
   }
   
   names(boiler) <- tolower(names(boiler))
@@ -222,15 +218,16 @@ for (i in 1985:2005){
   ## this dataset is uniquely identified at the boiler level
   print(boiler %>% unique_id(utility_code, plant_code, boiler_id))
   
-  # scrubber -----------------------------------------------------------------
+  ## Scrubber -----------------------------------------------------------------
+  
   if (i %in% c(1985:2000)) {
-    fgd <- read_excel(paste0("orig_data/eia_767/f767_", i, "/FGD.xls")) %>% unique()
+    fgd <- read_excel(here::here("data/eia/f767/FGD.xls")) %>% unique()
   } else if (i %in% c(2001:2003)) {
-    fgd <- read_excel(paste0("orig_data/eia_767/f767_", i, "/", i, " F767_FGD.xls")) %>% unique()
+    fgd <- read_excel(here::here("data/eia/f767", paste0(i, " F767_FGD.xls"))) %>% unique()
   } else if (i == 2004) {
-    fgd <- read_excel(paste0("orig_data/eia_767/f767_", i, "/", i, "_F767_FGD.xls")) %>% unique()
+    fgd <- read_excel(here::here("data/eia/f767/2004_F767_FGD.xls")) %>% unique()
   } else if (i == 2005) {
-    fgd <- read_excel(paste0("orig_data/eia_767/f767_", i, "/F767_FGD.xls")) %>% unique()
+    fgd <- read_excel(here::here("data/eia/f767/F767_FGD.xls")) %>% unique()
   }
   
   names(fgd) <- tolower(names(fgd))
@@ -254,13 +251,13 @@ for (i in 1985:2005){
   }
   
   if (i %in% c(1985:2000)) {
-    boiler_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/boiler_FGD.xls")) %>% unique()
+    boiler_xwalk <- read_excel(here::here("data/eia/f767/boiler_FGD.xls")) %>% unique()
   } else if (i %in% c(2001:2003)) {
-    boiler_xwalk <- read_excel(paste0("orig_data/eia_767/f767_", i, "/F767_BOILER_FGD.xls")) %>% unique()
+    boiler_xwalk <- read_excel(here::here("data/eia/f767/F767_BOILER_FGD.xls")) %>% unique()
   } else if (i == 2004) {
-    boiler_xwalk <- read_excel(paste0("orig_data/eia_767/f767_2004/2004 F767_BOILER_FGD.xls")) %>% unique()
+    boiler_xwalk <- read_excel(here::here("data/eia/f767/2004 F767_BOILER_FGD.xls")) %>% unique()
   } else if (i == 2005) {
-    boiler_xwalk <- read_excel("orig_data/eia_767/f767_2005/2005 EIA-767 Master Files/F767_BOILER_FGD.xls") %>% unique()
+    boiler_xwalk <- read_excel(here::here("data/eia/f767/2005 EIA-767 Master Files/F767_BOILER_FGD.xls")) %>% unique()
   }
 
   names(boiler_xwalk) <- tolower(names(boiler_xwalk))
@@ -293,19 +290,26 @@ for (i in 1985:2005){
   stackflues <- bind_rows(stackflues, flu_sub) 
   generators <- bind_rows(generators, gen_sub)
   
+  ## Remove -------------------------------------------------------------------
+  
+  l.zip %>%
+    purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
+    fs::file_delete()
+  
 }
 
+## Export ---------------------------------------------------------------------
 boilers %>% unique_id(plant_code, utility_code, boiler_id, year)
 fgds %>% unique_id(plant_code, utility_code, fgd_id, boiler_id, year)
 plants %>% unique_id(plant_code, utility_code, year)
 stackflues %>% unique_id(plant_code, utility_code, stack_id, flue_id, boiler_id, year)
 generators %>% unique_id(plant_code, utility_code, boiler_id, generator_id, year)
 
-write.csv(boilers, "use_data/boilers_1985_2005.csv")
-write.csv(plants, "use_data/plants_1985_2005.csv")
-write.csv(fgds, "use_data/fgds_1985_2005.csv")
-write.csv(stackflues, "use_data/stackflues_1985_2005.csv")
-write.csv(generators, "use_data/generators_1985_2005.csv")
+write.csv(boilers, here::here("data/boilers_1985_2005.csv"))
+write.csv(plants, here::here("data/plants_1985_2005.csv"))
+write.csv(fgds, here::here("data/fgds_1985_2005.csv"))
+write.csv(stackflues, here::here("data/stackflues_1985_2005.csv"))
+write.csv(generators, here::here("data/generators_1985_2005.csv"))
 
 ## the "type of boiler" variable lets us know which NSPS standards the boiler is subject to
 ## this can allow us to identify boilers that have been modified.
@@ -320,3 +324,7 @@ write.csv(generators, "use_data/generators_1985_2005.csv")
 #   mutate(before1978 = ifelse(inservice_year < 1971, 1, 0))
 # 
 # table(boilers$before1978, boilers$b_type_of_boiler)
+
+
+### END CODE ###
+

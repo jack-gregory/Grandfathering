@@ -1,48 +1,42 @@
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-# Modification Regressions                          #
-# Author: Bridget Pals                              #
-# Date: 2/8/2021                                    #
-# Purpose: Full process to clean data + generate    #
-# features for the model.                           #
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Grandfathering
+## 07_generate_regression_vars
+## Bridget Pals
+## 08 February 2021
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-library(dplyr)
-library(zoo)
-library(Hmisc)
 
-setwd("~/Documents/law school/research/research_revesz/clone-2023")
+# INTRODUCTION ------------------------------------------------------------------------------------
+## Final data cleaning to generate features for the model.
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Functions -------------------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# credit to: devtools::install.github("edwinth/thatssorandom")
-## function to identify whether a group of variables create
-## a unique id
-unique_id <- function(x, ...) {
-  id_set <- x %>% select(...)
-  id_set_dist <- id_set %>% distinct
-  if (nrow(id_set) == nrow(id_set_dist)) {
-    TRUE
-  } else {
-    non_unique_ids <- id_set %>% 
-      filter(id_set %>% duplicated()) %>% 
-      distinct()
-    suppressMessages(
-      inner_join(non_unique_ids, x) %>% arrange(...)
-    )
-  }
-}
+### START CODE ###
 
-mymax <- function(x) (max(as.numeric(x), na.rm = TRUE))
 
-mymin <- function(x) (min(as.numeric(x), na.rm = TRUE))
+# PREAMBLE ----------------------------------------------------------------------------------------
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Data clean-up ---------------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Initiate
+## ... Packages
+pkgs <- c(
+  "fs","here",                      # File system
+  "dplyr","Hmisc","zoo"             # Data wrangling
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
 
-boilers <- read.csv("use_data/all_years_all_plants_and_features.csv", stringsAsFactors = FALSE) %>%
+## ... Functions
+source(here::here("src/boilers.R"))
+
+## ... Definitions
+date <- format(Sys.Date(), "%Y%m%d")
+fs::dir_create(here::here("out", date))
+
+
+# IMPORT ------------------------------------------------------------------------------------------
+
+boilers <- read.csv(here::here("data/all_years_all_plants_and_features.csv"), 
+                    stringsAsFactors = FALSE) %>%
   select(-X)
 
 boilers <- boilers %>%
@@ -54,11 +48,12 @@ sum(is.na(boilers$age_boiler))
 
 unique_id(boilers, plant_code, boiler_id, year)
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Drop useless vars -----------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-## some useless vars snuck in - we drop them
+# CLEAN -------------------------------------------------------------------------------------------
+
+## Drop unnecessary vars ------------------------------------------------------
+
+## We drop some unnecessary vars.
 names(boilers)
 
 drop1 <- grep("util_", names(boilers))
@@ -72,9 +67,8 @@ boilers <- boilers %>%
 
 names(boilers)
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Create Modification Indicators ----------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+## Create modification indicators ---------------------------------------------
 
 boilers <- boilers %>%
   mutate(mod_D = ifelse(type_of_boiler == "D" & calc_inservice_y < 1972, 1 ,0),
@@ -93,7 +87,7 @@ table(boilers$mod_D)
 
 boilers$mod_D[is.na(boilers$mod_D)] <- 0
 
-## few potential mods in Da or Db
+## Few potential mods in Da or Db.
 table(boilers$mod_Da)
 table(boilers$mod_Db)
 
@@ -119,10 +113,10 @@ boilers$mod_D_in_y[is.na(boilers$mod_D_in_y)] <- 0
 boilers$mod_Da_in_y[is.na(boilers$mod_Da_in_y)] <- 0
 boilers$mod_Db_in_y[is.na(boilers$mod_Db_in_y)] <- 0
 
-## add flag if change regulation from state to fed
+## Add flag if change regulation from state to fed.
 
-## note this data begins in 1985 (and has reasonably good coverage 
-## after htat year (approximately 89% non-missing)
+## NB: This data begins in 1985 (and has reasonably good coverage after that year
+## (approximately 89% non-missing).
 table(boilers$so2_regulation)
 sum(is.na(boilers$so2_regulation))/nrow(boilers)
 
@@ -144,16 +138,15 @@ boilers <- boilers %>%
 boilers$year_mod_fed[boilers$year_mod_fed == 9999] <- NA
 boilers$mod_federal[is.na(boilers$mod_federal)] <- 0
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Convert percent sulfur standards --------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-## for now, of the top three fuels in primary_fuel1, bituminous is a primary fuel
-## for 62% of obs, subbituminous for 35% of obs and lignite for 3% of obs.
-## using the conversion table in the CFR, we calculate average conversion factors of: 
-##        (1.66*0.62 + 2.22*0.35+2.86*0.03) = 1.89 for % Sulfur to lbs/mmBTU
-##        (0.00287*0.62 + 0.00384*0.35 + 0*0.03) = 0.00312 for ppm to lbs/mmBTU
-## https://www.law.cornell.edu/cfr/text/40/appendix-B_to_part_72
+## Convert percent sulfur standards -------------------------------------------
+
+## For now, of the top three fuels in primary_fuel1, bituminous is a primary fuel
+## for 62% of obs, subbituminous for 35% of obs, and lignite for 3% of obs.
+## Using the conversion table in the CFR, we calculate average conversion factors of: 
+##    (1.66*0.62 + 2.22*0.35+2.86*0.03) = 1.89 for % Sulfur to lbs/mmBTU
+##    (0.00287*0.62 + 0.00384*0.35 + 0*0.03) = 0.00312 for ppm to lbs/mmBTU
+## See https://www.law.cornell.edu/cfr/text/40/appendix-B_to_part_72.
 table(boilers$primary_fuel1)
 
 boilers$reg_calc_so2_lbs_mmbtu <- as.numeric(boilers$reg_calc_so2_lbs_mmbtu)
@@ -173,11 +166,10 @@ boilers <- boilers %>%
                                            (ifnew_so2_ppm*0.00312))) %>%
   rename(reg_so2_lbs_mmbtu_weq = reg_calc_so2_lbs_mmbtu)
 
-## I have chosen 9.09 as our standin value because coal rarely contains 10%
-## sulfur, but a 10% sulfur content would yield lbs/mmbtu of
-## 9.09lbs/mmbtu
-## we only replace if the boiler wasn't joined to a reg (after all, some boilers)
-## are still regulated just under other paradigms - for example, ppm
+## We choose 9.09 as our stand-in value because coal rarely contains 10% sulfur, 
+## but a 10% sulfur content would yield lbs/mmbtu of 9.09lbs/mmbtu.  We only 
+## replace if the boiler wasn't joined to a reg (after all, some boilers) are 
+## still regulated just under other paradigms, i.e., ppm.
 boilers$reg_so2_lbs_mmbtu_calc[is.na(boilers$reg_so2_lbs_mmbtu_calc)] <- 9.0909
 boilers$ifnew_so2_lbs_mmbtu_calc[is.na(boilers$ifnew_so2_lbs_mmbtu_calc)] <- 9.0909
 
@@ -195,10 +187,9 @@ hist(boilers$ifnew_so2_lbs_mmbtu_calc)
 # boilers$ifnew_so2_lbs_mmbtu_calc[!is.na(boilers$ifnew_so2_ppm) & is.na(boilers$ifnew_so2_lbs_mmbtu)] <- NA
 # hist(boilers$ifnew_so2_lbs_mmbtu_calc)
 
-## we also need to apply FEDERAL standards to this
-
-## first, we pretend a new plant is being built. We use plant b/c if you were building a bunch of
-## boilers altogether, it would count as a new source (same as a single big boiler).
+## We also need to apply federal standards to this.  First, we pretend a new plant 
+## is being built.  We use plant b/c if you were building a bunch of boilers 
+## altogether, it would count as a new source (same as a single big boiler).
 boilers <- boilers %>%
   mutate(fed = ifelse(plant_capacity > 250, 1.2, 100),
          ifnew_fed_state_min_std = pmin(fed, ifnew_so2_lbs_mmbtu_calc, na.rm = TRUE)) %>%
@@ -210,16 +201,15 @@ boilers <- boilers %>%
          fed_std_req_scrubber = ifelse(type_of_boiler == "DA", 1, 0)) %>%
   select(-fed)
 
-## quick test - what if we make a histogram by boiler
+## Quick test: what if we make a histogram by boiler?
 test <- boilers %>% select(plant_code, boiler_id, reg_so2_lbs_mmbtu_calc) %>%
   group_by(plant_code, boiler_id) %>%
   summarise(reg_so2_lbs_mmbtu_calc = min(reg_so2_lbs_mmbtu_calc, na.rm = TRUE))
 
 hist(test$reg_so2_lbs_mmbtu_calc)
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Additional Vars of Interest -------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+## Additional vars of interest ------------------------------------------------
 
 boilers$plt_anngen <- as.numeric(boilers$plt_anngen)
 boilers$total_quantity <- as.numeric(boilers$total_quantity)
@@ -227,7 +217,6 @@ boilers$gen_total_gen <- as.numeric(boilers$gen_total_gen)
 boilers$fgd_tot_cost_total_by_boiler <- as.numeric(boilers$fgd_tot_cost_total_by_boiler)
 boilers$new_exp_air_abate <- as.numeric(boilers$new_exp_air_abate)
 boilers$ann_sulfur_content <- as.numeric(boilers$ann_sulfur_content)
-
 
 boilers <- boilers %>% 
   arrange(plant_code, boiler_id, year) %>%
@@ -268,7 +257,7 @@ hist(boilers$boiler_quantinc3yr)
 str(boilers)
 str(boilers[100:200])
 
-write.csv(boilers, "use_data/regression_vars.csv")
+write.csv(boilers, here::here("data/regression_vars.csv"))
 
 cor(data.frame(boilers$mod_fed_in_y, boilers$nsr_in_y, boilers$mod_D_in_y))
 cor(data.frame(boilers$mod_federal, boilers$mod_D, boilers$nsr_d_calc))
@@ -295,10 +284,11 @@ sum(test$nsr_d_calc == 1 & test$mod_federal == 1, na.rm = TRUE)
 
 sum(test$mod_D == 1 & test$mod_federal == 1)
 
-## summary of variables
 
-## create some summary statistics
-sink("output/summary_statistics_reg_vars.txt")  
+## Summary of vars ------------------------------------------------------------
+
+## Create some summary statistics
+sink(here::here("out", date, "summary_statistics_reg_vars.txt"))
 
 describe(boilers)
 
@@ -310,5 +300,8 @@ summary <- boilers %>%
   group_by(year) %>%
   summarise_each(funs(sum(!is.na(.))))
 
-write.csv(summary, "output/non_missing_values_by_year_reg_var.csv")
+write.csv(summary, here::here("out", date, "non_missing_values_by_year_reg_var.csv"))
+
+
+### END CODE ###
 

@@ -1,72 +1,62 @@
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-# Merging!                                          #
-# Author: Bridget Pals                              #
-# Date: 12/23/2020 updated 02/23/2024               #
-# Purpose: Merge plant and reg data                 #
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Grandfathering
+## 05_merge_boilers_to_regulations
+## Bridget Pals
+## 23 February 2024
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-# libraries needed
-library(dplyr)    # basic data cleaning
-library(readxl)   # read in excel files
-library(reshape2) # reshape long
-library(tidyr)    # "separate" function
- 
-#setwd("/Users/palsb1/Documents/law school/research/research_revesz")
-setwd("~/Documents/law school/research/research_revesz/clone-2023")
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Functions -------------------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# INTRODUCTION ------------------------------------------------------------------------------------
+## This script merges boiler and regulation data.
 
-# credit to: devtools::install.github("edwinth/thatssorandom")
-## function to identify whether a group of variables create
-## a unique id
 
-unique_id <- function(x, ...) {
-  id_set <- x %>% select(...)
-  id_set_dist <- id_set %>% distinct
-  if (nrow(id_set) == nrow(id_set_dist)) {
-    TRUE
-  } else {
-    non_unique_ids <- id_set %>% 
-      filter(id_set %>% duplicated()) %>% 
-      distinct()
-    suppressMessages(
-      inner_join(non_unique_ids, x) %>% arrange(...)
-    )
-  }
-}
+### START CODE ###
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Load in Necessary Datasets --------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-aqcr2cty <- read.csv("use_data/crosswalks/aqcrs_to_cty_xwalk.csv", stringsAsFactors = FALSE, skip = 2)
+# PREAMBLE ----------------------------------------------------------------------------------------
+
+## Initiate
+## ... Packages
+pkgs <- c(
+  "fs","here",                      # File system
+  "readxl",                         # Data reading
+  "dplyr","tidyr","reshape2"        # Data wrangling
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
+
+## ... Functions
+source(here::here("src/boilers.R"))
+
+
+# IMPORT ------------------------------------------------------------------------------------------
+
+aqcr2cty <- read.csv(here::here("data/xwalk/aqcrs_to_cty_xwalk.csv"), stringsAsFactors = FALSE, skip = 2)
 names(aqcr2cty)
 
 ## boiler-specific data
-boilers <- read.csv("use_data/boilers_1985-2018.csv", stringsAsFactors = FALSE)
+boilers <- read.csv(here::here("data/boilers_1985-2018.csv"), stringsAsFactors = FALSE)
 
 ## read in fuel data to get early period plants that might have fallen out
-fuel <- read.csv("use_data/all_fuel_1970_2018.csv", stringsAsFactors = FALSE)
+fuel <- read.csv(here::here("data/all_fuel_1970_2018.csv"), stringsAsFactors = FALSE)
 fuel <- fuel %>% select(-X)
 
 ## generators (for capacity data)
-gens <- read.csv("use_data/generators_1985-2018.csv", stringsAsFactors = FALSE)
+gens <- read.csv(here::here("data/generators_1985-2018.csv"), stringsAsFactors = FALSE)
 
 ## plants (and add in non abbrev states)
-plants <- read.csv("use_data/plants_1985-2018.csv", stringsAsFactors = FALSE)
-states <- read.csv("use_data/crosswalks/state_code_xwalk.csv", stringsAsFactors = FALSE)
+plants <- read.csv(here::here("data/plants_1985-2018.csv"), stringsAsFactors = FALSE)
+states <- read.csv(here::here("data/xwalk/state_code_xwalk.csv"), stringsAsFactors = FALSE)
 plants <- left_join(plants, states, by = "plt_state")
 
 ## regulations workbook
-regs <- read_excel("use_data/regulations/20240213_regulations_by_state.xlsx", skip = 1)
+regs <- read_excel(here::here("data/regs/20240213_regulations_by_state.xlsx"), skip = 1)
 
-indiana <- read_excel("use_data/regulations/indiana.xlsx", skip = 1)
+indiana <- read_excel(here::here("data/regs/indiana.xlsx"), skip = 1)
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Clean up Regulations Data ---------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# CLEAN REGULATIONS -------------------------------------------------------------------------------
 
 regs <- regs[,-1]
 
@@ -84,7 +74,7 @@ regs <- regs %>%
   select(-code_section, -notes, -year_adopted, -utility_code) %>% 
   filter(!state %in% c("California", "Ohio"))
 
-## we do some date cleaning next
+## Date cleaning
 regs$month_cutoff <- substr(regs$year_cutoff, 1, 2)
 regs$month_cutoff <- gsub("/", "", regs$month_cutoff)
 regs$month_cutoff <- as.numeric(regs$month_cutoff)
@@ -92,7 +82,7 @@ regs$month_cutoff[regs$month_cutoff > 12] <- NA
 
 regs$year_cutoff <- substr(regs$year_cutoff, nchar(regs$year_cutoff)-3,nchar(regs$year_cutoff))
 
-## quick cleaning on Regs
+## Regulations cleaning
 regs <- regs %>%
   mutate(all_ages = ifelse(year_cutoff == "all", 1, 0))
 
@@ -101,34 +91,33 @@ sum(is.na(regs$all_ages)) == sum(is.na(regs$year_cutoff))
 
 regs$year_cutoff <- as.numeric(regs$year_cutoff)
 
-## note that there are a handful of regs that have a range of years instead of just pre/post
+## Note that there are a handful of regs that have a range of years instead of pre/post.
 table(regs$pre_post)
 
-## we see that the regs with NA in year_cutoff map to those
-## that were for "all" boilers regardless of inservice year
+## We see that the regs with NA in year_cutoff map to those that were for "all" 
+## boilers regardless of inservice year.
 sum(is.na(regs$year_cutoff)) == sum(regs$all_ages == 1)
 
-## if we don't know when started --> pre 1972 --> just say year 0
-## same if we don't have an end date --> persisted to present day
+## If we are unsure when started --> pre 1972 --> assume year 0 same if we don't
+## have an end date --> persisted to present day.
 regs$year_std_start <- as.numeric(regs$year_std_start)
 regs$year_std_start[is.na(regs$year_std_start)] <- 0
 
 regs$year_std_end <- as.numeric(regs$year_std_end)
 regs$year_std_end[is.na(regs$year_std_end)] <- 9999
 
-## clean up cap vars
+## Clean up cap vars
 regs$max_cap[regs$max_cap == "max"] <- 9999999
 
 regs$max_cap <- as.numeric(regs$max_cap)
 regs$min_cap <- as.numeric(regs$min_cap)
 
-## we will have to reshape long! This is going to be a bit tricky, but for now
-## we go by county or aqcr and flag regs that rely on towns (since we do
-## not have that information)
+## We reshape long. This is tricky, but we go by county or aqcr and flag regs that
+## rely on towns (since we do not have that information).
 regs$plt_county <- gsub(";", ",", regs$plt_county)
 regs$aqcr <- gsub(";", ",", regs$aqcr)
 
-## we have to bind in our indiana data, which we managed separately:
+## We bind in our indiana data, which was managed separately.
 nrow(indiana)
 names(indiana) <- c("plant_name", "plant_code", "boiler_id", "generator_id", "std_so2_lbs_mmbtu",
                     "std_other", "year_std_start", "year_std_end",
@@ -141,14 +130,12 @@ regs <- bind_rows(regs, indiana)
 
 regs <- regs %>% mutate(id = 1:n())
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## -- Regs that require handmatching --------
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Handmatching regulations ---------------------------------------------------
 
-# we had originally dropped plants in Cal, Ohio, Penn and Maine. We only lose one plant
-# from Maine and one from California, but 33 from Pennsylvania and 29 from Ohio. 
-# Ohio has extraordinarily granular county-level regs that would be infeasible to
-# trace to time, so dropping it is necessary. PA is worth further investigation
+## We originally dropped plants in Cal, Ohio, Penn and Maine. We only lose one plant
+## from Maine and one from California, but 33 from Pennsylvania and 29 from Ohio. 
+## Ohio has extraordinarily granular county-level regs that would be infeasible to
+## trace to time, so dropping it is necessary. PA is worth further investigation
 # test <- plants %>%
 #   filter(state %in% c("California", "Ohio", "Pennsylvania", "Maine")) %>%
 #   select(plant_code, state) %>% unique()
@@ -161,31 +148,36 @@ regs <- regs %>% mutate(id = 1:n())
 ## regulations by town/city, so that matching is also done by hand.
 handmatch <- plants %>% 
   filter(state %in% c("Pennsylvania", "Maine", "Massachusetts", "New Mexico")) %>%
-  select(plant_code, plant_name, plt_state, state, plt_county, plt_st_address, plt_city) %>% unique()
+  select(plant_code, plant_name, plt_state, state, plt_county, plt_st_address, plt_city) %>% 
+  unique()
 
 write.csv(handmatch, "use_data/to_match_pa_maine_nm_mass.csv")
 
-## I handmatched these plants to the correct region
-## for Pennsylvania, counties are not coterminous with AQCRs. 
-## I relied on the map available at the below link and the provided addresses to determine
-## if a given plant was within an air basin (and, if so, which one). 
-## ## https://files.dep.state.pa.us/air/AirQuality/AQPortalFiles/Regulations%20and%20Clean%20Air%20Plans/attain/PM25Des/FigureB17-PA%20Air%20Basins.pdf
-## Certain regions changed names over time - for example, Beaver Valley was broken out into
-## Upper and Lower Beaver Valley - so I added in a T1 and T2 distinction in the file to rename these
-##
-## for Maine, AQCRs may include only part of a county, delineated by township. For the one Maine
-## powerplant in our sample, I was able to determine the town was in the Androscoggin AQCR
-##
-## for Massachusetts, AQCRs were based in part on township, and I matched the township
-## of these plants to the correct AQCR
-##
-## for New Mexico, the AQCRs are defined in part with reference to geographical features
-## (e.g. the border of one of the AQCRs include only the part of a county east of the continental divide)
+## Handmatched plants to the correct region.  For Pennsylvania, counties are not 
+## coterminous with AQCRs.  I relied on the map available at the below link and 
+## the provided addresses to determine if a given plant was within an air basin 
+## (and, if so, which one). 
+## https://files.dep.state.pa.us/air/AirQuality/AQPortalFiles/Regulations%20and%20Clean%20Air%20Plans/attain/PM25Des/FigureB17-PA%20Air%20Basins.pdf
+
+## Certain regions changed names over time - for example, Beaver Valley was broken out 
+## into Upper and Lower Beaver Valley - so I added in a T1 and T2 distinction in the
+## file to rename these.
+
+## For Maine, AQCRs may include only part of a county, delineated by township. For 
+## the one Maine powerplant in our sample, I was able to determine the town was in 
+## the Androscoggin AQCR.
+
+## For Massachusetts, AQCRs were based in part on township, and I matched the township
+## of these plants to the correct AQCR.
+
+## For New Mexico, the AQCRs are defined in part with reference to geographical features
+## (e.g. the border of one of the AQCRs include only the part of a county east of 
+## the continental divide).
 
 handmatch <- read.csv("use_data/handmatched_pa_maine_nm_mass.csv") %>%
   select(-plt_county, -plt_st_address, -plt_city)
 
-## we have to fix something in Pennsylvania for our merge to work
+## We have to fix something in Pennsylvania for our merge to work.
 pat1 <- handmatch %>% filter(match_name == "Nonair basin area") %>%
   mutate(time_period = "T1")
 
@@ -201,23 +193,24 @@ plants_handmatch <- plants %>%
   filter(state %in% c("Pennsylvania", "Maine", "Massachusetts", "New Mexico")) %>%
   left_join(handmatch)
   
-## we check our handmatch guys for uniqueness:
+## We check handmatches for uniqueness.
 plants_handmatch_id <- plants_handmatch %>% 
   select(state, plant_code, time_period, match_name, plt_county) %>% unique()
 
-## we get a unique ID based on this
+## We prepare a unique ID based on handmatches.
 unique_id(plants_handmatch_id, plant_code, time_period)
 
-## we do the same for the rest of the dataset
+## We do the same for the rest of the dataset
 plants <- plants %>%
   filter(!state %in% c("California", "Ohio"))
 
 plant_id <- plants %>% 
-  select(state, plt_county, plant_code) %>% unique()
+  select(state, plt_county, plant_code) %>% 
+  unique()
 
 unique_id(plant_id, plant_code)
 
-## next, we manage our plants that involved handmatching (PA, ME, NM, MA)
+## Next, we manage our plants that involved handmatching (PA, ME, NM, MA).
 
 hm_regs_wide <- regs %>% 
   filter(state %in% c("Pennsylvania", "Maine", "New Mexico", "Massachusetts"))  %>%
@@ -231,24 +224,22 @@ hm_regs_long <- hm_regs_wide %>%
 
 hm_regs_long$match_name <- trimws(hm_regs_long$match_name)
 
-## we also need to clean up the handmatched plants file
+## We also need to clean up the handmatched plants file.
 plants_handmatch_id$match_name <- trimws(plants_handmatch_id$match_name)
 
 hm_plts <- left_join(plants_handmatch_id, hm_regs_long, by = c("match_name", "time_period")) %>%
   select(id, state, match_name, time_period, plt_county, plant_code) 
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## specific plants --------------------------
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Specific plants ------------------------------------------------------------
 
-# Some states choose to regulate specific plants, sometimes by individual boiler. 
-# We link these up here. Because states named the plants, rather than providing 
-# a plant code, manual review was necessary.
+## Some states choose to regulate specific plants, sometimes by individual boiler. 
+## We link these up here. Because states named the plants, rather than providing 
+## a plant code, manual review was necessary.
 
-# I used the code below to allow for manual review to link the utility and plant
-# codes to the regulations, based off the name of the plant.
-#
-# There are 195 such constraints in our dataset, including 129 in Indiana.
+## I used the code below to allow for manual review to link the utility and plant
+## codes to the regulations, based off the name of the plant.
+
+## There are 195 such constraints in our dataset, including 129 in Indiana.
 nrow(indiana)
 nrow(regs %>% filter(!is.na(plant_code)))
 
@@ -256,13 +247,11 @@ names_plts <- regs %>% filter(!is.na(plant_code), plant_code != "") %>%
   select(id, state, geo_area, plt_county, plant_code, boiler_id, generator_id)
 
 ## NOTE: when we merge these onto boilers, we need to be careful - some of these map to
-## a specific boiler, one onto a generator, and many to an entire plant
+## a specific boiler, one onto a generator, and many to an entire plant.
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# regs with no geo restrictions -------------
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Regulations with no geo restrictions ---------------------------------------
 
-## we look at regulations that are not tied to a specific geographic area
+## We look at regulations that are not tied to a specific geographic area.
 regs_nongeo <- filter(regs, geo_area == "all") %>%
   filter(is.na(plant_name)) %>%
   filter(!state %in% c("New Mexico", "Pennsylvania", "Maine", "Massachusetts")) %>%
@@ -270,8 +259,8 @@ regs_nongeo <- filter(regs, geo_area == "all") %>%
 
 nongeo_plts <- left_join(plant_id, regs_nongeo, by = "state")
 
-## about 64% of plants are associated with one or more of these regs (we have not
-## yet filtered based on size or time, so that number will change)
+## About 64% of plants are associated with one or more of these regs (we have not
+## yet filtered based on size or time, so that number will change).
 nrow(nongeo_plts %>% filter(!is.na(id)) %>% select(plant_code) %>% unique())/
   nrow(nongeo_plts %>% select(plant_code) %>% unique())
 
@@ -280,15 +269,13 @@ nongeo_plts <- filter(nongeo_plts, !is.na(id)) %>%
 
 rm(regs_nongeo)
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## -- Link County-Based Regs ----------------
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Link county-based regulations ----------------------------------------------
 
-## first, we start by making the county data cleaner to allow for joining
+## First, we start by making the county data cleaner to allow for joining.
 regs_cty_wide <- regs %>% 
   select(id, state, geo_area, plt_county) %>%
   filter(!is.na(plt_county), plt_county != "all") %>%
-  ## we take out our handmatched guys - PA, ME, MA, and NM   
+  ## We remove handmatched - PA, ME, MA, and NM.
   filter(!state %in% c("Pennsylvania", "Maine", "Massachusetts", "New Mexico")) %>%
   separate(plt_county, c(paste0("county", 1:30)), c(","))
 
@@ -307,38 +294,36 @@ regs_cty_long$plt_county <- toupper(regs_cty_long$plt_county)
 cty_plts <- left_join(plant_id, regs_cty_long, by = c("plt_county", "state")) %>%
   select(id, state, geo_area, plt_county, plant_code) 
 
-## about 21% of plants in our sample may be associated with one of these regs (again,
-## we don't know for sure until we filter on plant size/vintage/year/etc)
+## About 21% of plants in our sample may be associated with one of these regs (again,
+## we don't know for sure until we filter on plant size/vintage/year/etc).
 nrow(cty_plts %>% filter(!is.na(id)) %>% select(plant_code) %>% unique())/
   nrow(cty_plts %>% select(plant_code) %>% unique())
 
 cty_plts <- cty_plts %>% filter(!is.na(id))
 
-## we also want to check how good of "coverage" we get of the regs
+## We also want to check how good of "coverage" we get of the regs.
 cty_regs <- left_join(regs_cty_long, plant_id, by = c("plt_county", "state")) %>%
   select(id, state, plt_county, plant_code) %>%
   filter(!is.na(id))
 
-## there are many counties (229) that don't contain a single powerplant in our
-## dataset (perhaps contain smaller powerplants that we don't have or industrial sources)
+## There are many counties (229) that don't contain a single powerplant in our dataset 
+## (perhaps contain smaller powerplants that we don't have or industrial sources).
 sum(is.na(cty_regs$plant_code))
 
-## about a quarter of these regs are regs that apply to "other" counties, 
-## which we must treat separately
+## About a quarter of these regs apply to "other" counties, which we must treat 
+## separately
 sum(cty_regs$plt_county %in% c("OTHER") & is.na(cty_regs$plant_code))
 
 rm(regs_cty_wide)
 rm(cty_regs)
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## -- AQCR ----------------------------------
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## AQCR -----------------------------------------------------------------------
 
-## next, we reshape AQCR long (as we did for county) and also crosswalk
-## AQCR data to counties so that we will be able to join by county
+## Next, we reshape AQCR long (as we did for county) and also crosswalk AQCR data 
+## to counties so that we will be able to join by county.
 regs_aqcr_wide <- regs %>% select(id, state, geo_area, aqcr) %>%
   filter(!is.na(aqcr), aqcr != "all") %>%
-  ## we take out our handmatched guys - PA, ME, MA, and NM 
+  ## We remove handmatched - PA, ME, MA, and NM.
   filter(!state %in% c("Pennsylvania", "Maine", "Massachusetts", "New Mexico")) %>%
   separate(aqcr, c(paste0("aqcr", 1:30)), c(","))
 
@@ -358,20 +343,20 @@ aqcr2cty_long <- aqcr2cty_long %>% filter(!is.na(value), value != "", value != "
   rename(plt_county = value) %>%
   select(-variable)
 
-## the only counties with AQCRs that change back and forth over time are in New Mexico and Texas.
-## for the Texas counties, the AQCRs changed in 1991 and a new rule - that 
-## does not consider AQCR - took effect in 1992. I will assume these actions
-## were paired.
-## the New Mexico redesignation took effect in 1980, but New Mexico stopped
-## basing its standards off AQCR in 1977, so it is not material.
+## The only counties with AQCRs that change back and forth over time are in New Mexico
+## and Texas.
 
-## we can therefore filter out these later changes, and say 
-## "keep if start year (of the AQCR designation) is 1971)
-#View(aqcr2cty_long %>% filter(year_start != 1971 | year_end != "present"))
+## For the Texas counties, the AQCRs changed in 1991 and a new rule - that does not 
+## consider AQCR - took effect in 1992. I will assume these actions were paired.
+
+## The New Mexico redesignation took effect in 1980, but New Mexico stopped basing
+## its standards off AQCR in 1977, so it is not material.  We can therefore filter 
+## out these later changes, and keep if start year (of the AQCR designation) is 1971.
+# View(aqcr2cty_long %>% filter(year_start != 1971 | year_end != "present"))
 
 aqcr2cty_long <- filter(aqcr2cty_long, year_start == 1971) %>% unique()
 
-# we have to do a little string cleaning
+# Clean strings
 aqcr2cty_long$plt_county <- gsub(" County", "", aqcr2cty_long$plt_county)
 aqcr2cty_long$plt_county <- gsub(" county", "", aqcr2cty_long$plt_county)
 aqcr2cty_long$plt_county <- trimws(aqcr2cty_long$plt_county)
@@ -390,18 +375,19 @@ regs_aqcr_long$aqcr <- as.numeric(regs_aqcr_long$aqcr)
 
 regs_aqcr <- left_join(regs_aqcr_long, aqcr2cty_long, by = c("state", "aqcr"))
 
-## now we merge the reg information onto the plant information 
-aqcr_plts <- plant_id %>% filter(!state %in% c("Pennsylvania", "Maine", "Massachusetts", "New Mexico")) %>%
+## Merge the reg information onto the plant information. 
+aqcr_plts <- plant_id %>% filter(!state %in% c("Pennsylvania", "Maine", "Massachusetts", 
+                                               "New Mexico")) %>%
   left_join(regs_aqcr, by = c("state", "plt_county")) %>%
   select(id, state, geo_area, plt_county, aqcr, plant_code)
 
-## lets check how many plants this reaches - it looks like just shy of 10%
-nrow(aqcr_plts %>% filter(!is.na(id)) %>% select(plant_code) %>% unique())/
+## Check how many plants this reaches, around 10%.
+nrow(aqcr_plts %>%filter(!is.na(id)) %>% select(plant_code) %>% unique())/
   nrow(aqcr_plts %>% select(plant_code) %>% unique())
 
-## upon inspection, something is off in Virginia, because the AQCRs are identified by
+## Upon inspection, something is off in Virginia, because the AQCRs are identified by
 ## city and county, and some plants have listed their city instead of their county.
-## we fix this manually.
+## We fix this manually.
 aqcr_va <- aqcr_plts %>% filter(state == "Virginia" & is.na(aqcr))
 
 aqcr_va$aqcr[aqcr_va$plant_code == 10071] <- 223
@@ -409,7 +395,9 @@ aqcr_va$aqcr[aqcr_va$plant_code == 10377] <- 225
 aqcr_va$aqcr[aqcr_va$plant_code == 3788] <- 47
 aqcr_va$aqcr[aqcr_va$plant_code == 3803] <- 223
 aqcr_va$aqcr[aqcr_va$plant_code == 50900] <- 226
-aqcr_va$aqcr[aqcr_va$plant_code == 54081] <- 225 # match to the city "Richmond" (AQCR 225), not the county (AQCR 224), although it doens't matter since both are subject to the same regs
+## Match to the city "Richmond" (AQCR 225), not the county (AQCR 224), although 
+## it doesn't matter since both are subject to the same regs.
+aqcr_va$aqcr[aqcr_va$plant_code == 54081] <- 225 
 
 regs_va <- regs_aqcr %>% filter(state == "Virginia") %>%
   select(-plt_county) %>% unique()
@@ -417,7 +405,7 @@ regs_va <- regs_aqcr %>% filter(state == "Virginia") %>%
 aqcr_va <- aqcr_va %>% select(state, plant_code, aqcr) %>% 
   left_join(regs_va)
 
-## we add back in these Virginia plants and remove unmatched plants
+## We add back in these Virginia plants and remove unmatched plants.
 aqcr_plts <- aqcr_plts %>%
   filter(!is.na(aqcr)) %>%
   bind_rows(aqcr_va)
@@ -430,25 +418,21 @@ rm(regs_aqcr_wide)
 rm(regs_aqcr)
 rm(aqcr_va)
 
-## the plants by AQCR and county are now linked properly by geography!!
-## note that not all plants have been joined in - some, for
-## example only apply if they are in an "other" geographic
-## area. This is going to take a bit of work to make sure
-## we are applying "other" to the correct time frame (e.g. if
-## in t1 the reg applies to counties A, B, C, and other and in
-## t2 the reg applies to counties A, B, and other, a plant in
-## county D would be "other" in both time frames, but county C
+## The plants by AQCR and county are now linked properly by geography.  Note that 
+## not all plants have been joined in - some, for example only apply if they are 
+## in an "other" geographic area. This is going to take a bit of work to make sure
+## we are applying "other" to the correct time frame (e.g. if in t1 the reg applies
+## to counties A, B, C, and other and in t2 the reg applies to counties A, B, and 
+## other, a plant in county D would be "other" in both time frames, but county C
 ## would need to be "other" in some cases and not in others). We do this next.
 
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## "other" geo areas ------------------------
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Other geographic areas -----------------------------------------------------
 
-## we look at regs in "other" county or "other" AQCR
+## We investigate regs in "other" counties or "other" AQCRs.
 
-# we had to wait to do "other" geo areas until after everything
-# else is linked up since the "other" can vary by year
-## we catch all "others" by subsetting on plt_county
+## We had to wait to do "other" geo areas until after everything else is linked up 
+## since the "other" can vary by year.  We catch all "others" by subsetting on 
+## plt_county.
 
 sum(regs$plt_county %in% c("Other", "other", "OTHER") & !regs$aqcr %in% c("Other", "other", "OTHER"))
 sum(!regs$plt_county %in% c("Other", "other", "OTHER") & regs$aqcr %in% c("Other", "other", "OTHER"))
@@ -460,33 +444,29 @@ regs_other <- regs_other %>%
   ## clean up var for easier linkage
   mutate(plt_county = "OTHER")
 
-# we're going to have to go by state. It's a bit messy, but bear with me.
-
-# Alabama
+## Alabama
 plts_al <- plant_id %>% 
   filter(state == "Alabama",
-         ## we take out our "Category I Counties" - Colbert County has a separate regulation
-         ## for certain plants, but the default would be that a plant is covered by the "other" 
-         ## or "Category II County" rule
+         ## we take out our "Category I Counties" - Colbert County has a separate 
+         ## regulation for certain plants, but the default would be that a plant 
+         ## is covered by the "other" or "Category II County" rule.
          !plt_county %in% c("JACKSON", "JEFFERSON", "MOBILE")) %>%
   mutate(plt_county = "OTHER", time_period = "T2")
 
-# Delaware
+## Delaware
 plts_del <- plant_id %>%
   filter(state == "Delaware", plt_county != "NEW CASTLE") %>%
   mutate(plt_county = "OTHER")
 
-# Florida
+## Florida
 plts_fl <-plant_id %>%
   filter(state == "Florida", !plt_county %in% c("ESCAMBIA", "HILLSBOROUGH", "DUVAL")) %>%
   mutate(plt_county = "OTHER")
 
-# Illinois
-
-## n.b. McHenry and Kankakee are in the IL Metros, but when we wrote out
-## the regulations, we kept them on a separate line for ease of coding
-## because they sometimes follow the IL Metro rule and sometimes don't,
-## but they are never within the "other" group
+## Illinois
+## NB: McHenry and Kankakee are in the IL Metros, but when we wrote out the regulations, 
+## we kept them on a separate line for ease of coding because they sometimes follow 
+## the IL Metro rule and sometimes don't, but they are never within the "other" group.
 il_metros <- c("Cook", "Lake", "Will", "DuPage", "McHenry", "Kane", "Grundy", 
                "Kendall", "Kankakee", "St Clair", "Saint Clair", "Madison", "Peoria", "Tazewell")
 il_metros <- toupper(il_metros)
@@ -496,21 +476,21 @@ plts_il <- plant_id %>%
          !plt_county %in% il_metros) %>%
   mutate(plt_county = "OTHER")
 
-# Iowa
+## Iowa
 plts_ia <- plant_id %>%
   filter(state == "Iowa", 
          !plt_county %in% c("BLACK HAWK", "CLINTON", "DES MOINES",
                             "DUBUQUE", "JACKSON", "LEE", "LINN", "LOUISA", "MUSCATINE", "SCOTT")) %>%
   mutate(plt_county = "OTHER")
 
-# Kentucky
-# these counties are always separately regulated. Only after 1982, is Boyd also
-# separately regulated
+## Kentucky
+## these counties are always separately regulated. Only after 1982, is Boyd also
+## separately regulated.
 ky_inc <- c("Jefferson", "McCracken", "Bell", "Clark", "Woodford", 
             "Pulaski", "Webster", "Hancock", "Muhlenberg")
 ky_inc <- toupper(ky_inc)
 
-# as such, we will "save" Boyd for now, and recode when we are actually merging
+## As such, we will "save" Boyd for now, and recode when we are actually merging.
 plts_ky <- plant_id %>%
   filter(state == "Kentucky",
          !plt_county %in% ky_inc)
@@ -523,17 +503,16 @@ plts_ky <- plts_ky %>%
   mutate(plt_county = "OTHER", time_period = "T1") %>%
   bind_rows(boyd)
 
-# # Massachusetts
-# we switched to a handmatching approach for Massachusetts, so we no longer need this
+## Massachusetts
+## We switched to a handmatching approach for Massachusetts, so we no longer need this.
 # plts_ma <- plant_id %>%
 #   filter(state == "Massachusetts", 
 #          !plt_county %in% c("SUFFOLK", "NORFOLK", "MIDDLESEX", 
 #                             "ESSEX", "PLYMOUTH")) %>%
 #   mutate(plt_county = "OTHER")
 
-# Minnesota
-
-## we exclude counties in accoutned for AQCRs and Duluth
+## Minnesota
+## we exclude counties in accounted for AQCRs and Duluth.
 minn_inc <- c("Anoka County", "Carver County", "Dakota County", 
               "Hennepin County", "Ramsey County", "Scott County", 
               "Washington County", "Duluth")
@@ -545,23 +524,22 @@ plts_minn <- plant_id %>%
          !plt_county %in% minn_inc) %>%
   mutate(plt_county = "OTHER")
 
-# Michigan
+## Michigan
 plts_mi <- plant_id %>%
   filter(state == "Michigan",
          plt_county != "WAYNE") %>%
   mutate(plt_county = "OTHER")
 
-# Nevada
+## Nevada
 plts_nev <- plant_id %>%
   filter(state == "Nevada",
          !plt_county %in% c("WASHOE", "CLARK")) %>%
   mutate(plt_county = "OTHER")
 
-# New Jersey
-# In 1981, New Jersey modified their rules and each county was 
-# explicitly subject to a particular set of rules.
-# as such, we only want to recode for plants prior to 1981.
-
+## New Jersey
+## In 1981, New Jersey modified their rules and each county was explicitly subject 
+## to a particular set of rules.  As such, we only want to recode for plants prior
+## to 1981.
 nj_inc <- c("Atlantic", "Cape May", "Cumberland", "Hunterdon", 
             "Ocean", "Sussex", "Warren")
 nj_inc <- toupper(nj_inc)
@@ -570,12 +548,10 @@ plts_nj <- plant_id %>%
   filter(state == "New Jersey", !plt_county %in% nj_inc) %>%
   mutate(plt_county = "OTHER") %>% mutate(time_period = "T1")
 
-# New Mexico
-
-# we no longer need this code as I switched to a handmatch strategy for NM
-# New Mexico has irregular borders, so it was actually easier
-# to track down which counties are not in AQCR 12 and 14, rather than
-# the other way around
+## New Mexico
+## We no longer need this code as I switched to a handmatch strategy for NM.
+## New Mexico has irregular borders, so it was actually easier to track down which
+## counties are not in AQCR 12 and 14, rather than the other way around.
 # nm_inc <- c("Colfax", "Union", "Mora", "Harding", "San Miguel", "Guadalupe", 
 #             "Torrance", "Quay", "Curry", "DeBaca", "Roosevelt", "Chaves", "Lea", 
 #             "Eddy", "Lincoln", "Otero", "Sierra", "Dona Ana", "Socerro", "Catron", 
@@ -586,7 +562,7 @@ plts_nj <- plant_id %>%
 #   filter(state == "New Mexico", plt_county %in% nm_inc) %>%
 #   mutate(plt_county = "OTHER")
 
-# New York
+## New York
 ny_inc <- c("Bronx", "Kings", "Queens", "New York", "Richmond", "Nassau", 
             "Rockland", "Westchester", "Suffolk", "Erie", "Niagara")
 ny_inc <- toupper(ny_inc)
@@ -595,23 +571,21 @@ plts_ny <- plant_id %>%
   filter(state == "New York", !plt_county %in% ny_inc) %>%
   mutate(plt_county = "OTHER")
 
-# South Carolina
+## South Carolina
 plts_sc <- plant_id %>%
   filter(state == "South Carolina", 
          !plt_county %in% c("CHARLESTON", "AIKEN", "ANDERSON"))
 
 unique(plts_sc$plt_county)
 
-plts_sc <- plts_sc %>% 
-  # this line is unnecessary
-  #  filter(plt_county != "NOT IN FILE") %>%
+plts_sc <- plts_sc %>%
   mutate(plt_county = "OTHER")
 
-# Tennessee
+## Tennessee
 tn1 <- c("Polk", "Maury", "Sullivan", "Roane", "Humphreys")
 tn1 <- toupper(tn1)
 
-# note T2 and T3 have same counties regulated, so we'll lean on that
+## NB: T2 and T3 have same counties regulated, so we'll lean on that.
 tn2 <- c("Polk", "Humphreys", "Maury", "Roane", "Sullivan", "Shelby", 
          "Anderson", "Davidson", "Hamilton", "Hawkins", "Knox", "Rhea")
 tn2 <- toupper(tn2)
@@ -630,16 +604,16 @@ tn_plts3 <- tn_plts2 %>% mutate(time_period = "T3")
 
 plts_tn <- bind_rows(tn_plts1, tn_plts2) %>% bind_rows(tn_plts3)
 
-# Texas
+## Texas
 plts_tx <- plant_id %>%
   filter(state == "Texas", 
          plt_county != "MILAM") %>%
   mutate(plt_county = "OTHER")
 
-# West Virginia
-## we might worry about how best to code Fayette County, because different parts of the
-## county are regulated by different rules, however, conveniently, there are no plants in our sample in 
-## Fayette County, so it does not matter.
+## West Virginia
+## We might worry about how best to code Fayette County, because different parts of 
+## the county are regulated by different rules, however, conveniently, there are no 
+## plants in our sample in Fayette County, so it does not matter.
 wv_inc <- c("Brooke", "Hancock", "Marshall", "Ohio", "Grant", "Mineral", "Jackson", 
             "Pleasants", "Tyler", "Wetzel", "Wood", "Kanawha", "Putnam", "Fayette")
 wv_inc <- toupper(wv_inc)
@@ -649,7 +623,7 @@ plts_wv <- plant_id %>%
          !plt_county %in% wv_inc) %>%
   mutate(plt_county = "OTHER")
 
-# Missouri
+## Missouri
 mo_inc <- c("Franklin", "Jefferson", "St Charles", "St Louis City", "St Louis")
 mo_inc <- toupper(mo_inc)
 
@@ -658,18 +632,18 @@ plts_mo <- plant_id %>%
          !plt_county %in% mo_inc) %>%
   mutate(plt_county = "OTHER")
 
-# combine all states
+## Combine all states
 other_plts <- bind_rows(plts_al, plts_del) %>%
   bind_rows(plts_fl) %>%
   bind_rows(plts_il) %>%
   bind_rows(plts_ia) %>%
   bind_rows(plts_ky) %>%
-#  bind_rows(plts_ma) %>%
+  # bind_rows(plts_ma) %>%
   bind_rows(plts_mi) %>%
   bind_rows(plts_minn) %>%
   bind_rows(plts_nev) %>%
   bind_rows(plts_nj) %>%
-#  bind_rows(plts_nm) %>%
+  # bind_rows(plts_nm) %>%
   bind_rows(plts_ny) %>%
   bind_rows(plts_sc) %>%
   bind_rows(plts_tn) %>%
@@ -677,25 +651,27 @@ other_plts <- bind_rows(plts_al, plts_del) %>%
   bind_rows(plts_wv) %>%
   bind_rows(plts_mo)
 
-## we merge the regs onto these plants
+## We merge the regs onto these plants.
 other_plts <- left_join(other_plts, regs_other)
 
 unique_id(other_plts, id, plant_code)
 sum(is.na(other_plts$id))
 sum(is.na(other_plts$plant_code))
 
-## there are 151 (non-handmatched) plants that are in "other" geographical areas at some point in time.
-## some of these may be plants that also have a plant/boiler/generator specific regulation
+## There are 151 (non-handmatched) plants that are in "other" geographical areas 
+## at some point in time.  Some of these may be plants that also have a 
+## plant/boiler/generator specific regulation.
 nrow(other_plts %>% select(plant_code) %>% unique())
 
-## combine the above groups ----
+## Merge datasets -------------------------------------------------------------
+
 names(names_plts)
 names(cty_plts)
 names(aqcr_plts)
 names(other_plts)
 
-## we can drop the time_period variable because we now have the regulation ID, which
-## is already tied to the correct time period
+## We can drop the time_period variable because we now have the regulation ID, which
+## is already tied to the correct time period.
 other_plts <- select(other_plts, -time_period)
 
 names_plts <- names_plts %>% mutate(geo_type = "targeted reg")
@@ -712,60 +688,60 @@ plt_regs <- bind_rows(names_plts, cty_plts) %>%
   bind_rows(other_plts) %>%
   select(id, state, plt_county, plant_code, boiler_id, generator_id, geo_type)
 
-## we have no duplicates!
+## We have no duplicates!
 unique_id(plt_regs, plant_code, id)
 
-## these are only MATCHED plants
+## These are only MATCHED plants.
 sum(is.na(plt_regs$id))
 sum(!is.na(plt_regs$id))
 
-## we have linked up 473 plants (out of 472) to at least one possible regulation.
-## some of this will change after we eliminate plants outside the regulations' parameters
-## for size or date built, but it shows we had good initial coverage.
+## We have linked up 473 plants (out of 472) to at least one possible regulation.
+## Some of this will change after we eliminate plants outside the regulations' 
+## parameters for size or date built, but it shows we had good initial coverage.
 length(unique(plt_regs$plant_code))
 length(unique(plants$plant_code))
 
-## you'll note that we have matched one more plant here than is in our underlying plants dataset,
-## which seems, well, not good. 
-## The reason for this is that the Village of Winnetka Plant (plant code 972) did not report to 
-## the EIA form we use as its base (fuel consumption in EIA 767), but, nonetheless, is separately regulated
-## by name and is, in fact, a coal plant. We leave it in for now.
+## Note that we have matched one more plant here than is in our underlying plants 
+## dataset.  The reason for this is that the Village of Winnetka Plant (plant code
+## 972) did not report to the EIA form we use as its base (fuel consumption in EIA
+## 767), but, nonetheless, is separately regulated by name and is, in fact, a coal
+## plant.  We leave it in for now.
 plt_regs$plant_code[!plt_regs$plant_code %in% plants$plant_code]
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Capacity Data for Boilers/Plants --------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# BOILER/PLANT CAPACITIIES ----------------------------------------------------
 
 names(gens)
 
-# 5% of data is missing for nameplate mmbtu, 21% for each summer and winter capacity
+## For nameplate mmbtu, 5% of the data is missing, 21% for each summer and winter 
+## capacity
 sum(is.na(gens$nameplate_mmbtu))/nrow(gens)
 sum(is.na(gens$summer_cap_mmbtu))/nrow(gens)
 sum(is.na(gens$winter_cap_mmbtu))/nrow(gens)
 
-sum(is.na(gens$state))/nrow(gens) ## state is missing 20% of the time
-sum(is.na(gens$county))/nrow(gens) ## county is missing 32% of the time
-sum(is.na(gens$boiler_id))/nrow(gens) ## boiler ID is missing 58% of the time
-sum(is.na(gens$plant_code))/nrow(gens) ## plant code is always present
+sum(is.na(gens$state))/nrow(gens) ## State is missing 20% of the time
+sum(is.na(gens$county))/nrow(gens) ## County is missing 32% of the time
+sum(is.na(gens$boiler_id))/nrow(gens) ## Boiler ID is missing 58% of the time
+sum(is.na(gens$plant_code))/nrow(gens) ## Plant code is always present
 
 gen_by_boi <- gens %>%
   select(year, state, plant_code, boiler_id, 
          generator_id, nameplate = nameplate_mmbtu)
 
-## only uniquely identifies less than a third of obs
+## Uniquely identifies less than a third of obs
 #unique_id(gen_by_boi, year, plant_code, boiler_id)
 nrow(unique_id(gen_by_boi, year, plant_code, boiler_id))/nrow(gen_by_boi)
 
-## uniquely identifies 75% of data
+## Uniquely identifies 75% of data
 nrow(unique_id(gen_by_boi, year, plant_code, generator_id))/nrow(gen_by_boi)
 
-## uniquely identifies (some boilers must go to multiple generators and vice versa)
+## Uniquely identifies (some boilers must go to multiple generators and vice versa)
 unique_id(gen_by_boi, year, plant_code, boiler_id, generator_id)
 
-## very few obs are 0, so we are in good shape there
+## Very few obs are 0, so we are in good shape 
 sum(gen_by_boi$nameplate == 0, na.rm = TRUE)
 
-## about 5% of nameplate obs are NA, however, we would not expect the nameplate to
+## About 5% of nameplate obs are NA; however, we would not expect the nameplate to
 ## dramatically change from one year to another, so we may be able to work around this
 sum(is.na(gen_by_boi$nameplate))
 sum(is.na(gen_by_boi$nameplate))/nrow(gen_by_boi)
@@ -781,14 +757,14 @@ gen_by_boi <- gens %>%
          min_boi_nameplate = sum(nameplate, na.rm = TRUE)) %>%
   ungroup() 
 
-## the difference between max and min, is just that MAX recognizes it could be larger, but 
-## for the NA. This affects 10% of obs
+## The difference between max and min, is just that MAX recognizes it could be larger, 
+## but for the NA.  This affects 10% of obs.
 test <- gen_by_boi %>% mutate(diff = max_boi_nameplate - min_boi_nameplate)
 
-  hist(test$diff)
-  sum(test$diff == 0, na.rm = TRUE)/nrow(test)
-  sum(is.na(test$diff))/nrow(test)
-  sum(test$diff == 0, na.rm = TRUE) - sum(!is.na(test$diff))
+hist(test$diff)
+sum(test$diff == 0, na.rm = TRUE)/nrow(test)
+sum(is.na(test$diff))/nrow(test)
+sum(test$diff == 0, na.rm = TRUE) - sum(!is.na(test$diff))
 
 rm(test)
 
@@ -796,11 +772,11 @@ gen_by_plant <- gens %>%
   select(year, plant_code, generator_id, nameplate_mmbtu) %>%
   rename(nameplate = nameplate_mmbtu) %>% unique() 
 
-## we quickly check that this uniquely identifies (e.g. we don't randomly have
-## multiple of the same generator in a given year)
+## Check that this uniquely identifies (e.g. we don't randomly have multiple of 
+## the same generator in a given year)
 nrow(unique_id(gen_by_plant, year, plant_code, generator_id))
 
-## we sum by plant_code and year, to get the total capacity by plant
+## We sum by plant_code and year, to get the total capacity by plant
 gen_by_plant <- gen_by_plant %>% 
   group_by(year, plant_code) %>%
   summarise(plant_capacity = sum(nameplate),
@@ -809,14 +785,14 @@ gen_by_plant <- gen_by_plant %>%
 
 gen_summary <- left_join(gen_by_plant, gen_by_boi)
 
-## we are properly identified at the boiler/year level
+## We are properly identified at the boiler/year level
 nrow(unique_id(gen_summary, year, plant_code, boiler_id))
 
-## we check to see if the boiler nameplate is consistent over time
+## We check to see if the boiler nameplate is consistent over time
 test <- gen_by_boi %>% group_by(plant_code, boiler_id) %>%
   summarise(diff = max(min_boi_nameplate) - min(min_boi_nameplate))
 
-## we see there are a fair amount of changes over the course of this period
+## We see there are a fair amount of changes over the course of this period
 hist(test$diff)
 sum(test$diff == 0)/nrow(test)
 sum(test$diff <= 50)/nrow(test)
@@ -871,65 +847,61 @@ rm(gen_by_plant)
 #rm(gen_by_plant_pre1985)
 #rm(gen_summary_pre1985)
 
-## note, the NAs in utility code are from a random set of
-## descriptive notes that were carried into the dataset - no worries
+## NB: the NAs in utility code are from a random set of descriptive notes that were
+## carried into the dataset.
 gen_summary$plant_code <- as.numeric(gen_summary$plant_code)
 
 unique_id(gen_summary, year, plant_code, boiler_id)
 
 names(gen_summary)
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Combine above to get accurate merge!!! --------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Combine above to get accurate merge.
 linked <- unique(plt_regs$plant_code)
 unlinked <- unique(plants$plant_code)
 unlinked <- unlinked[!unlinked %in% linked]
 
-## all of our guys are linked up (again, this will change as we take into account
-## vintage and size and time period)
+## All boilers are linked up (again, this will change as we take into account
+## vintage and size and time period).
 length(linked)/(length(unlinked) + length(linked))
 
-## first, a tiny bit more cleaning on the regulations files
+## First, more cleaning on the regulations files.
 merge_regs <- plt_regs %>% 
   select(id, state, plant_code, boiler_id, generator_id, geo_type)
 
 table(merge_regs$geo_type)
 unique_id(merge_regs, plant_code, id)
 
-## 150 links (from targeted constraints) contain a boiler ID (these are individually regulated boilers)
+## Some 150 links (from targeted constraints) contain a boiler ID (these are 
+## individually regulated boilers).
 sum(!is.na(merge_regs$boiler_id))
 
-# get rid of boiler-specific regs, to be merged on later
+## Remove boiler-specific regs, to be merged on later.
 merge_b <- merge_regs %>% filter(!is.na(boiler_id))
 merge_p <- merge_regs %>% filter(is.na(boiler_id) & is.na(generator_id)) %>% select(-boiler_id)
 merge_g <- merge_regs %>% filter(!is.na(generator_id))
 
-## now, we are going to add in the other data (e.g. capacity
-## and inservice information) and then limit by capacity,
-## year, etc.
+## Now, we are going to add in the other data (e.g. capacity and inservice 
+## information) and then limit by capacity, year, etc.
 
-# plant ids are in regs because of the indiv. plants that are
-# regulated, but the plt_regs are tied to a reg ID so we can just
-# drop those vars to avoid any mess
+## Plant ids are in regs because of the indiv. plants that are regulated, but the 
+## plt_regs are tied to a reg ID so we can just drop those vars to avoid any mess.
 regs <- regs %>% select(-boiler_id, -plant_code)
 
-# first, let's get all the boiler data together BUT lets start with
-# the inservice dataset, since if we don't have an inservice year
-# it is kind of useless for our purposes
+## First, combine all boiler data but start with the inservice dataset, since if 
+## we don't have an inservice year.
 plt_data <- boilers %>% 
   select(plant_code, boiler_id, plt_state, inservice_y, inservice_m, plt_inservice_y, plt_inservice_m) %>%
   filter(!is.na(inservice_y) | !is.na(plt_inservice_y)) %>% 
   group_by(plant_code) %>%
-  ## there were some duplicate plt_inservice_m -- we keep earliest. There are also
-  ## some NA plt_inservice_m, which throws an error, but doesn't matter.
+  ## Duplicate plt_inservice_m exist -- keep earliest. There are also some NA 
+  ## plt_inservice_m, which throws an error, but doesn't matter.
   mutate(plt_inservice_m = min(plt_inservice_m, na.rm = TRUE),
          inservice_m = min(inservice_m, na.rm = TRUE)) %>%
   ungroup() %>% unique() %>%
   left_join(states) %>% mutate(join = 1)
 
-## if no non-NA plt_inservice_m, the above makes it -Inf
-## we replace with 6 - (middle of the year)
+## If no non-NA plt_inservice_m, the above makes it -Inf we replace with 6 - 
+## (middle of the year).
 plt_data$plt_inservice_m[is.na(plt_data$plt_inservice_m)] <- 6
 
 retirement <- boilers %>% 
@@ -938,29 +910,27 @@ retirement <- boilers %>%
 
 unique_id(retirement, plant_code, boiler_id)
 
-## if the calculated retirement year is 2018, we assume persists forward
+## If the calculated retirement year is 2018, we assume persists forward.
 retirement$calc_retirement_y[retirement$calc_retirement_y == 2018] <- 9999
 
 plt_data <- left_join(plt_data, retirement)
 
-## check for dups
+## Check for dups
 unique_id(plt_data, plant_code, boiler_id)
 
-## there's one plant where the state is NA in one year. We manually fix
+## There's one plant where the state is NA in one year -- manual fix
 plt_data <- plt_data[!(plt_data$plant_code == 8066 & plt_data$boiler_id == "BW73" & is.na(plt_data$plt_state)),]
 
-## check for dups
+## Check for dups
 unique_id(plt_data, plant_code, boiler_id)
 
-## we want to create a universe across all years, so we do that here
+## We want to create a universe across all years, so we do that here.
 years <- data.frame(year = c(1985:2018), join = 1)
 
-## we create skeleton dataset based on ALL plant info and all years
-## but we want to filter to only boilers that theoretically existed
-## in a given year
+## We create skeleton dataset based on ALL plant info and all years but we want 
+## to filter to only boilers that theoretically existed in a given year.
 
-## we triple check that, post-cleaning, each boiler has only one inservice year 
-## (it holds true - phew!)
+## We triple check, post-cleaning, each boiler has only one inservice year
 boilers %>% select(plant_code, boiler_id, inservice_y) %>% 
   unique() %>% group_by(plant_code, boiler_id) %>% 
   summarise(n = n()) %>% ungroup() %>% group_by(n) %>% summarise(num = n())
@@ -973,18 +943,18 @@ plt_data <- left_join(plt_data, gen_summary) %>%
             %>% unique())
 
 unique_id(plt_data, state, plant_code, boiler_id, year)
-nrow(plt_data) ## from 1985 to 2018, we have 43,340 obs
+nrow(plt_data) ## From 1985 to 2018, we have 43,340 obs
 
-# now we join on the regs, and then we'll have to filter (since
-# based purely on geography, plants will match to multiple regs)
+## Now, we join on the regs and then filter (based purely on geography, plants 
+## will match to multiple regs)
 plts <- left_join(plt_data, merge_p) %>%
   left_join(regs) %>% filter(!is.na(id))
 
 table(plts$geo_type)
 unique_id(plts, plant_code, year, boiler_id, id)
 
-## our boilers in the merge_b daset are doubles but they're string in plt_data. We replace
-## the merge_b boilers with strings that match those in plt_data
+## Our boilers in the merge_b daset are doubles but they're string in plt_data. 
+## We replace the merge_b boilers with strings that match those in plt_data.
 merge_b$boiler_id[merge_b$boiler_id == "1"] <- "01"
 merge_b$boiler_id[merge_b$boiler_id == "2"] <- "02"
 merge_b$boiler_id[merge_b$boiler_id == "3"] <- "03"
@@ -1000,7 +970,7 @@ bois <- left_join(plt_data, merge_b) %>%
 
 unique_id(bois, plant_code, year, boiler_id, id)
 
-## now we do the same for our (very few) generator regulations
+## Now, we do the same for our (very few) generator regulations.
 genregs <- gens %>% select(plant_code, boiler_id, generator_id) %>% unique() %>%
   left_join(merge_g %>% select(-boiler_id)) %>% filter(!is.na(id)) %>% filter(!is.na(boiler_id)) %>%
   select(-generator_id)
@@ -1008,8 +978,8 @@ genregs <- gens %>% select(plant_code, boiler_id, generator_id) %>% unique() %>%
 geo_regs <- bind_rows(plts, bois) %>% bind_rows(genregs)
 table(geo_regs$geo_type)
 
-## we add in the primary_fuel data, because some states base their regs on fuel type
-## we note, again, that our sample is all boilers that used coal in a given year over
+## We add in the primary_fuel data, because some states base their regs on fuel type.
+## We note, again, that our sample is all boilers that used coal in a given year over
 ## our time period. It is possible some boilers used coal for only a short period, or
 ## primarily used a different fuel.
 geo_regs <- left_join(geo_regs, 
@@ -1018,41 +988,39 @@ geo_regs <- left_join(geo_regs,
                              primary_fuel4, primary_fuel5, primary_fuel6, primary_fuel7,
                              primary_fuel8))
 
-## we check that this worked
+## We check that this worked
 table(boilers$primary_fuel1)
 
 ## 93% of boiler/year/reg obs have a primary fuel of coal
 nrow(boilers %>% filter(primary_fuel1 %in% c("ANT", "BIT", "LIG", "SUB", "SGC", "RC", "WC", "COL")))/nrow(boilers)
 
-## another 1% have a secondary fuel of coal
+## Another 1% have a secondary fuel of coal
 nrow(boilers %>% filter(primary_fuel2 %in% c("ANT", "BIT", "LIG", "SUB", "SGC", "RC", "WC", "COL") & 
        !primary_fuel1 %in% c("ANT", "BIT", "LIG", "SUB", "SGC", "RC", "WC", "COL")))/nrow(boilers)
 
-# note that we require reg ID for identification - plants are mapped
-# to multiple possible regs
+## Note that we require reg ID for identification - plants are mapped to multiple 
+## possible regs.
 #unique_id(geo_regs, state, utility_code, plant_code, boiler_id, year, id)
 
-## -----------------------------------------------------------------------
-## cleaning interlude
-## -----------------------------------------------------------------------
-
-## we have to clean up the SO2 limits variables - certain states calculate the variable based
-## on the heat capacity of the boiler or plant, or by the stack flue.
+## Cleaning -------------------------------------------------------------------
+## We have to clean up the SO2 limits variables - certain states calculate the variable 
+## based on the heat capacity of the boiler or plant, or by the stack flue.
 
 geo_regs$std_other[is.na(geo_regs$std_other)] <- "none"
 
 geo_regs <- geo_regs %>%
-  mutate(calc_std_so2 = ifelse(std_other == "17Q^(-0.33) lbs of SO2/mmBTU", 17*(plant_capacity^(-0.33)), std_so2_lbs_mmbtu)) %>%
-  mutate(calc_std_so2 = ifelse(std_other == "13.8781*(HR)^(-0.4434)", 13.8781*(plant_capacity^(-0.4434)), calc_std_so2)) %>%
-  mutate(calc_std_so2 = ifelse(std_other == "1.7Q^(-0.14) lbs SO2/mmBTU", 1.7 * (min_boi_nameplate^(-0.14)), calc_std_so2)) %>%
-  mutate(calc_std_so2 = ifelse(std_other == "5.1Q^(-0.14) lbs SO2/mmBTU", 5.1 * (min_boi_nameplate^(-0.14)), calc_std_so2))
+  mutate(calc_std_so2 = ifelse(std_other=="17Q^(-0.33) lbs of SO2/mmBTU", 17*(plant_capacity^(-0.33)), std_so2_lbs_mmbtu)) %>%
+  mutate(calc_std_so2 = ifelse(std_other=="13.8781*(HR)^(-0.4434)", 13.8781*(plant_capacity^(-0.4434)), calc_std_so2)) %>%
+  mutate(calc_std_so2 = ifelse(std_other=="1.7Q^(-0.14) lbs SO2/mmBTU", 1.7 * (min_boi_nameplate^(-0.14)), calc_std_so2)) %>%
+  mutate(calc_std_so2 = ifelse(std_other=="5.1Q^(-0.14) lbs SO2/mmBTU", 5.1 * (min_boi_nameplate^(-0.14)), calc_std_so2))
 
-## we have to manage Illinois separately on account of needing to add in stack/flue information:
+## We have to manage Illinois separately on account of needing to add in stack/flue 
+## information.
 stacks <- read.csv("use_data/stackflues_1985-2018.csv") %>% select(-X)
 names(stacks)
 
-## we note the state data in here is not reliable, so we will drop it and fill it
-## in from elsewhere
+## We note the state data in here is not reliable, so we will drop it and fill it
+## in from elsewhere.
 table(stacks$state)
 sum(is.na(stacks$state))
 
@@ -1068,11 +1036,11 @@ test <- stacks %>%
   mutate(stack = ifelse(!is.na(stack_height), 1, 0), 
          flue = ifelse(!is.na(flue_height), 1, 0))
 
-## we see stack picks up where flue leaves off
+## We see stack picks up where flue leaves off.
 table(test$stack, test$year)
 table(test$flue, test$year)
 
-## histograms of the two vars are also incredibly similar
+## Histograms of the two vars are also incredibly similar.
 hist(as.numeric(test$stack_height))
 hist(as.numeric(test$flue_height))
 
@@ -1082,27 +1050,27 @@ stacks <- stacks %>%
 test <- stacks %>% 
   mutate(stack = ifelse(!is.na(height), 1, 0))
 
-## we see stack picks up where flue leaves off
+## We see stack picks up where flue leaves off.
 table(test$stack, test$year)
 
-## for Illinois, we need:
-##      average actual height of stack
-##      effective height of stack, which we calculate using the weighted average
-##      of the following:
-##          -- diameter of stack
-##          -- exit temp stack gases (in Rankine or Kelvin)
-##          -- exit velocity (feet/sec or meters/sec)
-##          -- % total emissions expressed as equivalents emitted from each source
-##          -- actual stack height
-##          -- heat emission rate in btu/sec or kcal/sec
+## For Illinois, we need:
+##    average actual height of stack
+##    effective height of stack, which we calculate using the weighted average
+##    of the following:
+##      - diameter of stack
+##      - exit temp stack gases (in Rankine or Kelvin)
+##      - exit velocity (feet/sec or meters/sec)
+##      - % total emissions expressed as equivalents emitted from each source
+##      - actual stack height
+##      - heat emission rate in btu/sec or kcal/sec
 
 nrow(unique_id(stacks, plant_code, year, stack_id))
 
-## we see that multiple boilers serve the same stack, which is
-## causing duplicate observations. So we start by removing boiler id
+## We see that multiple boilers serve the same stack, which is causing duplicate 
+## observations.  So, we start by removing boiler id.
 stacks <- stacks %>% select(-boiler_id) %>% unique()
 
-## we also notice that from years 2013 onward, we have one ID ("stackflue ID")
+## We also notice that from years 2013 onward, we have one ID ("stackflue ID")
 ## rather than a separate stack and separate flue ID.
 test <- stacks %>% mutate(sf_id = ifelse(!is.na(stackflue_id), 1, 0),
                           s_id = ifelse(!is.na(stack_id), 1, 0))
@@ -1149,17 +1117,16 @@ stacksbyplant <- stacks %>%
   select(plant_code, year, twt_diam, twt_height, twt_exit_temp_100per, twt_exit_velocity_100per) %>%
   unique()
 
-## we have to convert the temp into Rankine, which is the absolute scale for Fahrenheit
+## We have to convert the temp into Rankine, which is the absolute scale for Fahrenheit
 ## and is equivalent to T_f + 459.67.
 stacksbyplant <- stacksbyplant %>%
   mutate(twt_exit_temp_100per = twt_exit_temp_100per + 459.67)
 
-## now we can calculate Q_h, as defined by Illinois. Qh = 7.54 * D^2 * v (T-515)/%
-
+## Now, we can calculate Q_h, as defined by Illinois. Qh = 7.54 * D^2 * v (T-515)/%
 stacksbyplant <- stacksbyplant %>%
   mutate(qh = 7.54 * ((twt_diam^2)/twt_exit_velocity_100per) * (twt_exit_temp_100per-515)/twt_exit_temp_100per)
 
-## the "height effective" calculation used by Illinois varies for Qh > and < 6000 btu/sec
+## The "height effective" calculation used by Illinois varies for Qh > and < 6000 btu/sec
 stacksbyplant <- stacksbyplant %>%
   mutate(qh_6000 = ifelse(qh >= 6000, 1, 0)) %>%
   mutate(delta_height = ifelse(qh_6000 == 1, 2.58 * (qh^0.6)/(twt_height^0.11), 0.718*(qh^0.75)/(twt_height & 0.11))) %>%
@@ -1174,13 +1141,11 @@ geo_regs <- left_join(geo_regs, ill_merge) %>%
   mutate(calc_plant_std_lbs_so2_hr = ifelse(std_other == "(avg stack height)^(0.11) * (effective height effluent release)^2", calc_plant_std_lbs_so2_hr, std_lbs_so2_hr))
 nrow(geo_regs)
 
-## we want to keep if:
+## We want to keep if:
 ##      cutoff is "all" OR 
 ##      pre/post = "pre" and year_cutoff > plt_inservice_y
 ##      pre/post = "post" and year_cutoff < plt_inservice_y
-##   cutoff being non-numeric could make a mess. I make
-##   a separate column
-
+## Cutoff being non-numeric could make a mess - make a separate column.
 geo_regs$pre_post[geo_regs$pre_post == "11/01/1967"] <- "1967"
 geo_regs$pre_post[geo_regs$pre_post == "12/31/1976"] <- "1976"
 #geo_regs$pre_post[geo_regs$pre_post == "4/1/1972"] <- "1972"
@@ -1210,8 +1175,9 @@ geotime_regs <- geotime_regs %>%
                                 ifelse((inservice_y == year_cutoff) & (inservice_m <= month_cutoff), 1, 0))) %>%
   mutate(in_range = ifelse(after_start_range == 1 & before_cutoff == 1, 1, 0))
 
-## New Mexico has one set of regulations that considers not only the age of the boiler, but also the age of the rest
-## of the plant. (If a boiler is part of a plant containing pieces from between 1976 and 1982 as well as from before 1976,
+## New Mexico has one set of regulations that considers not only the age of the 
+## boiler, but also the age of the rest  of the plant. (If a boiler is part of a 
+## plant containing pieces from between 1976 and 1982 as well as from before 1976,
 ## it is subject to a 0.55 lbs/mmbtu standard).
 nm_sub <- geotime_regs %>%
   filter(state == "New Mexico") %>%
@@ -1219,13 +1185,14 @@ nm_sub <- geotime_regs %>%
   group_by(plant_code, year) %>%
   mutate(between1976_1982 = max(between1976_1982)) %>%
   ungroup() %>%
-  mutate(newandexistingreg = ifelse(plt_inservice_y <= 1972 & between1976_1982 == 1 & 
-                                   other_limits == "if plant includes equipment from before 1972 and between 1976 to 1982", 1, 0))
+  mutate(newandexistingreg = 
+           ifelse(plt_inservice_y <= 1972 & between1976_1982 == 1 
+                  & other_limits == "if plant includes equipment from before 1972 and between 1976 to 1982", 1, 0))
 
-## there are no plants in our sample to which this New Mexico reg applies
+## There are no plants in our sample to which this New Mexico reg applies.
 table(nm_sub$newandexistingreg)
 
-## we drop this reg from our dataset
+## We drop this reg from our dataset.
 nm_sub <- nm_sub %>%
   filter(other_limits != "if plant includes equipment from before 1972 and between 1976 to 1982") %>%
   select(-newandexistingreg, -between1976_1982)
@@ -1249,7 +1216,7 @@ geotime_regs <- geotime_regs %>%
 # 
 # geotime_regs <- bind_rows(geotime_regs, new_mexico_middle) %>% bind_rows(wisconsin_mid)
 
-## now we filter by capacity
+## Now, we filter by capacity.
 geotimecap <- geotime_regs %>%
   mutate(plant = ifelse(cap_level == "Plant", 1, 0),
          boiler = ifelse(cap_level == "Boiler", 1, 0)) %>%
@@ -1257,8 +1224,7 @@ geotimecap <- geotime_regs %>%
          boil_min = ifelse(boiler == 1 & min_cap <= max_boi_nameplate & max_cap >= max_boi_nameplate, 1, 0)) %>%
   mutate(plantcap250 = ifelse(plant_capacity >= 250, 1, 0))
 
-# there are only 130 edge cases out of 7802 obs. Sylwia - do you prefer we use
-# the max or min?
+## There are only 130 edge cases out of 7802 obs.
 sum(geotimecap$boil_max == 1, na.rm = TRUE)
 sum(geotimecap$boil_min == 1, na.rm = TRUE)
 sum(geotimecap$boil_max == 1 & geotimecap$boil_min == 1, na.rm = TRUE)
@@ -1268,19 +1234,19 @@ geotimecap <- geotimecap %>%
            (plant == 1 & plant_capacity >= min_cap & plant_capacity <= max_cap) |
            (min_cap == 0 & max_cap == 9999999))
 
-## Minnesota considers both plant heat and boiler heat, depending, so we separate it out
+## Minnesota considers both plant heat and boiler heat, depending, so we separate it out.
 minnesota <- geotimecap %>%
   filter((other_limits != "total heat input location >250mmBTU" &
            boil_min == 1 & plant_capacity > 250) |
            (other_limits == "total heat input at location <= 250mmBTU" &
             boil_min == 1 &  plant_capacity <= 250))
 
-# michigan (alone) uses steam instead of mmbtu, so we treat it separately
+## Michigan (alone) uses steam instead of mmbtu, so we treat it separately.
 michigan <- geotime_regs %>% 
   filter(min_cap_any_unit == "500k lbs steam" & plant_steam_flow > 500 |
          max_cap_any_unit == "500k lbs steam" & plant_steam_flow <= 500)
 
-## nj has requirements based on fuel:
+## New Jersey has requirements based on fuel.
 nj <- geotime_regs %>%
   filter(primary_fuel1 == "ANT" & other_limits == "anthracite coal" |
            primary_fuel1 == "BIT" & other_limits == "bituminous coal" |
@@ -1295,44 +1261,47 @@ geotimecap <- geotimecap %>%
   filter(!other_limits %in% c("anthracite coal", "bituminous coal", "not anthracite")) %>%
   bind_rows(nj)
 
-## we sometimes have multiple regs assigned because we have failed to consider
+## We sometimes have multiple regs assigned because we have failed to consider
 ## other features. For example, in New Mexico, plants are regulated more stringently
 ## if they contain pieces from both 1972 to 1983 and post 1983 (as opposed to only
-## pieces from before 1983). There is also a regulation in Florida affecting Hillsborough
-## County for which we were unable to isolate the year end date, however, the two plants in our
-## dataset in Hillsborough County are separately regulated, so we can filter out that regulation.
+## pieces from before 1983). There is also a regulation in Florida affecting 
+## Hillsborough County for which we were unable to isolate the year end date, however, 
+## the two plants in our dataset in Hillsborough County are separately regulated, 
+## so we can filter out that regulation.
 geotimecap <- geotimecap %>% 
   mutate(drop_hillsborough = ifelse(plt_county == "Hillsborough" & state == "Florida" & std_so2_lbs_mmbtu == 1.5, 1, 0)) %>%
   filter(drop_hillsborough != 1) %>%
   select(-drop_hillsborough)
 
-## in New Jersey, boilers over 200mmBTU and plants over 400 mmBTU are subject to a 1.5 lbs/mmBTU standard,
-## but there are, of course, boilers over 200mmBTU that serve plants over 400mmBTU. We filter out the
-## extra regulation match, as it doesn't matter.
+## In New Jersey, boilers over 200mmBTU and plants over 400 mmBTU are subject to a 
+## 1.5 lbs/mmBTU standard, but there are, of course, boilers over 200mmBTU that 
+## serve plants over 400mmBTU. We filter out the extra regulation match, as it 
+## doesn't matter.
 geotimecap <- geotimecap %>%
   mutate(drop_nj = ifelse(state == "New Jersey" & min_cap == 200 & plant_capacity >= 400, 1, 0)) %>%
   filter(drop_nj != 1) %>%
   select(-drop_nj)
 
-## Massachusetts has a separate standard for PLANTS that emitted over 500 tons each of SO2 and NOx
-## in either 1997, 1998, or 1999 and also contains a boiler that:
-##        -- was built before 1977, 
-##        -- is over 100MW capacity
-##        -- and is regulated by the Federal Acid Rain Program.
+## Massachusetts has a separate standard for PLANTS that emitted over 500 tons each 
+## of SO2 and NOx in either 1997, 1998, or 1999 and also contains a boiler that:
+##    - was built before 1977, 
+##    - is over 100MW capacity
+##    - and is regulated by the Federal Acid Rain Program.
 ## 1606 has a boiler built before 1977 that is above 100MW (341 MMBTU) (Boiler 01)
 ## 1613 also has a boiler built before 1977 that is equal to 100MW (341 MMBTU) (Boiler 08)
 ## 1619 has three boilers, built befoer 1977, that are big enough (01, 02, and 03)
 ## 1626 has a boiler that is built before 1977 and large enough (Boiler 03)
-## All four plants are listed as Phase II plants at 40 CFR 73.10(b)
-## We still need, however, to know who emitted at least 500 tons of SO2 and NOx.
+## All four plants are listed as Phase II plants at 40 CFR 73.10(b).  We still need, 
+## however, to know who emitted at least 500 tons of SO2 and NOx.
 ## In the 1997 EPA Acid Rain Program compliance guide, EPA lists tpy for SO2 and NOx
 ## for all four facilities as greater than 500. Therefore, each of these four facilities
 ## (and all boilers at the facility) are regulated undert his reg.
 
-## we see these Massachusetts plants are the only ones that are not yet assigned exclusively to one regulation.
-## except for a problem in North Carolina, post 2009 - this is because there is a utility-level cap on
-## emissions. I think we have to drop these observations after we have included the
-## plants/boilers not being regulated by the state.
+## We see these Massachusetts plants are the only ones that are not yet assigned 
+## exclusively to one regulation.
+## Except for a problem in North Carolina, post 2009 - this is because there is a 
+## utility-level cap on emissions. We drop these observations after we have included 
+## the plants/boilers not being regulated by the state.
 #View(unique_id(geotimecap, plant_code, year, boiler_id))
 test <- unique_id(geotimecap, plant_code, boiler_id, year)
 nrow(test)
@@ -1367,9 +1336,9 @@ unreg <- plt_data %>% mutate(plant_year = paste(plant_code, boiler_id, year)) %>
   filter(!plant_year %in% geotimecap$plant_year) %>%
   mutate(linked_state_reg = "NO")
 
-## we bind these two sets together and then filter out certain plants in North Carolina post 2009 
-## because the regulation is a utility-wide
-## cap, and there is not a way to show that in our dataset
+## We bind these two sets together and then filter out certain plants in North Carolina 
+## post 2009, because the regulation is a utility-wide cap, and there is not a way 
+## to show that in our dataset.
 geotimecap <- bind_rows(geotimecap, unreg) %>%
   filter(!(state == "North Carolina" & year >= 2009 & pre_post == "all"))
 
@@ -1396,7 +1365,7 @@ nrow(unique_id(geotimecap, plant_code, boiler_id, year))
 
 geotimecap_org <- geotimecap %>% bind_rows(specific)
 
-## if a boiler is linked to a targeted reg and a general reg, we keep the targeted reg
+## If a boiler is linked to a targeted and a general reg, we keep the targeted reg.
 geotimecap_org <- geotimecap_org %>%
   group_by(plant_code, boiler_id, year) %>%
   mutate(n = n()) %>% ungroup() %>%
@@ -1414,12 +1383,9 @@ nrow(test)
 #table(test$state)
 remove(test)
 
+## Regulatory benefit of grandfathering ---------------------------------------
 
-# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# # -- Regulatory Benefit of Grandfathering ----------
-# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-## we want to keep if:
+## We want to keep if:
 ##      cutoff is "all" OR 
 ##      pre/post = "pre" and year_cutoff > plt_inservice_y
 ##      pre/post = "post" and year_cutoff < plt_inservice_y
@@ -1437,8 +1403,9 @@ geotime_regs <- geo_regs %>%
                                 ifelse((inservice_y == year_cutoff) & (inservice_m <= month_cutoff), 1, 0))) %>%
   mutate(in_range = ifelse(after_start_range == 1 & before_cutoff == 1, 1, 0))
 
-## New Mexico has one set of regulations that considers not only the age of the boiler, but also the age of the rest
-## of the plant. (If a boiler is part of a plant containing pieces from between 1976 and 1982 as well as from before 1976,
+## New Mexico has one set of regulations that considers not only the age of the 
+## boiler, but also the age of the rest of the plant. (If a boiler is part of a 
+## plant containing pieces from between 1976 and 1982 as well as from before 1976,
 ## it is subject to a 0.55 lbs/mmbtu standard).
 nm_sub <- geotime_regs %>%
   filter(state == "New Mexico") %>%
@@ -1446,13 +1413,14 @@ nm_sub <- geotime_regs %>%
   group_by(plant_code, year) %>%
   mutate(between1976_1982 = max(between1976_1982)) %>%
   ungroup() %>%
-  mutate(newandexistingreg = ifelse(plt_inservice_y <= 1972 & between1976_1982 == 1 & 
-                                      other_limits == "if plant includes equipment from before 1972 and between 1976 to 1982", 1, 0))
+  mutate(newandexistingreg = 
+           ifelse(plt_inservice_y <= 1972 & between1976_1982 == 1 
+                  & other_limits == "if plant includes equipment from before 1972 and between 1976 to 1982", 1, 0))
 
-## there are no plants in our sample to which this New Mexico reg applies
+## There are no plants in our sample to which this New Mexico reg applies.
 table(nm_sub$newandexistingreg)
 
-## we drop this reg from our dataset
+## We drop this reg from our dataset.
 nm_sub <- nm_sub %>%
   filter(other_limits != "if plant includes equipment from before 1972 and between 1976 to 1982") %>%
   select(-newandexistingreg, -between1976_1982)
@@ -1471,8 +1439,7 @@ geotimecap <- geotime_regs %>%
          boil_min = ifelse(boiler == 1 & min_cap <= max_boi_nameplate & max_cap >= max_boi_nameplate, 1, 0)) %>%
   mutate(plantcap250 = ifelse(plant_capacity >= 250, 1, 0))
 
-# there are only 92 edge cases out of 5998 obs. Sylwia - do you prefer we use
-# the max or min?
+## There are only 92 edge cases out of 5998 obs.
 sum(geotimecap$boil_max == 1, na.rm = TRUE)
 sum(geotimecap$boil_min == 1, na.rm = TRUE)
 sum(geotimecap$boil_max == 1 & geotimecap$boil_min == 1, na.rm = TRUE)
@@ -1482,19 +1449,19 @@ geotimecap <- geotimecap %>%
            (plant == 1 & plant_capacity >= min_cap & plant_capacity <= max_cap) |
            (min_cap == 0 & max_cap == 9999999))
 
-## Minnesota considers both plant heat and boiler heat, depending, so we separate it out
+## Minnesota considers both plant heat and boiler heat, depending, so we separate it out.
 minnesota <- geotimecap %>%
   filter((other_limits != "total heat input location >250mmBTU" &
             boil_min == 1 & plant_capacity > 250) |
            (other_limits == "total heat input at location <= 250mmBTU" &
               boil_min == 1 &  plant_capacity <= 250))
 
-# michigan (alone) uses steam instead of mmbtu, so we treat it separately
+## Michigan (alone) uses steam instead of mmbtu, so we treat it separately.
 michigan <- geotime_regs %>% 
   filter(min_cap_any_unit == "500k lbs steam" & plant_steam_flow > 500 |
            max_cap_any_unit == "500k lbs steam" & plant_steam_flow <= 500)
 
-## nj has requirements based on fuel:
+## New Jersey has requirements based on fuel.
 nj <- geotime_regs %>%
   filter(primary_fuel1 == "ANT" & other_limits == "anthracite coal" |
            primary_fuel1 == "BIT" & other_limits == "bituminous coal" |
@@ -1509,36 +1476,41 @@ geotimecap <- geotimecap %>%
   filter(!other_limits %in% c("anthracite coal", "bituminous coal", "not anthracite")) %>%
   bind_rows(nj)
 
-## we sometimes have multiple regs assigned because we have failed to consider
-## other features. For example, in Florida, in Hillsborough
-## County, we were unable to isolate the year end date for a particular regulation, however, the two plants in our
-## dataset in Hillsborough County are regulated by name, so we can filter out that other regulation.
+## We sometimes have multiple regs assigned because we have failed to consider other
+## features. For example, in Florida, in Hillsborough County, we were unable to 
+## isolate the year end date for a particular regulation, however, the two plants 
+## in our dataset in Hillsborough County are regulated by name, so we can filter 
+## out that other regulation.
 geotimecap <- geotimecap %>% 
   mutate(drop_hillsborough = ifelse(plt_county == "Hillsborough" & state == "Florida" & std_so2_lbs_mmbtu == 1.5, 1, 0)) %>%
   filter(drop_hillsborough != 1) %>%
   select(-drop_hillsborough)
 
-## in New Jersey, boilers over 200mmBTU and plants over 400 mmBTU are subject to a 1.5 lbs/mmBTU standard,
-## but there are, of course, boilers over 200mmBTU that serve plants over 400mmBTU. We filter out the
-## extra regulation match for boilers over 200mmbtu serving plants over 400mmbtu.
+## In New Jersey, boilers over 200mmBTU and plants over 400 mmBTU are subject to 
+## a 1.5 lbs/mmBTU standard, but there are, of course, boilers over 200 mmBTU that 
+## serve plants over 400mmBTU. We filter out the extra regulation match for boilers 
+## over 200 mmbtu serving plants over 400 mmbtu.
 geotimecap <- geotimecap %>%
   mutate(drop_nj = ifelse(state == "New Jersey" & min_cap == 200 & plant_capacity >= 400, 1, 0)) %>%
   filter(drop_nj != 1) %>%
   select(-drop_nj)
 
-## Massachusetts has a separate standard for plants that emitted over emits over 500 tons SO2 in 1997, 1998, or 1999
-## built before 1977, over 100MW capacity, and regulated by the Federal Acid Rain Program. This regulation
-## no longer poses a problem for us when considering new plants, because the regulation requires the source
-## to have been constructed before 1977, which will never be the case for our "dummy" new plants/boilers.
+## Massachusetts has a separate standard for plants that emitted over emits over 
+## 500 tons SO2 in 1997, 1998, or 1999 built before 1977, over 100MW capacity, and
+## regulated by the Federal Acid Rain Program. This regulation no longer poses a 
+## problem for us when considering new plants, because the regulation requires the 
+## source to have been constructed before 1977, which will never be the case for 
+## our "dummy" new plants/boilers.
 
-## for plants in New Mexico built between 1976 and 1982, there is a separate standard
-## if any of the plant is from before 1972. We had to look at this manually before,
+## For plants in New Mexico built between 1976 and 1982, there is a separate standard
+## if any of the plants are from before 1972. We had to look at this manually before,
 ## but for a hypothetical new plant/boiler, in 1982 (for example) this regulation is not
 ## in place, and in 1983 and later, we would be assuming nothing pre-existed.
 
-## we see there is an issue with the linkage in certain North Carolina plants. This is because North Carolina has
-## created a utility-wide cap after 2010. We will drop those observations after we have linked up to the
-## unregulated plants, having no good way to identify the actual regulation on a given plant/boiler.
+## We see there is an issue with the linkage in certain North Carolina plants. This 
+## is because North Carolina has created a utility-wide cap after 2010. We will 
+## drop those observations after we have linked up to the unregulated plants, having 
+## no good way to identify the actual regulation on a given plant/boiler.
 #View(unique_id(geotimecap, plant_code, year, boiler_id))
 test <- unique_id(geotimecap, plant_code, boiler_id, year)
 nrow(test)
@@ -1560,12 +1532,12 @@ length(unique(geotimecap$plant_code))
 ## 1446 unique boilers
 length(unique(paste(geotimecap$plant_code, geotimecap$boiler_id)))
 
-## we drop certain plants in North Carolina post 2009 because the regulation is a utility-wide
-## cap, and there is not a way to show that in our dataset
+## We drop certain plants in North Carolina post 2009 because the regulation is 
+## a utility-wide cap, and there is not a way to show that in our dataset.
 geotimecap <- geotimecap %>%
   filter(!(state == "North Carolina" & year >= 2009 & pre_post == "all"))
 
-## now we can see that we have no issues
+## Now, we can see that we have no issues.
 test <- unique_id(geotimecap, plant_code, boiler_id, year)
 nrow(test)
 #table(test$state) ## throws an error because there are no values in "test"
@@ -1582,10 +1554,10 @@ geotimecap <- geotimecap %>%
 nrow(unique_id(geotimecap, plant_code, boiler_id, year, reg_id))
 nrow(unique_id(geotimecap, plant_code, boiler_id, year))
 
-## we add our targeted regulations back in
+## We re-add our targeted regulations.
 new_stds <- geotimecap %>% bind_rows(specific)
 
-## if a boiler is linked to a targeted reg and a general reg, we keep the targeted reg
+## If a boiler is linked to a targeted and a general reg, we keep the targeted reg.
 new_stds <- new_stds %>%
   group_by(plant_code, boiler_id, year) %>%
   mutate(n = n()) %>% ungroup() %>%
@@ -1624,9 +1596,7 @@ new_stds <- new_stds %>%
 unique_id(new_stds, plant_code, boiler_id, year)
 unique_id(geotimecap_org, plant_code, boiler_id, year)
 
-# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# # -- Merge and save file! ---------------------------
-# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Merge ----------------------------------------------------------------------
 
 geotimecap <- left_join(geotimecap_org, new_stds) %>%
   select(-year_std_end, -year_std_start, -month_cutoff, -indiana_county, -after_start_range,
@@ -1634,10 +1604,8 @@ geotimecap <- left_join(geotimecap_org, new_stds) %>%
 
 write.csv(geotimecap, "use_data/merged_regs_and_plants.csv")
 
-# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# # -- Modifications ---------------------------------
-# # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 
+## Modifications --------------------------------------------------------------
+ 
 # boilers <- read.csv("use_data/boilers_1985-2018.csv", stringsAsFactors = FALSE)
 # names(boilers)
 # 
@@ -1661,4 +1629,7 @@ write.csv(geotimecap, "use_data/merged_regs_and_plants.csv")
 # nsr <- boilers %>% select(year, utility_code, plant_code, boiler_id,
 #                           type_of_boiler, nsr_d, nsr_permit_y, nsr_permit_num)
 # View(nsr)
-# 
+
+
+### END CODE ###
+

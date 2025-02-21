@@ -1,67 +1,64 @@
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-# Create universe from 1970-present                 #
-# Author: Bridget Pals                              #
-# Date: 2/1/2019 edited 12/30/2023                  #
-# Purpose: Combine EIA-767, EIA-923, and EIA-869 to #
-# get location, heat rate, nameplate, and scrubber  #
-# information about coal plants.                    #
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Grandfathering
+## 04_fuel_and_fuel_comp_1970_2018
+## Bridget Pals
+## 30 December 2023
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-# libraries needed
-library(dplyr)    # basic data cleaning
-library(readxl)   # read in excel files
-#library(zoo)      # to fill in NAs for county/state
 
-#setwd("~/Documents/research/research_revesz")
+# INTRODUCTION ------------------------------------------------------------------------------------
+## This script merges EIA forms 767, 923, and 869 to get coal plant location, heat rate, nameplate,
+## and scrubber information.
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Functions -------------------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# credit to: devtools::install.github("edwinth/thatssorandom")
-## function to identify whether a group of variables create
-## a unique id
-unique_id <- function(x, ...) {
-  id_set <- x %>% select(...)
-  id_set_dist <- id_set %>% distinct
-  if (nrow(id_set) == nrow(id_set_dist)) {
-    TRUE
-  } else {
-    non_unique_ids <- id_set %>% 
-      filter(id_set %>% duplicated()) %>% 
-      distinct()
-    suppressMessages(
-      inner_join(non_unique_ids, x) %>% arrange(...)
-    )
-  }
-}
+### START CODE ###
 
-mysum <- function(x) (sum(as.numeric(x), na.rm = TRUE))
 
-mymean <- function(x) (mean(as.numeric(x), na.rm = TRUE))
+# PREAMBLE ----------------------------------------------------------------------------------------
 
+## Initiate
+## ... Packages
+pkgs <- c(
+  "fs","here",                    # File system
+  "readxl",                       # Data reading
+  "dplyr","tidyr","stringr"       # Data wrangling
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
+
+## ... Functions
+source(here::here("src/boilers.R"))
+
+## ... Definitions
 months <- c("january", "february", "march", "april", "may", "june", "july", "august",
             "september", "october", "november", "december")
-
 shortmonths <- c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
-
 monthnum <- c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12")
-
 coal <- c("COL", "BIT", "LIG", "SUB", "ANT", "RC", "WC")
+
+
+# COAL 1970-2000 ----------------------------------------------------------------------------------
 
 coal_full <- data.frame()
 
-files <- c(paste0(1971:1995,"u"), paste0(1996:2000, "mu"))
-
-for (i in files) {
+for (i in c(1971:2000)) {
   
   print("***********************************************")
   print(paste("--------------------", i, "--------------------"))
   print("***********************************************")
   
-  # https://www.eia.gov/electricity/data/eia923/F759layout_um.txt
+  zip_file <- here::here("data/eia/f923", paste0("f759_", i, ".zip"))
+  l.zip <- zip::zip_list(zip_file) %>%
+    dplyr::pull(filename) %>%
+    as.list()
+  zip::unzip(zip_file, exdir=fs::path_dir(zip_file))
   
-  allplts <- read_excel(paste0("orig_data/eia_923/f759",i,".xls"), col_types = "text")
+  allplts <- read_excel(here::here("data/eia/f923", unlist(l.zip)), col_types = "text")
+
+  l.zip %>%
+    purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
+    fs::file_delete()
   
   names(allplts)  
   print("# Plants by FUELDESC")
@@ -71,9 +68,9 @@ for (i in files) {
   print(table(allplts$EFFDATE))
   print(table(allplts$YEAR))
     
-  ## until 1995, essentially no plants are missing FUELDESC. Starting in
-  ## 1996, hunderds are missing each year. We will check number of unique
-  ## plants, by year, to see the extent to which this is impacting our universe
+  ## Until 1995, essentially no plants are missing FUELDESC. Starting in
+  ## 1996, hundreds are missing each year. We check number of unique
+  ## plants, by year, to see the extent to which this is impacting our sample.
   print(paste("# Plants missing FUELDESC - ", sum(is.na(allplts$FUELDESC))))
   
   # print(table(allplts$FUELNM))
@@ -82,18 +79,17 @@ for (i in files) {
   # print(table(allplts$FUELTYP))
   # print(paste("# PLANTS missing FUELTYP - ", sum(is.na(allplts$FUELTYP))))
   
-  # limit only to plants with a coal fueltype
+  ## Limit to plants with a coal fueltype
   coal_sub <- allplts %>%
     filter(FUELDESC %in% coal) 
   
   names(coal_sub) <- tolower(names(coal_sub)) 
   
-  # it appears the data may be at a boiler level, given that utility, plant,
-  # fuel, and capacity give a unique identifier, almost universally.
-  
-  # there are occasional facilities that are not uniquely identified by
-  # these values. For those, we will sum the numeric vars so that they
-  # are at the boiler level, as well.
+  ## It appears the data may be at a boiler level, given that utility, plant,
+  ## fuel, and capacity give a unique identifier, almost universally.
+  ## There are occasional facilities that are not uniquely identified by
+  ## these values. For those, we sum the numeric vars so that they
+  ## are at the boiler level too.
   print(nrow(coal_sub %>% unique_id(pcode, cocode, fueldesc, capacity)))
   
   nums <- c("01", "02", "03", "04", "05", "06", 
@@ -106,39 +102,36 @@ for (i in files) {
   
   print(nrow(coal_sub %>% unique_id(pcode, utilcode, fueldesc, capacity)))
   
-  ## note: the capacity variable is very often blank or equal to zero.
-  ## For now, I am preserving the capacity variable, especially as I think
-  ## it may be tied either to a boiler or a generator (data may not be at
-  ## plant level, after all)
-  
-  ## updated note: Sylwia has a colleague with access to a (stable) capacity variable
-  ## it makes more sense to depend on that, rather that to try to piece it together
+  ## Note: the capacity variable is often blank or equal to zero.
+  ## For now, I preserve the capacity variable, especially as I think
+  ## it may be tied either to a boiler or a generator. (The data may not be at
+  ## plant level, after all).
+  ## Updated note: Sylwia has a colleague with access to a (stable) capacity variable
+  ## it makes more sense to depend on that, rather that to try to piece it together.
   
   coal_sub <- coal_sub %>%
-    ## create variable for annual generation and a year variable
+    ## Create variable for annual generation and a year variable.
     mutate(plt_anngen = sum(gen01, gen02, gen03, gen04, gen05, gen06,
              gen07, gen08, gen09, gen10, gen11, gen12, na.rm = TRUE),
            plt_annstk = sum(stk01, stk02, stk03, stk04, stk05, stk06,
                         stk07, stk08, stk09, stk10, stk11, stk12, na.rm = TRUE),
            plt_anncon = sum(con01, con02, con03, con04, con05, con06,
                         con07, con08, con09, con10, con11, con12, na.rm = TRUE),
-           ## the effdate of the 1995 dataset is 1994, (same for the years prior with an effdate) 
-           ## so we should set the year as the date before the report year, presumably
+           ## The effdate of the 1995 dataset is 1994, (same for the years prior with an effdate) 
+           ## so we should set the year as the date before the report year, presumably.
            year = (as.numeric(substr(i,1,4))-1)) %>%
     rename(plant_code = pcode, company_code = cocode, state = fipst, utility_code = utilcode)
   
   coal_full <- bind_rows(coal_full, coal_sub)
-  
 }
 
-## we check there aren't any wild variances year to year - there appears to be
-## a relatively constant decline
+## We check there aren't any wild variances year to year - there appears to be
+## a relatively constant decline.
 table(coal_full$year)
 
-## our data is currently at the plant/fuel-type level. We collapse to the plant level
-
-## we want to preserve the amount of different types of coal present, just in caes
-## it's useful later
+## Our data is currently at the plant/fuel-type level. We collapse to the plant level.
+## We want to preserve the amount of different types of coal present, just in case
+## it is useful later.
 early_plants <- coal_full %>% 
   mutate(fuel_col = ifelse(fueldesc == "COL", plt_anncon, 0),
          fuel_bit = ifelse(fueldesc == "BIT", plt_anncon, 0),
@@ -151,8 +144,8 @@ early_plants <- coal_full %>%
 num_vars <- c(num_vars, "plt_anngen", "plt_anncon", "plt_annstk", 
               grep("fuel_", names(early_plants), value = T))
 
-## the .txt file explaining the dataset explains that within each state the
-## company code and plant code uniquely identifies plants
+## The .txt file with metadata explains that within each state the
+## company code and plant code uniquely identifies plants.
 early_plants <- early_plants %>%
   filter(plant_code != 9999) %>%
   group_by(plant_code, company_code, state, year) %>%
@@ -163,22 +156,25 @@ table(early_plants$year)
 
 early_plants %>% unique_id(plant_code, state, company_code, year)
 
-write.csv(early_plants, "use_data/plants_fuel_1970_2000")
+write.csv(early_plants, here::here("data/plants_fuel_1970_2000.csv"))
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#-- 2001-2018 -------------------------------------
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# COAL 2001-2018 ----------------------------------------------------------------------------------
 
 coal_full <- data.frame()
 stocks_full <- data.frame()
 
-## file names vary slightly by year, but format remains same over these periods
+## File names vary slightly by year, but format remains same over these periods
 files <- c("y2001", "y2002", "_2003", "_2004", "_2005", "_2006", "_2007",
            "eia923December2008.xls", "EIA923 SCHEDULES 2_3_4_5 M Final 2009 REVISED 05252011.xls",
-           "EIA923 SCHEDULES 2_3_4_5 Final 2010.xls","EIA923_Schedules_2_3_4_5_2011_Final_Revision.xlsx",
-           "EIA923_Schedules_2_3_4_5_M_12_2012_Final_Revision.xlsx", "EIA923_Schedules_2_3_4_5_2013_Final_Revision.xlsx",
-           "EIA923_Schedules_2_3_4_5_M_12_2014_Final_Revision.xlsx", "EIA923_Schedules_2_3_4_5_M_12_2015_Final_Revision.xlsx",
-           "EIA923_Schedules_2_3_4_5_M_12_2016_Final_Revision.xlsx", "EIA923_Schedules_2_3_4_5_M_12_2017_Final_Revision.xlsx",
+           "EIA923 SCHEDULES 2_3_4_5 Final 2010.xls",
+           "EIA923_Schedules_2_3_4_5_2011_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_M_12_2012_Final_Revision.xlsx", 
+           "EIA923_Schedules_2_3_4_5_2013_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_M_12_2014_Final_Revision.xlsx", 
+           "EIA923_Schedules_2_3_4_5_M_12_2015_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_M_12_2016_Final_Revision.xlsx", 
+           "EIA923_Schedules_2_3_4_5_M_12_2017_Final_Revision.xlsx",
            "EIA923_Schedules_2_3_4_5_M_12_2018_Final_Revision.xlsx")
 
 years <- c(2001:2018)
@@ -189,25 +185,39 @@ for (i in c(1:18)) {
   print(paste("------------------ Coal", years[i], "------------------"))
   print("***********************************************")
   
-  # Additional background on datasets available here:
-  # https://www.eia.gov/electricity/data/guide/pdf/guide.pdf, page 4
+  ## Additional background on datasets available here:
+  ## https://www.eia.gov/electricity/data/guide/pdf/guide.pdf, page 4
   
   if (years[i] %in% c(2001:2007)) {
-    allplts <- read_excel(paste0("orig_data/eia_923/f906920_", years[i],
-                                 "/f906920", files[i], ".xls"), sheet = 1, skip = 7)
+    zip_file <- here::here("data/eia/f923", paste0("f906920_", years[i], ".zip"))
+  } else {
+    zip_file <- here::here("data/eia/f923", paste0("f923_", years[i], ".zip"))
+  }
+  l.zip <- zip::zip_list(zip_file) %>%
+    dplyr::pull(filename) %>%
+    as.list()
+  zip::unzip(zip_file, exdir=fs::path_dir(zip_file))
+  
+  if (years[i] %in% c(2001:2007)) {
+    allplts <- read_excel(here::here("data/eia/f923", paste0("f906920", files[i], ".xls")), 
+                          sheet = 1, skip = 7)
   } else if (years[i] %in% c(2008:2010)) {
-    allplts <- read_excel(paste0("orig_data/eia_923/f923_", years[i], "/", files[i]), 
+    allplts <- read_excel(here::here("data/eia/f923", files[i]), 
                           sheet = 1, skip = 7)
   } else {
-    allplts <- read_excel(paste0("orig_data/eia_923/f923_", years[i], "/", files[i]), 
+    allplts <- read_excel(here::here("data/eia/f923", files[i]), 
                           sheet = 1, skip = 5)
   }
   
-  # certain years have these characters randomly inserted in certain var names
+  l.zip %>%
+    purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
+    fs::file_delete()
+  
+  ## Certain years have these characters randomly inserted in certain var names.
   names(allplts) <- gsub("\r\n", " ", names(allplts))
   
-  # we have different capitalization conventions each year, so, for ease, we bring all to
-  # lowercase
+  ## We have different capitalization conventions each year, so, for ease, we 
+  ## bring all to lowercase
   names(allplts) <- tolower(names(allplts))
   
   print(table(allplts$`reported fuel type code`))
@@ -216,8 +226,8 @@ for (i in c(1:18)) {
   
   allplts %>% filter(`plant id` == "99999") %>% select(`plant id`, `plant name`) %>% unique()
   
-  # limit only to plants with a coal fueltype and those not coded "99999" in Plant ID (which
-  # is just state-level statistics)
+  ## Limit only to plants with a coal fueltype and those not coded "99999" in 
+  ## Plant ID (which is just state-level statistics).
   coal_sub <- allplts %>%
     filter(`reported fuel type code` %in% coal) %>%
     filter(`plant id` != "99999")
@@ -225,25 +235,24 @@ for (i in c(1:18)) {
   orig_rows <- nrow(coal_sub)
   print(orig_rows)
   
-  ## let's do some due diligence on the identifying level
-  ## Plant ID and Fuel description does not quite identify the data.
+  ## We perform some due diligence on the identifying level.
+  ## Plant ID and Fuel description do not identify the data.
   print(nrow(coal_sub %>% unique_id(`plant id`, `reported fuel type code`)))
   
-  ## if we add in EIA sector number - which defines as utility or non-utility - and the
-  ## reported prime mover (e.g. what type of turbine the boiler is driving) we get
-  ## full identification
+  ## If we add in EIA sector number - which defines as utility or non-utility - and the
+  ## reported prime mover (e.g. what type of turbine the boiler is driving), we get
+  ## full identification.
   print(coal_sub %>% unique_id(`plant id`, `reported fuel type code`, `eia sector number`, `reported prime mover`))
-  ## in 2017, there are two duplicates - I think we can add them without catastrophe
+  ## In 2017, there are two duplicates - I think we can add them without catastrophe.
 
   coal_sub <- coal_sub %>%
     rename(plant_id = 'plant id', fueldesc = 'reported fuel type code')
   
   ## For our purposes, we can combine the different EIA sector data and prime mover data
-  ## as we are primarily concerned with the total emissions (we don't really care where it's 
-  ## going), so we can sum all of the variables
-  
-  ## first, we cross-identify vars from the 1970-2001 datasets, and here
-  ## from our data documentation, we know the "genXX" vars referred to net generation
+  ## as we are primarily concerned with the total emissions (we don't really care where 
+  ## it's going), so we can sum all of the variables.
+  ## First, we cross-identify vars from the 1970-2001 datasets, and here
+  ## from our data documentation, we know the "genXX" vars referred to net generation.
   for (m in c(1:12)) {
     names(coal_sub) <- gsub(months[m], monthnum[m], names(coal_sub))
     names(coal_sub) <- gsub(shortmonths[m], monthnum[m], names(coal_sub))
@@ -252,21 +261,21 @@ for (i in c(1:18)) {
   ## The net generation vars are equivalent to the "gen" vars in earlier years
   names(coal_sub) <- gsub("netgen", "gen", names(coal_sub))
   
-  ## the "quantity" var refers to the total quantity consumed, which aligns with the "con"
-  ## var of earlier years.
+  ## The "quantity" var refers to the total quantity consumed, which aligns with the 
+  ## "con" var of earlier years.
   names(coal_sub) <- gsub("quantity", "con", names(coal_sub))
   
-  ## we remove spaces from varnames
+  ## We remove spaces from varnames
   names(coal_sub) <- gsub(" ", "", names(coal_sub))
   names(coal_sub) <- gsub("gen_", "gen", names(coal_sub))
   names(coal_sub) <- gsub("con_", "con", names(coal_sub))
   
   keepvars <- c(paste0("gen", monthnum), paste0("con", monthnum))
   
-  ## everything is in consistent units so we can add up rows!
-  ## n.b. according to the data documentation, unit options are 
+  ## Everything uses consistent units so we can sum by row.
+  ## NB: according to the data documentation, unit options are 
   ## tons, barrels, and mcf, so we do not need to worry about a
-  ## tons/short tons distinction
+  ## tons/short tons distinction.
   print(table(coal_sub$`physicalunitlabel`))
 
   print(table(coal_sub$year))
@@ -275,7 +284,7 @@ for (i in c(1:18)) {
   coal_sub <- coal_sub %>%
     select(plant_id, fueldesc, all_of(keepvars)) %>%
     group_by(plant_id, fueldesc) %>%
-    ## we assume NA = 0 for the purpose of summing together these variables
+    ## We assume NA = 0 for the purpose of summing together these variables.
     summarize_at(keepvars, mysum) %>%
     select(plant_id, fueldesc, keepvars) %>%
     unique() %>%
@@ -300,43 +309,49 @@ for (i in c(1:18)) {
   
   coal_sub %>% unique_id(plant_id)
   
-  ## because through year 2000 both an effective date and year is listed and the effective date
-  ## is the end of the prior calendar year, we assume this continues to be the case and the data
-  ## comes from the year prior
+  ## Through year 2000 both an effective date and year is listed and the effective date
+  ## is the end of the prior calendar year, we assume this continues to be the case and 
+  ## the data comes from the year prior.
   coal_sub <- mutate(coal_sub, year = years[i]-1)
   
   print(table(coal_sub$year))
   
   coal_full <- bind_rows(coal_full, coal_sub)
-  
 }
 
-## now we add in the "stocks" variables, which are on a different
-## tab in the spreadsheet. Stocks data begins being collected only
-## in 2002.
+## Now, we add in the "stocks" variables, which are on a different tab in the spreadsheet. 
+## Stocks data is collected starting only in 2002.
 for (i in c(2:18)) {
   
   print("***********************************************")
   print(paste("----------------- Stocks", years[i], "-----------------"))
   print("***********************************************")
   
-  ## we also want to add in our stock variables. There is no such data in 2001.
+  ## We also want to add in our stock variables. There is no such data in 2001.
   if (years[i] %in% c(2002:2007)) {
-    stocks <- read_excel(paste0("orig_data/eia_923/f906920_", years[i],
-                                "/f906920", files[i], ".xls"), sheet = 4, skip = 5)
-  } else if (years[i] %in% c(2008:2010)) {
-    stocks <- read_excel(paste0("orig_data/eia_923/f923_", years[i], "/", files[i]), 
+    zip_file <- here::here("data/eia/f923", paste0("f906920_", years[i], ".zip"))
+  } else {
+    zip_file <- here::here("data/eia/f923", paste0("f923_", years[i], ".zip"))
+  }
+  l.zip <- zip::zip_list(zip_file) %>%
+    dplyr::pull(filename) %>%
+    as.list()
+  zip::unzip(zip_file, exdir=fs::path_dir(zip_file))
+  
+  if (years[i] %in% c(2002:2007)) {
+    stocks <- read_excel(here::here("data/eia/f923", paste0("f906920", files[i], ".xls")),
                          sheet = 4, skip = 5)
-  } else if (years[i] %in% c(2011:2016)) {
-    stocks <- read_excel(paste0("orig_data/eia_923/f923_", years[i], "/", files[i]), 
-                         sheet = 4, skip = 5)
+  } else if (years[i] %in% c(2008:2016)) {
+    stocks <- read_excel(here::here("data/eia/f923", files[i]), sheet = 4, skip = 5)
   } else if (years[i] == 2017) {
-    stocks <- read_excel(paste0("orig_data/eia_923/f923_", years[i], "/", files[i]), 
-                         sheet = 5, skip = 5)
+    stocks <- read_excel(here::here("data/eia/f923", files[i]), sheet = 5, skip = 5)
   } else if (years[i] == 2018) {
-    stocks <- read_excel(paste0("orig_data/eia_923/f923_", years[i], "/", files[i]), 
-                         sheet = 6, skip = 5)
+    stocks <- read_excel(here::here("data/eia/f923", files[i]), sheet = 6, skip = 5)
   }  
+  
+  l.zip %>%
+    purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
+    fs::file_delete()
   
   names(stocks)
   names(stocks) <- tolower(names(stocks))
@@ -359,19 +374,18 @@ for (i in c(2:18)) {
     filter(plant_id != "999999")
   
   print(stocks %>% unique_id(plant_id, fueldesc))
-  ## there are only 4 plant-year obs not uniquely identified by this - I am going to
+  ## There are only 4 plant-year obs not uniquely identified by this - I am going to
   ## assume it is safe to simply aggregate those duplicates.
-  
-  ## since everything is in the same units, we can add it up!
+  ## Since everything is in the same units, we can perform a sum.
   print(table(stocks$`physical unit label`))
   
   stk_vars <- paste0("stk", monthnum)
   
   names(stocks) <- gsub(" ", "", names(stocks))
   
-  ## we just add up to the plant id var. We've used consumption - not stocks - to retain
+  ## We add up to the plant id var. We've used consumption - not stocks - to retain
   ## the fuel type information, so we do not need to worry about keeping fuel-specific
-  ## stock data
+  ## stock data.
   stocks <- stocks %>%
     select(plant_id, stk_vars) %>%
     group_by(plant_id) %>%
@@ -381,11 +395,10 @@ for (i in c(2:18)) {
   
   stocks %>% unique_id(plant_id)
   
-  ## effective date is reporting from year prior
+  ## Effective date is reported from year prior.
   stocks <- stocks %>% mutate(year = (years[i]-1))
   
   stocks_full <- bind_rows(stocks, stocks_full)
-  
 }
 
 stocks_full %>% unique_id(plant_id, year)
@@ -403,8 +416,7 @@ early_plants %>% unique_id(plant_code, year)
 names(early_plants)
 names(coal_full)
 
-## we keep only the annual metrics - the monthly aren't going to get us anything
-## and they're super messy
+## We keep only the annual metrics.
 all_fuel <- bind_rows(early_plants, coal_full) %>%
   select(plant_code, year, plt_anngen, plt_anncon, plt_annstk,
          fuel_col, fuel_bit, fuel_lig, fuel_sc, fuel_sub, fuel_wc) %>%
@@ -416,48 +428,64 @@ names(all_fuel) <- gsub("fuel_", "plt_fuel_", names(all_fuel))
 
 nrow(all_fuel)
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#-- Add in Fuel Comp Info: 1985-2005 --------------
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# FUEL 1985-2005 ----------------------------------------------------------------------------------
 
 fuel_85_18 <- data.frame()
 
-## file names vary slightly by year, but format remains same over these periods
+## Filenames vary slightly by year, but format remains same over these periods.
 files <- c("eia923December2008.xls", "EIA923 SCHEDULES 2_3_4_5 M Final 2009 REVISED 05252011.xls",
-           "EIA923 SCHEDULES 2_3_4_5 Final 2010.xls","EIA923_Schedules_2_3_4_5_2011_Final_Revision.xlsx",
-           "EIA923_Schedules_2_3_4_5_M_12_2012_Final_Revision.xlsx", "EIA923_Schedules_2_3_4_5_2013_Final_Revision.xlsx",
-           "EIA923_Schedules_2_3_4_5_M_12_2014_Final_Revision.xlsx", "EIA923_Schedules_2_3_4_5_M_12_2015_Final_Revision.xlsx",
-           "EIA923_Schedules_2_3_4_5_M_12_2016_Final_Revision.xlsx", "EIA923_Schedules_2_3_4_5_M_12_2017_Final_Revision.xlsx",
+           "EIA923 SCHEDULES 2_3_4_5 Final 2010.xls",
+           "EIA923_Schedules_2_3_4_5_2011_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_M_12_2012_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_2013_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_M_12_2014_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_M_12_2015_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_M_12_2016_Final_Revision.xlsx",
+           "EIA923_Schedules_2_3_4_5_M_12_2017_Final_Revision.xlsx",
            "EIA923_Schedules_2_3_4_5_M_12_2018_Final_Revision.xlsx")
 
 l <- 1
-## note, because Form 767 was superseded by Form 923, and Form 923 only began reporting in 2008, there
-## is a gap in data.
+## NB: Since Form 767 was superseded by Form 923, and Form 923 only began reporting in 
+## 2008, there is a gap in data.
 for (i in c(1985:2005, 2008:2018)) {
   
-# boiler fuel ----------------------------------------
-if (i %in% c(1985:2000)) {
-  fuel <- read_excel(paste0("orig_data/eia_767/f767_", i, "/Boiler_Fuel.xls")) %>% unique()
-} else if (i %in% c(2001:2003)) {
-  fuel <- read_excel(paste0("orig_data/eia_767/f767_", i, "/F767_BOILER_FUEL.xls")) %>% unique()
-} else if (i == 2004) {
-  fuel <- read_excel(paste0("orig_data/eia_767/f767_2004/2004 F767_BOILER_FUEL.xls")) %>% unique()
-} else if (i == 2005) {
-  fuel <- read_excel("orig_data/eia_767/f767_2005/2005 EIA-767 Master Files/F767_BOILER_FUEL.xls") %>% unique()
-} else if (i %in% c(2008:2010)) {
-  fuel <- read_excel(paste0("orig_data/eia_923/f923_", i, "/", files[l]), 
-                        sheet = 6, skip = 7)
-} else if (i %in% c(2011:2016)) {
-  fuel <- read_excel(paste0("orig_data/eia_923/f923_", i, "/", files[l]), 
-                        sheet = 6, skip = 5)
-} else if (i == 2017) {
-  fuel <- read_excel(paste0("orig_data/eia_923/f923_", i, "/", files[l]), 
-                        sheet = 7, skip = 5)
-} else if (i == 2018) {
-  fuel <- read_excel(paste0("orig_data/eia_923/f923_", i, "/", files[l]), 
-                        sheet = 8, skip = 5)
-}
+  ## Boiler fuel
+  
+  if (i %in% c(1985:2005)) {
+    zip_file <- here::here("data/eia/f767", paste0("f767_", i, ".zip"))
+  } else if (i %in% c(2001:2007)) {
+    zip_file <- here::here("data/eia/f923", paste0("f906920_", i, ".zip"))
+  } else {
+    zip_file <- here::here("data/eia/f923", paste0("f923_", i, ".zip"))
+  }
+  l.zip <- zip::zip_list(zip_file) %>%
+    dplyr::pull(filename) %>%
+    as.list()
+  zip::unzip(zip_file, exdir=fs::path_dir(zip_file))
+  
+  if (i %in% c(1985:2000)) {
+    fuel <- read_excel(here::here("data/eia/f767/Boiler_Fuel.xls")) %>% unique()
+  } else if (i %in% c(2001:2003)) {
+    fuel <- read_excel(here::here("data/eia/f767/F767_BOILER_FUEL.xls")) %>% unique()
+  } else if (i == 2004) {
+    fuel <- read_excel(here::here("data/eia/f767/2004 F767_BOILER_FUEL.xls")) %>% unique()
+  } else if (i == 2005) {
+    fuel <- read_excel(here::here("data/eia/f767/2005 EIA-767 Master Files/F767_BOILER_FUEL.xls")) %>% unique()
+  } else if (i %in% c(2008:2010)) {
+    fuel <- read_excel(here::here("data/eia/f923", files[l]), sheet = 6, skip = 7)
+  } else if (i %in% c(2011:2016)) {
+    fuel <- read_excel(here::here("data/eia/f923", files[l]), sheet = 6, skip = 5)
+  } else if (i == 2017) {
+    fuel <- read_excel(here::here("data/eia/f923", files[l]), sheet = 7, skip = 5)
+  } else if (i == 2018) {
+    fuel <- read_excel(here::here("data/eia/f923", files[l]), sheet = 8, skip = 5)
+  }
 
+  l.zip %>%
+    purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
+    fs::file_delete()
+  
   if ("YEAR" %in% names(fuel)) {
     fuel <- fuel %>% select(-YEAR)
   }
@@ -536,61 +564,53 @@ if (i %in% c(1985:2000)) {
 
     numeric <- grep("quantity|ash|sulfur|heat", names(fuel))
     fuel[numeric] <- sapply(fuel[numeric], as.numeric)
-    
-    
   } else {
     l <- l
   }
 
-names(fuel) <- tolower(names(fuel))
+  names(fuel) <- tolower(names(fuel))
+  
+  # fuel %>% unique_id(utility_code, plant_code, boiler_id, fuel_code)
+  print(table(fuel$fuel_code))
+  
+  ## We keep only rows with a fuel code that corresponds to coal.
+  fuel <- fuel %>% filter(fuel_code %in% coal)
+  
+  ## This dataset is defined at the boiler/fuel level.
+  print(fuel %>% unique_id(utility_code, plant_code, boiler_id, fuel_code))
+  
+  if ("sampling_procedure" %in% names(fuel)) {
+    fuel <- select(fuel, -sampling_procedure)
+  }
+  if ("method_analysis" %in% names(fuel)) {
+    fuel <- select(fuel, -method_analysis)
+  }
+  if ("lab_performing_analysis" %in% names(fuel)) {
+    fuel <- select(fuel, -lab_performing_analysis)
+  }
+  if ("preprintgroup" %in% names(fuel)) {
+    fuel <- select(fuel, -preprintgroup)
+  }
+  
+  ## We want to preserve the amount of different types of coal present, just in 
+  ## case it is useful later.
+  fuel <- fuel %>% 
+    mutate(fuel_col = ifelse(fuel_code == "COL", total_quantity, 0),
+           fuel_bit = ifelse(fuel_code == "BIT", total_quantity, 0),
+           fuel_lig = ifelse(fuel_code == "LIG", total_quantity, 0),
+           fuel_sc = ifelse(fuel_code == "SC", total_quantity, 0),
+           fuel_sub = ifelse(fuel_code == "SUB", total_quantity, 0),
+           fuel_wc = ifelse(fuel_code == "WC", total_quantity, 0)) %>%
+    select(-fuel_code)
 
-#fuel %>% unique_id(utility_code, plant_code, boiler_id, fuel_code)
-print(table(fuel$fuel_code))
+  ## This section takes a weighted average of the heat/ash/sulfur content of the
+  ## different fuel types used by each boiler.
+  keepvars <- c("utility_code", "plant_code", "boiler_id", "year",
+                grep("quantity", names(fuel), value = TRUE),
+                grep("content", names(fuel), value = TRUE))
 
-## we keep only rows with a fuel code that corresponds to coal
-fuel <- fuel %>% filter(fuel_code %in% coal)
-
-## this dataset is defined at the boiler/fuel level
-print(fuel %>% unique_id(utility_code, plant_code, boiler_id, fuel_code))
-
-if ("sampling_procedure" %in% names(fuel)) {
-  fuel <- select(fuel, -sampling_procedure)
-}
-
-if ("method_analysis" %in% names(fuel)) {
-  fuel <- select(fuel, -method_analysis)
-}
-
-if ("lab_performing_analysis" %in% names(fuel)) {
-  fuel <- select(fuel, -lab_performing_analysis)
-}
-
-
-if ("preprintgroup" %in% names(fuel)) {
-  fuel <- select(fuel, -preprintgroup)
-}
-
-## we want to preserve the amount of different types of coal present, just in caes
-## it's useful later
-fuel <- fuel %>% 
-  mutate(fuel_col = ifelse(fuel_code == "COL", total_quantity, 0),
-         fuel_bit = ifelse(fuel_code == "BIT", total_quantity, 0),
-         fuel_lig = ifelse(fuel_code == "LIG", total_quantity, 0),
-         fuel_sc = ifelse(fuel_code == "SC", total_quantity, 0),
-         fuel_sub = ifelse(fuel_code == "SUB", total_quantity, 0),
-         fuel_wc = ifelse(fuel_code == "WC", total_quantity, 0)) %>%
-  select(-fuel_code)
-
-## I'm sure there exists a more elegant way to do this, but this is what I've got
-## this section takes a weighted average of the heat/ash/sulfur content of the
-## different fuel types used by each boiler 
-
-keepvars <- c("utility_code", "plant_code", "boiler_id", "year",
-              grep("quantity", names(fuel), value = TRUE),
-              grep("content", names(fuel), value = TRUE))
-
-fuel <- fuel %>%
-  mutate(jan_heat_content_wt = jan_heat_content * jan_quantity,
+  fuel <- fuel %>%
+    mutate(jan_heat_content_wt = jan_heat_content * jan_quantity,
          feb_heat_content_wt = feb_heat_content * feb_quantity,
          mar_heat_content_wt = mar_heat_content * mar_quantity,
          apr_heat_content_wt = apr_heat_content * apr_quantity,
@@ -665,27 +685,27 @@ fuel <- fuel %>%
          oct_sulfur_content = oct_sulfur_content_wt/oct_quantity,
          nov_sulfur_content = nov_sulfur_content_wt/nov_quantity,
          dec_sulfur_content = dec_sulfur_content_wt/dec_quantity) %>%
-  ungroup() %>% select(keepvars)
+  ungroup() %>% select(all_of(keepvars))
 
-## we are going to generate annual variables as well, in case they are
-## more predictive (due to less noise)
+  ## We generate annual variables as well, in case they are more predictive 
+  ## (due to less noise).
+  
+  print(fuel %>% unique_id(utility_code, plant_code, boiler_id))
 
-print(fuel %>% unique_id(utility_code, plant_code, boiler_id))
-
-fuel <- fuel %>%
-  mutate(ann_heat_content = (jan_heat_content * jan_quantity +
-                                feb_heat_content * feb_quantity + 
-                                mar_heat_content * mar_quantity +
-                                apr_heat_content * apr_quantity +
-                                may_heat_content * may_quantity +
-                                jun_heat_content * jun_quantity +
-                                jul_heat_content * jul_quantity +
-                                aug_heat_content * aug_quantity +
-                                sep_heat_content * sep_quantity +
-                                oct_heat_content * oct_quantity +
-                                nov_heat_content * nov_quantity +
-                                dec_heat_content * dec_quantity)/total_quantity,
-         ann_ash_content = (jan_ash_content * jan_quantity +
+  fuel <- fuel %>%
+    mutate(ann_heat_content = (jan_heat_content * jan_quantity +
+                               feb_heat_content * feb_quantity + 
+                               mar_heat_content * mar_quantity +
+                               apr_heat_content * apr_quantity +
+                               may_heat_content * may_quantity +
+                               jun_heat_content * jun_quantity +
+                               jul_heat_content * jul_quantity +
+                               aug_heat_content * aug_quantity +
+                               sep_heat_content * sep_quantity +
+                               oct_heat_content * oct_quantity +
+                               nov_heat_content * nov_quantity +
+                               dec_heat_content * dec_quantity)/total_quantity,
+           ann_ash_content = (jan_ash_content * jan_quantity +
                               feb_ash_content * feb_quantity + 
                               mar_ash_content * mar_quantity +
                               apr_ash_content * apr_quantity +
@@ -697,7 +717,7 @@ fuel <- fuel %>%
                               oct_ash_content * oct_quantity +
                               nov_ash_content * nov_quantity +
                               dec_ash_content * dec_quantity)/total_quantity,
-         ann_sulfur_content = (jan_sulfur_content * jan_quantity +
+           ann_sulfur_content = (jan_sulfur_content * jan_quantity +
                                  feb_sulfur_content * feb_quantity + 
                                  mar_sulfur_content * mar_quantity +
                                  apr_sulfur_content * apr_quantity +
@@ -709,16 +729,15 @@ fuel <- fuel %>%
                                  oct_sulfur_content * oct_quantity +
                                  nov_sulfur_content * nov_quantity +
                                  dec_sulfur_content * dec_quantity)/total_quantity) %>%
-  unique()
+    unique()
 
-fuel$utility_code <- as.character(fuel$utility_code)
-fuel$plant_code <- as.character(fuel$plant_code)
-
-fuel_85_18 <- bind_rows(fuel, fuel_85_18)
-
+  fuel$utility_code <- as.character(fuel$utility_code)
+  fuel$plant_code <- as.character(fuel$plant_code)
+  
+  fuel_85_18 <- bind_rows(fuel, fuel_85_18)
 }
 
-## lets get some of these vars at the plant level
+## Convert some of these vars to the plant level.
 fuel_85_18 <- fuel_85_18 %>%
   mutate(plt_ann_sulfur_content_wt = ann_sulfur_content * total_quantity,
          plt_ann_heat_content_wt = ann_heat_content * total_quantity,
@@ -745,10 +764,14 @@ unique_id(fuel_85_18, year, plant_code, boiler_id)
 
 fuel_85_18$plant_code <- as.numeric(fuel_85_18$plant_code)
 
-write.csv(fuel_85_18, "use_data/boilers_fuel_comp_1985_2018.csv")
+write.csv(fuel_85_18, here::here("data/boilers_fuel_comp_1985_2018.csv"))
 
   all_fuel %>% unique_id(plant_code, year)
 
   all_fuel$plant_code <- as.numeric(all_fuel$plant_code)
   
-write.csv(all_fuel, "use_data/all_fuel_1970_2018.csv")
+write.csv(all_fuel, here::here("data/all_fuel_1970_2018.csv"))
+
+
+### END CODE ###
+

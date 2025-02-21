@@ -1,22 +1,73 @@
-library(dplyr)
-library(maptools)
-library(rgeos)
-library(reshape2)
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+## Grandfathering
+## 00_county_level_data
+## Bridget Pals
+## 17 March 2021
+## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-setwd("~/Documents/research/research_revesz")
 
-statefips <- read.csv("use_data/crosswalks/state_fips_xwalk.csv") %>% 
+# INTRODUCTION ------------------------------------------------------------------------------------
+## This script synthesizes the following datasets:
+##  - county centerpoints; and,
+##  - county non-attainment by year. 
+
+
+### START CODE ###
+
+
+# PREAMBLE ----------------------------------------------------------------------------------------
+
+## Initiate
+## ... Packages
+pkgs <- c(
+  "fs","here","zip",                      # File system
+  "dplyr","purrr","reshape2",             # Data wrangling
+  "maptools","rgeos"                      # Spatial data
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
+
+## ... Paths
+l.file <- list(
+  xwalk = here::here("data/xwalk/state_fips_xwalk.csv"),
+  cb = here::here("data/cb/cb_2018_us_county_500k.zip"),
+  epa = here::here("data/epa/phistory.csv"),
+  epa_old = here::here("data/epa/phistory_1978_1990.csv")
+)
+
+
+# IMPORT ------------------------------------------------------------------------------------------
+
+statefips <- l.file$xwalk %>%
+  read.csv() %>% 
   rename(st_abbr = state_Code, fips_st = fips)
-counties <- readShapePoly("orig_data/cb_2018_us_county_500k/cb_2018_us_county_500k")
+
+l.zip <- zip::zip_list(l.file$cb) %>%
+  dplyr::pull(filename) %>%
+  as.list()
+zip::unzip(l.file$cb, exdir=fs::path_dir(l.file$cb))
+
+counties <- readShapePoly(fs::path_ext_remove(l.file$cb))
+
+l.zip %>%
+  purrr::map_chr(\(x) fs::path(fs::path_dir(l.file$cb), x)) %>%
+  fs::file_delete()
+
+phist <- read.csv(l.file$epa, stringsAsFactors = FALSE) %>%
+  select(-exportdt)
+
+phist_old <- read.csv(l.file$epa_old, stringsAsFactors = FALSE)
+
+
+# CLEAN -------------------------------------------------------------------------------------------
 
 ids <- as.data.frame(counties) %>% select(fips_st = STATEFP, fips_cnty = COUNTYFP, county = NAME)
 
 centers <- gCentroid(counties, byid = TRUE)
-
 centers <- as.data.frame(centers)
 
 data <- cbind(ids, as.data.frame(centers))
-
 data <- data %>% rename(cty_lat = x, cty_lon = y)
 
 unique(data$fips)
@@ -46,20 +97,14 @@ data$county[data$county == "RICHMOND" & data$fips_cnty == 760] <- "RICHMOND CITY
 data$county[data$county == "ROANOKE" & data$fips_cnty == 770] <- "ROANOKE CITY"
 data$county[data$county == "ST LOUIS" & data$fips_cnty == 510] <- "ST LOUIS CITY"
 
-write.csv(data, "use_data/ctrpoints_counties.csv")
+write.csv(data, here::here("data/ctrpoints_counties.csv"))
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# -- Merge in Attainment Data ----------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-phist <- read.csv("orig_data/phistory.csv", stringsAsFactors = FALSE) %>%
-  select(-exportdt)
-
-phist_old <- read.csv("orig_data/phistory_1978_1990.csv", stringsAsFactors = FALSE)
+# MERGE ATTAINMENT --------------------------------------------------------------------------------
 
 phist_long <- melt(phist, id.vars = c("pollutant", "revoked_naaqs", "state_name",
-                                  "st_abbr", "fips_state", "fips_cnty",
-                                  "countyname"))
+                                      "st_abbr", "fips_state", "fips_cnty",
+                                      "countyname"))
 
 phist_old_long <- melt(phist_old, 
                        id.vars = c("pollutant", "state_name",
@@ -123,6 +168,8 @@ sum(is.na(test$state_name))
 nonattainment <- left_join(nonattainment, data) %>% 
   select(fips_cnty, st_abbr, year, so2_nonattain, other_nonattain, county)
 
-write.csv(nonattainment, "use_data/nonattainment_by_cty_year.csv")
+write.csv(nonattainment, here::here("data/nonattainment_by_cty_year.csv"))
 
+
+### END CODE ###
 
