@@ -1,0 +1,127 @@
+---
+title: "EIA-759 Data"
+subtitle: "Monthly power plant report"
+author: "Jack Gregory"
+date: "18 September 2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    fig_caption: yes
+    highlight: textmate
+  #   keep_md: true
+  # pdf_document:
+  #   latex_engine: pdflatex
+  #   highlight: haddock
+  #   keep_md: true
+---
+___
+
+```{r preamble, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message=FALSE, 
+  warning=FALSE,
+  fig.topcaption=TRUE, 
+  fig.show="hold",
+  fig.align="center",
+  fig.width=7, 
+  fig.height=4.6)
+
+
+## Initiate 
+## ... Packages
+source(here::here("src/preamble.R"))
+
+install.packages(setdiff(c("httr","rvest"), rownames(installed.packages())))
+library(httr)
+library(rvest)
+
+## ... Functions
+source(here("src/def_paths.R"))
+source(here("src/text_colour.R"))
+
+## ... Paths
+l.path$f759 <- path(l.path$data, "eia/f923")
+
+## ... URLs
+l.url <- list(
+  data = "https://www.eia.gov/electricity/data/eia923/archive/xls/utility/"
+)
+```
+
+
+# Objective
+
+This workbook forms a part of the data cleaning process related to the Grandfathering project.  It downloads annual electricity data from the Energy Information Administration (EIA).  Specifically, it scrapes historical form EIA-759 "Monthly power plant report".  The data are available from 1970 to 2000.  The data along with additional information can be found at the following link:
+
+- [https://www.eia.gov/electricity/data/eia923/eia906u.php](https://www.eia.gov/electricity/data/eia923/eia906u.php).
+
+
+# Download
+
+We download the set of publicly available xls files storing the data to the repository here:
+
+- `r l.path$f923`
+
+Prior to the download, we ensure that the folder above exists, and if not, we create it.
+
+```{r folder}
+
+if (!fs::dir_exists(l.path$f759)) {
+  fs::dir_create(l.path$f759)
+}
+```
+
+Finally, we perform the download.  The files are hidden within the EIA-923 webpage.
+
+```{r download-zip-fn, include=FALSE}
+
+## Define download function
+download_file <- function(url, dir) {
+
+  ## Assertions
+  stopifnot(
+    stringr::str_detect(url, "https://www.eia.gov/electricity/data/eia923/archive/xls/utility/"),
+    fs::path_ext(url)=="xls",
+    fs::dir_exists(dir)
+  )
+
+  ## Define destination file name
+  file <- url %>%
+    stringr::str_extract("f759[0-9]{4}[mu]{1,2}\\.xls")
+
+  cat(file, "\n", sep="")
+
+  ## Define destination
+  file_path <- path(dir, file)
+
+  ## Download file
+  httr::RETRY("GET", url=url, times=5) %>%
+    content("raw") %>%
+    writeBin(file_path)
+  # download.file(url, file, mode="wb", quiet=TRUE)
+  
+  ## Zip file
+  zip_path <- file %>%
+    stringr::str_replace_all(c("f759"="f759_","(mu|u)"="",".xls"=".zip")) %>%
+    fs::path(dir, .)
+  zip::zip(zipfile=zip_path, files=file, root=dir)
+  
+  ## Remove download
+  fs::file_delete(file_path)
+}
+```
+
+```{r download}
+
+## Create list of xls files
+l.file_url <- c(paste0(1970:1995,"u"), paste0(1996:2000, "mu")) |>
+  purrr::map(\(x) xml2::url_absolute(paste0("f759", x, ".xls"), l.url$data))
+
+## Perform download, if necessary
+purrr::walk(l.file_url, ~download_file(.x, l.path$f759))
+```
+
