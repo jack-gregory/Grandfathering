@@ -91,7 +91,7 @@ download_860 <- function(url, dir) {
 
   ## Define destination file name
   file <- url %>%
-    stringr::str_extract("eia860[0-9]{4}\\.zip") %>%
+    stringr::str_extract("eia860[a|b]?[0-9]{4}\\.zip") %>%
     stringr::str_replace("eia860", "f860_")
 
   cat(file, "\n", sep="")
@@ -115,10 +115,11 @@ l.zip_url <- l.url$data %>%
   read_html() %>%
   rvest::html_nodes("a") %>%
   rvest::html_attr("href") %>%
+  stringr::str_trim() %>%
   as.list() %>%
-  purrr::keep(str_detect(., "eia860[0-9]{4}\\.zip$")) %>%
-  purrr::keep(str_detect(., paste0("(", paste(seq(2007,2018), collapse="|"), ")"))) %>%
-  map(~xml2::url_absolute(.x, l.url$data))
+  purrr::keep(str_detect(., "eia860[a|b]?[0-9]{4}\\.zip$")) %>%
+  purrr::keep(str_detect(., paste0("(", paste(seq(1990,2018), collapse="|"), ")"))) %>%
+  map(~xml2::url_absolute(.x, stringr::str_trim(l.url$data)))
 
 ## Perform download, if necessary
 if (length(l.zip_url)>length(fs::dir_ls(l.path$f860, regexp="\\.zip$"))) {

@@ -193,7 +193,6 @@ l.url_423 <- l.url$eia_423 %>%
   filter(str_detect(value, "\\.(xls|zip)$")) %>%
   mutate(year = str_extract(value, "\\d{4}(?=\\.)") %>% as.numeric(),
          type = str_extract(value, "(?<=\\.)[a-z]{3}$")) %>%
-  filter(year<2008) %>%
   filter(year<=1992 
          | (year>1992 & year<=2001 & type=="zip") 
          | (year>2001 & type=="xls")) %>%
@@ -356,7 +355,10 @@ df.county <- readxl::read_excel(l.file$fips, skip=4) %>%
 
 ## Data
 
-Next, we import the "Fuel Receipts and Costs" data from the xls files and zip archives into R.
+Next, we import the "Fuel Receipts and Costs" data from the xls files and zip archives into R.  We import only the following files:
+
+- EIA-423 from 1972--2007; and,
+- EIA-923 from 2008--2019.
 
 `r text_colour(colour="red", text="NB - This section is incomplete.  Many of the variables identified above are currently sacrificed.  The data is much more rich than what we end up importing and cleaning for this exercise.")`
 
@@ -586,7 +588,12 @@ extract_zip <- function(zip, file, sheet) {
 ``` {r import}
 
 ## Build zip list
-l.zip <- fs::dir_ls(l.path$f923, regexp="f(4|9)23_\\d{4}\\.zip$")
+l.zip <- fs::dir_info(l.path$f923, regexp="f(4|9)23_\\d{4}\\.zip$") %>%
+  mutate(form = str_extract(path, "f[4|9]23(?=_)"),
+         year = str_extract(path, "[0-9]{4}")) %>%
+  filter(!(year>=2008 & form=="f423")) %>%
+  pull(path) %>%
+  as.list()
 
 ## Build zip & file dataframe
 df.zip <- l.zip %>%
