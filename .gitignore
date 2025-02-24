@@ -1,8 +1,16 @@
 # Credentials
 *.yml
 
+# Code
+build/archive/
+rep/
+
 # Data
 data/*/
+
+# Output
+out/
+report/
 
 # Dropbox files
 *.ini
