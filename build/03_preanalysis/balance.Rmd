@@ -19,7 +19,18 @@ output:
 ___
 
 ```{r preamble, include=FALSE}
-library(knitr)
+
+## Initiate 
+## ... Packages
+pkgs <- c(
+  "knitr",                            # Reproducible reporting
+  "here",                             # File system
+  "sf"                                # Spatial data
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
+
 knitr::opts_chunk$set(
   echo = TRUE,
   message=FALSE, 
@@ -30,48 +41,27 @@ knitr::opts_chunk$set(
   fig.width=7, 
   fig.height=4.6)
 
-
-## Initiate 
-## ... Packages
-source(here::here("src/preamble.R"))
-
-install.packages(setdiff(c("sf"), rownames(installed.packages())))
-library(sf)
-
-## ... Functions
-source(here("src/def_paths.R"))
-source(here("src/text_colour.R"))
-
-## ... Files
-l.file <- list(
-  gf_raw = path(l.path$data, "gf_original/regression_vars.csv"),
-  gf_cln = path(l.path$data, "gf_original/regressions_ready_data3.dta"),
-  epa_eia_xwalk = path(l.path$data, "epa/epa_eia_crosswalk.csv"),
-  gf_cems_xwalk = path(l.path$data, "gf_cems_xwalk.xlsx"),
-  epa = path(l.path$data, "epa/Facility_Attributes.zip"),
-  state = path(l.path$data, "eia/shp/USA_States_Generalized.shp")
-)
+source(here("src/preamble.R"))
 
 ## ... Definitions
 date <- format(Sys.Date(), "%Y%m%d")
-# date <- "20240629"
 fs::dir_create(path(l.path$out, date))
+
+## ... Files
+l.file <- list(
+  gf_raw = here("data/use_data/regression_vars.csv"),
+  gf_cln = here("data/use_data/regressions_ready_data.dta"),
+  epa_eia_xwalk = here("data/epa/epa_eia_crosswalk.csv"),
+  gf_cems_xwalk = here("data/gf_cems_xwalk.xlsx"),
+  epa = here("data/epa/Facility_Attributes.zip"),
+  state = here("data/eia/shp/USA_States_Generalized.shp"),
+  fig2 = here("out", date, "fig2.pdf"),
+  tbl5 = here("out", date, "tbl5.tex"),
+  tbl6 = here("out", date, "tbl6.tex")
+)
 ```
 
 ```{r theme, include=FALSE}
-
-# theme_sulfur <- function() {
-#   theme_classic() +
-#   theme(strip.background = element_rect(fill="grey85", color=NA),
-#         axis.line.y = element_blank(),
-#         axis.ticks.y = element_blank(),
-#         panel.grid.major.y = element_line(colour="grey85", size=0.3),
-#         panel.grid.minor.y = element_line(colour="grey85", size=0.3),
-#         axis.line.x = element_line(size=0.4),
-#         axis.ticks.x = element_line(size=0.4),
-#         legend.position = "right",
-#         plot.caption = element_text(hjust=0))
-# }
 
 theme_maps <- function() {
   theme_void() +
@@ -80,6 +70,7 @@ theme_maps <- function() {
         plot.caption = element_text(hjust=0))
 } 
 ```
+
 
 # Objective
 
@@ -95,7 +86,7 @@ We import grandfathering, EPA-EIA crosswalk, EPA facility and various spatial da
 
 ## Boiler characteristics
 
-Grandfathering ...
+We import the grandfathering dataset, i.e., the synthesis of boiler characteristics previously generated. 
 
 ```{r data-gf}
 
@@ -170,9 +161,7 @@ There are multiple sources for plant geographic locations:
 - EPA facility attributes; and,
 - EIA860.
 
-The source for the grandfathering dataset is most likely the EIA.  Here, we rely on the grandfathering and EPA datasets.  `r text_colour(colour="red", text="In future versions, we should incorportate EIA860 coordinates in order to avoid using county centroids.")`
-
-We first import the grandfathering data, where we summarize it at the ORISPL level.
+Here, we rely on the grandfathering and EPA datasets.  We first import the grandfathering data, where we summarize it at the ORISPL level.
 
 ```{r data-gf-coord}
 
@@ -213,10 +202,10 @@ We next import the EPA data and summarize at the ORISPL level.
 epa_file <- zip::zip_list(l.file$epa) %>%
   filter(str_detect(filename, "^facility")) %>%
   pull(filename)
-zip::unzip(l.file$epa, file=epa_file, exdir=path(l.path$data, "epa"))
+zip::unzip(l.file$epa, file=epa_file, exdir=here("data/epa"))
 
 ## Import EPA coordinate data
-df.epa <- read_csv(path(l.path$data, "epa", epa_file)) %>%
+df.epa <- read_csv(here("data/epa", epa_file)) %>%
   select(ORISPL = `Facility ID (ORISPL)`, 
        LAT_EPA = `Facility Latitude`, 
        LON_EPA = `Facility Longitude`) %>%
@@ -224,7 +213,7 @@ df.epa <- read_csv(path(l.path$data, "epa", epa_file)) %>%
   arrange(ORISPL)
 
 ## Remove EPA facility data
-fs::file_delete(path(l.path$data, "epa", epa_file))
+fs::file_delete(here("data/epa", epa_file))
 ```
 
 Finally, we import the EPA-EIA crosswalk data and summarize at the ORISPL level.
@@ -265,7 +254,7 @@ ggplot(data=df.state) +
 
 # Cleaning
 
-...
+This sections cleans plant coordinates and boiler characteristics.
 
 
 ## Plant coordinates
@@ -278,7 +267,9 @@ We first construct the plant latitude and longitude coordinates using the follow
 4. EPA coordinates from EPA-EIA crosswalk; and,
 5. Grandfathering county centroids.
 
-The base values are from the grandfathering dataset, which are sourced from EIA-860.  For any missing values, we replace them with coordinates from EPA facility attributes.  Finally, for any remaining missing values, we adopt county centroids as calculated in the grandfathering dataset.  `r text_colour(colour="red", text="County centroids should eventually be superceded by EIA860 plant coordinates.")`
+The base values are from the grandfathering dataset, which are sourced from EIA-860.  For any missing values, we replace them with coordinates from EPA facility attributes.  Finally, for any remaining missing values, we adopt county centroids as calculated in the grandfathering dataset.
+
+This subsection produces Figure 2 in the paper.
 
 ```{r plant-coords}
 
@@ -344,9 +335,9 @@ ggplot() +
          size = guide_legend(order=2, override.aes=list(shape=1, alpha=0.5)))
 
 ggplot() +
-  geom_sf(data=df.state, fill="grey85", color="grey95", size=0.3) +
+  geom_sf(data=df.state, fill="grey99", color="grey70", size=0.3) +
   geom_sf(data=df.plant, aes(color=GF_MEAN, size=N)) +
-  scale_color_viridis_c(direction=-1, begin=0.1, end=0.85, alpha=0.4) +
+  scale_color_viridis_c(direction=-1, begin=0.1, end=0.8, alpha=0.4) +
   scale_size(breaks=c(5,10)) +
   coord_sf(crs=sf::st_crs(2163)) +
   labs(#title="Coal-fired power plants",
@@ -356,14 +347,13 @@ ggplot() +
   guides(color = guide_legend(order=1, override.aes=list(size=3.5, alpha=0.5)),
          size = guide_legend(order=2, override.aes=list(shape=1, alpha=0.5)))
 
-# ggsave(path(l.path$out, date, "fig.gf_share_map.pdf"),
-#        width=8, height=4.25, units="in")
+ggsave(l.file$fig2, width=8, height=4.25, units="in")
 ```
 
 
 ## Boiler characteristics
 
-...
+Next, we join plant coordinates with the grandfathering dataset.
 
 ```{r boiler-chars}
 
@@ -377,9 +367,12 @@ df.boiler <- df.gf_cln %>%
 
 # Analysis
 
-...
+This section prepares balance tables for the paper.
+
 
 ## Grandfathering
+
+This subsection produces Table 5 in the paper.
 
 ```{r analysis}
 
@@ -556,20 +549,20 @@ tbl_footer <- c("\\hline\\hline",
                 "\\end{center}\n")
 
 ## Output TeX table file
-f_header %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=FALSE)
-tbl_header %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=TRUE)
-tbl_coef %>% write_tsv(path(l.path$out, date, "tbl.balance.tex"), 
+f_header %>% write_lines(l.file$tbl5, append=FALSE)
+tbl_header %>% write_lines(l.file$tbl5, append=TRUE)
+tbl_coef %>% write_tsv(l.file$tbl5, 
                        append=TRUE, col_names=FALSE, escape="none")
-tbl_midder %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=TRUE)
-tbl_summary %>% write_tsv(path(l.path$out, date, "tbl.balance.tex"), 
+tbl_midder %>% write_lines(l.file$tbl5, append=TRUE)
+tbl_summary %>% write_tsv(l.file$tbl5, 
                           append=TRUE, col_names=FALSE, escape="none")
-tbl_footer %>% write_lines(path(l.path$out, date, "tbl.balance.tex"), append=TRUE)
+tbl_footer %>% write_lines(l.file$tbl5, append=TRUE)
 ```
 
 
 ## Local reg > 1.1
 
-...
+This subsection produces Table 6 in the paper.
 
 ```{r}
 
@@ -717,174 +710,13 @@ tbl_footer <- c("\\hline\\hline",
                 "\\end{center}\n")
 
 ## Output TeX table file
-f_header %>% write_lines(path(l.path$out, date, "tbl.balance_lr11.tex"), append=FALSE)
-tbl_header %>% write_lines(path(l.path$out, date, "tbl.balance_lr11.tex"), append=TRUE)
-tbl_coef %>% write_tsv(path(l.path$out, date, "tbl.balance_lr11.tex"), 
+f_header %>% write_lines(l.file$tbl6, append=FALSE)
+tbl_header %>% write_lines(l.file$tbl6, append=TRUE)
+tbl_coef %>% write_tsv(l.file$tbl6, 
                        append=TRUE, col_names=FALSE, escape="none")
-tbl_midder %>% write_lines(path(l.path$out, date, "tbl.balance_lr11.tex"), append=TRUE)
-tbl_summary %>% write_tsv(path(l.path$out, date, "tbl.balance_lr11.tex"), 
+tbl_midder %>% write_lines(l.file$tbl6, append=TRUE)
+tbl_summary %>% write_tsv(l.file$tbl6, 
                           append=TRUE, col_names=FALSE, escape="none")
-tbl_footer %>% write_lines(path(l.path$out, date, "tbl.balance_lr11.tex"), append=TRUE)
-```
-
-
-## Local reg > 1.2
-
-...
-
-```{r}
-
-df.boiler12 <- df.boiler |>
-  mutate(LR = ifelse(LOCALREG<1.2, 1, 0))
-
-df.bal_n <- df.boiler12 %>%
-  group_by(LR) %>%
-  summarise(N = n(), .groups="drop") %>%
-  mutate(N = formatC(N, format="f", digits=0, big.mark=",")) %>%
-  pivot_wider(names_from=LR, names_prefix="LR_", values_from="N") %>%
-  mutate(VAR = "N",
-         ORDER = 1) %>%
-  select(VAR, ORDER, LR_1, LR_0)
-
-df.bal <- df.boiler12 %>%
-  select(-GF, -HEATRATE) %>%
-  mutate(GLOAD = GLOAD/10^3,
-         UT_CI = (UTILITY_TYPE %in% c(2,4)),
-         UT_IOU = (UTILITY_TYPE==5),
-         UT_OTH = (!(UTILITY_TYPE %in% c(2,4,5))),
-         MT_CE = (MANUFACT_TYPE==4),
-         MT_FW = (MANUFACT_TYPE==7),
-         MT_RS = (MANUFACT_TYPE==17),
-         MT_OTH = (!(MANUFACT_TYPE %in% c(4,7,17)))) %>%
-  select(-ORISPL, -BOILERID, -STATE, -UTILITY_TYPE, -MANUFACT_TYPE) %>%
-  pivot_longer(cols=-LR, names_to="VAR", values_to="VAL") %>%
-  group_by(VAR, LR) %>%
-  summarise(MEAN = mean(VAL, na.rm=TRUE),
-            SD = sd(VAL, na.rm=TRUE),
-            N = sum(!is.na(VAL), na.rm=TRUE),
-            .groups="drop") %>%
-  pivot_wider(id_cols=VAR, names_from=LR, values_from=c(MEAN, SD, N)) %>%
-  mutate(DIFF = MEAN_1 - MEAN_0,
-         TSTAT = (MEAN_1 - MEAN_0)/sqrt(SD_0^2/N_0 + SD_1^2/N_1),
-         SIG = case_when(abs(TSTAT)>=3.291 ~ "^{***}",
-                         abs(TSTAT)>=2.576 ~ "^{**}",
-                         abs(TSTAT)>=1.960 ~ "^{*}",
-                         TRUE ~ "")) %>%
-  mutate_at(vars(matches("MEAN|SD|DIFF|TSTAT")), ~formatC(., format="f", digits=2, big.mark=",")) %>%
-  mutate_at(vars(starts_with("SD")), ~glue("({.})")) %>%
-  mutate(DIFF = glue("{DIFF}{SIG}"),
-         TSTAT = glue("[{TSTAT}]")) %>%
-  select(-starts_with("N_"), -SIG) %>%
-  pivot_longer(cols=matches("MEAN|SD|DIFF|TSTAT"), names_to="STAT", values_to="VAL") %>%
-  separate(STAT, into=c("STAT","LR"), sep="_") %>%
-  mutate(ORDER = case_when(STAT %in% c("MEAN","DIFF") ~ 1,
-                           TRUE ~ 2)) %>%
-  pivot_wider(id_cols=c(VAR, ORDER), names_from=LR, names_prefix="LR_", values_from=VAL) %>%
-  rename(DIFF = LR_NA) %>%
-  bind_rows(df.bal_n) %>%
-  mutate(VAR = factor(VAR, levels=levels, labels=labels)) %>%
-  arrange(VAR, ORDER) %>%
-  mutate(VAR = as.character(VAR),
-         VAR = case_when(VAR=="Applicable Non-NSR Emission Standard [lbs/MMBtu]" & ORDER==1 ~ 
-                           "Applicable Non-NSR Emission",
-                         VAR=="Applicable Non-NSR Emission Standard [lbs/MMBtu]" & ORDER==2 ~ 
-                           " Standard [lbs/MMBtu]",
-                         VAR=="Weighted average mine sulfur content [\\% weight]" & ORDER==1 ~ 
-                           "Weighted average mine sulfur",
-                         VAR=="Weighted average mine sulfur content [\\% weight]" & ORDER==2 ~ 
-                           " content [\\% weight]",
-                         VAR=="Commercial \\& industrial utility share" & ORDER==1 ~ 
-                           "Commercial \\& industrial utility",
-                         VAR=="Commercial \\& industrial utility share" & ORDER==2 ~ 
-                           " share",
-                         ORDER==2 ~ as.character(NA),
-                         TRUE ~ VAR)) %>%
-  mutate_all(~ifelse(is.na(.), "", .)) %>%
-  select(ORDER, VAR, LR_1, LR_0, DIFF)
-```
-
-```{r balance-tbl}
-
-if (knitr::is_html_output()) {
-  df.bal %>%
-    kable(format="html", align="lrrr", booktabs=TRUE, linesep=c(""),
-          caption="Average characteristics of boilers by local regulation",
-          col.names=c("","Local regulation > 1.2","Local regulation <= 1.2.","Difference")) 
-} else {
-  df.bal
-}
-```
-
-This section exports the table to a tex file.
-
-```{r export}
-
-## Build regression table (longtable) -----------------------------------------
-
-## Construct table coefficients
-tbl_coef <- df.bal %>%
-  filter(VAR!="N") %>%
-  mutate_at(vars(last_col()), ~case_when(ORDER==1 ~ paste0(., " \\\\"),
-                                         TRUE ~ paste0(., " \\\\ [1.0ex]"))) %>%
-  mutate_at(vars(2:last_col(offset=1)), ~paste0(., " &")) %>%
-  select(-ORDER)
-
-## Construct table summary
-tbl_summary <- df.bal %>%
-  filter(VAR=="N") %>%
-  mutate(VAR = "Number of Boilers") %>%
-  mutate_at(vars(2:last_col(offset=1)), ~paste0(., " &")) %>%
-  mutate_at(vars(last_col()), ~paste0(., " \\\\")) %>%
-  select(-ORDER)
-
-## Prepare file header and table header, midder and footer
-f_header <- c("%% Grandfathering Project",
-              "%% Balance table",
-              glue::glue("%% Compiled on {base::Sys.time()} using <balance.Rmd>"),
-              "%% Written by Jack Gregory",
-              "\n")
-tbl_header <- c("\\begin{center}",
-                "\\begin{singlespace}",
-                "\\begin{footnotesize}\n",
-                "\\begin{longtable}[c]{@{\\extracolsep{0.7ex}}l*{3}{D{.}{.}{-2}}@{}}",
-                "\t\\caption{Average characteristics of boilers by local regulation}",
-                "\t\\label{tbl:balance_lr12}\n",
-                "\\\\",
-                "\\hline\\hline",
-                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\> 1.2}}} & ",
-                       "\\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\$\\leq$ 1.2}}} & ",
-                       "\\multicolumn{1}{c}{\\textbf{Difference}} \\\\ [1.0ex]"),
-                "\\midrule",
-                "\\endfirsthead",
-                "\\hline\\hline",
-                paste0("\\textbf{Variable} & \\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\> 1.2}}} & ",
-                       "\\multicolumn{1}{c}{\\textbf{\\makecell{Local regulation\\\\$\\leq$ 1.2}}} & ",
-                       "\\multicolumn{1}{c}{\\textbf{Difference}} \\\\ [1.0ex]"),
-                "\\midrule",
-                "\\endhead")
-tbl_midder <- c("\\midrule")
-tbl_footer <- c("\\hline\\hline",
-                paste0("\\multicolumn{4}{p{14.1cm}}{\\textit{Notes}:  This table displays average ",
-                       "characteristics by local regulation at a cutoff of 1.2 lbs/MMBtu.  Standard deviations are in ",
-                       "parentheses, with \\textit{t}-statistics of the difference between ",
-                       "`grandfathered' and `non-grandfathered' boilers in brackets where ",
-                       "*** p<0.001;  ** p<0.01;  * p<0.05.  All variables utilize the full extent ",
-                       "of our dataset, except for those from CEMS which are from 1997 onwards and ",
-                       "are identified with a $^{\\dagger}$. Each row is a separate calculation, and ",
-                       "is not conditional on the other variables reported here.} \\\\"),
-                "\\end{longtable}\n",
-                "\\end{footnotesize}",
-                "\\end{singlespace}",
-                "\\end{center}\n")
-
-## Output TeX table file
-f_header %>% write_lines(path(l.path$out, date, "tbl.balance_lr12.tex"), append=FALSE)
-tbl_header %>% write_lines(path(l.path$out, date, "tbl.balance_lr12.tex"), append=TRUE)
-tbl_coef %>% write_tsv(path(l.path$out, date, "tbl.balance_lr12.tex"), 
-                       append=TRUE, col_names=FALSE, escape="none")
-tbl_midder %>% write_lines(path(l.path$out, date, "tbl.balance_lr12.tex"), append=TRUE)
-tbl_summary %>% write_tsv(path(l.path$out, date, "tbl.balance_lr12.tex"), 
-                          append=TRUE, col_names=FALSE, escape="none")
-tbl_footer %>% write_lines(path(l.path$out, date, "tbl.balance_lr12.tex"), append=TRUE)
+tbl_footer %>% write_lines(l.file$tbl6, append=TRUE)
 ```
 
