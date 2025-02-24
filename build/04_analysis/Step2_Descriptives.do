@@ -1,4 +1,12 @@
 
+** Set definitions
+set matsize  900, permanently
+global path_orig_data "Here_your_path\data\orig_data"
+global path_code "Here_your_path\code\3_Final_dataset_creation" 
+global path_data "Here_your_path\data"
+global path_output "Here_your_path\out"
+
+
 ***************************************************************
 ** Optimal grandfathering project ***
 ** Code for graphs 5 and 6 
