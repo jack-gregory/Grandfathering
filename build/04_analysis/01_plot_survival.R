@@ -1,19 +1,9 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 02_analysis/survival_share.R
+## Analysis -- Plot -- Survival
 ## Jack Gregory
 ## 29 June 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-# INTRODUCTION ------------------------------------------------------------------------------------
-## This script produces the "survival share" plot for the Grandfathering project.
-
-
-# VERSION HISTORY ---------------------------------------------------------------------------------
-## V    DATE      EDITOR        NOTES
-## 1.0  19Sep2021 Jack Gregory  Initial version
-## 1.1  29Jun2024 Jack Gregory  New draft; Update for JAERE R&R submission
 
 
 ### START CODE ###

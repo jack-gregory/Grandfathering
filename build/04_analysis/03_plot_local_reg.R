@@ -1,19 +1,9 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## 02_analysis/local_reg.R
+## Analysis -- Plot -- Local Regs
 ## Jack Gregory
 ## 29 June 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-# INTRODUCTION ------------------------------------------------------------------------------------
-## This script produces the "local regulations" plot for the Grandfathering project.
-
-
-# VERSION HISTORY ---------------------------------------------------------------------------------
-## V    DATE      EDITOR        NOTES
-## 1.0  20Sep2021 Jack Gregory  Initial version
-## 1.1  29Jun2024 Jack Gregory  New draft; Update for JAERE R&R submission
 
 
 ### START CODE ###
