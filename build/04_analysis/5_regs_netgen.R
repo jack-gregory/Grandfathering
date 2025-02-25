@@ -35,29 +35,26 @@
 
 ## Initiate
 ## ... Packages
-source(here::here("src/preamble.R"))
+pkgs <- c(
+  "sandwich","lmtest","stargazer"
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
 
-install.packages(setdiff(c("sandwich"), rownames(installed.packages())))
-library(sandwich)
-
-install.packages(setdiff(c("lmtest"), rownames(installed.packages())))
-library(lmtest)
-
-install.packages(setdiff(c("stargazer"), rownames(installed.packages())))
-library(stargazer)
-
-## ... Functions
-source(here("src/def_paths.R"))
+## ... Date
+date <- format(Sys.Date(), "%Y%m%d")
+dir_create(here("out", date))
 
 ## ... Files
 l.file <- list(
-  epa_eia_xwalk = path(l.path$data, "epa/epa_eia_crosswalk.csv"),
-  gf_cems_xwalk = path(l.path$data, "gf_cems_xwalk.xlsx"),
-  epa = path(l.path$data, "epa/Facility_Attributes.zip"),
-  gf= path(l.path$data, "gf_original/regressions_ready_data3.dta"),
-  netgen = path(l.path$data, "eia_netgen.csv"),
-  netgen_unit = path(l.path$data, "eia_netgen_unit.csv"),
-  plant = path(l.path$data, "eia_plant.csv")
+  epa_eia_xwalk = here("data/epa/epa_eia_crosswalk.csv"),
+  gf_cems_xwalk = here("data/gf_cems_xwalk.xlsx"),
+  epa = here("data/epa/Facility_Attributes.zip"),
+  gf = here("data/use_data/regressions_ready_data.dta"),
+  netgen_unit = here("data/eia_netgen_unit.csv"),
+  plant = here("data/eia_plant.csv"),
+  tbl2 = here("out", date, "tbl2.tex")
 )
 
 
@@ -133,9 +130,6 @@ if (!all(distinct(df.gf, GF) %>% pull() %in% c(0,1))) {
 
 
 ## (2d) Import net generation data
-## Import EIA-923 netgen data
-# df.netgen <- readRDS(fs::path_ext_set(l.file$netgen, "rds"))
-
 ## Import EIA-923 netgen-unit data
 df.netgen_unit <- readRDS(fs::path_ext_set(l.file$netgen_unit, "rds")) %>%
   rename(EIA_GENERATOR_ID = GENERATOR_ID)
@@ -210,138 +204,11 @@ df.xwalk <- l.xwalk$Clean %>%
   fill(REPORTING, .direction="updown") %>%
   filter(FUEL=="Coal")
 
-# ## Cleaning for Multiple???
-#   distinct(ORISPL, GF_BOILER, EPA_UNIT_ID, N) %>%
-#   full_join(df.xwalk_epa_eia %>%
-#               select(ORISPL = EPA_PLANT_ID, 
-#                      EIA_PLANT_ID, EPA_UNIT_ID, EIA_BOILER_ID, EPA_GENERATOR_ID, 
-#                      EIA_GENERATOR_ID, EIA_UNIT_TYPE, EPA_FACILITY_NAME, EIA_PLANT_NAME),
-#             by=c("ORISPL","EPA_UNIT_ID")) %>%
-#   relocate(EIA_PLANT_ID, N, .after=ORISPL) %>%
-#   group_by(ORISPL) %>%
-#   mutate(GF = ifelse(!is.na(GF_BOILER), 1, NA)) %>%
-#   fill(GF, .direction="downup") %>%
-#   filter(GF==1) %>%
-#   arrange(ORISPL, GF_BOILER)
 
+# (4) IMPORT GR -----------------------------------------------------------------------------------
 
-# (4) BUILD GR ------------------------------------------------------------------------------------
-
-## (4a) Create precursors
-## Build years list based on net generation data
-l.yrs <- df.netgen_unit %>%
-  filter(!(YR<1985 | YR==2006 | YR>2017)) %>%
-  distinct(YR) %>%
-  arrange(YR) %>%
-  pull() %>%
-  as.list()
-
-## CEMS query function
-query_cems <- function(yr, con) {
-  
-  ## Assertions
-  ## NB - Future versions should perform assertr checks on the df.xwalk below to ensure
-  ##      proper content and structure.
-  if (!exists("df.xwalk")) {
-    stop("The dataframe df.xwalk is missing from the global environment.")
-  }
-  stopifnot(
-    yr>=1997 & yr<=2025,
-    DBI::dbIsValid(con)
-  )
-  
-  cat("\n", yr, " ...\n", sep="")
-  
-  ## Query CEMS data for single year from MySQL epa database
-  ## NB - Future versions could aggregate the query to the year-month level, if they could 
-  ##      be joined with the df.xwalk dataframe.  This could be achieved by using temporary 
-  ##      tables, see <.../src/sql_data_transfer.R>.
-  cat("  Query CEMS\n")
-  res <- glue::glue_sql("
-  select 		ORISPL,
-			      UNIT as EPA_UNIT_ID,
-			      year(DATETIME) as YR,
-			      DATETIME,
-			      DURATION,
-		        GLOAD,
-		        SLOAD,
-		        HEAT
-  from		  epa.cems
-  where     year(DATETIME)={yr}
-  ;", .con=con) %>% 
-    DBI::SQL() %>% 
-    {DBI::dbSendQuery(con, .)}
-  df <- DBI::dbFetch(res, n=-1)
-  DBI::dbClearResult(res)
-  
-  ## Aggregate over months
-  cat("  Aggregate to yr-mths\n")
-  df %>%
-    mutate(YR = as.numeric(YR)) %>%
-    
-    ## Filter on GF boilers
-    inner_join(df.xwalk %>% 
-                 select(ORISPL, EPA_UNIT_ID, GF_BOILER_ID, EIA_GENERATOR_ID, REPORTING, YR), 
-               by=c("ORISPL","EPA_UNIT_ID","YR")) %>%
-    
-    ## Generate monthly CEMS  
-    mutate(MTH = month(DATETIME)) %>%
-    group_by(ORISPL, EPA_UNIT_ID, GF_BOILER_ID, EIA_GENERATOR_ID, REPORTING, YR, MTH) %>%
-    summarise_at(vars(DURATION, GLOAD, SLOAD, HEAT), sum, na.rm=TRUE)
-}
-
-
-## (4b) Query MySQL epa.cems table
-## Connect to MySQL
-# con <- DBI::dbConnect(RMySQL::MySQL(), 
-#                       user="root", 
-#                       password="blackberries22-", 
-#                       dbname="epa", 
-#                       host="localhost")
-con <- DBI::dbConnect(odbc::odbc(), "local_epa")
-
-## Query CEMS
-df.cems <- map_dfr(l.yrs, ~query_cems(yr=.x, con=con))
-
-## Disconnect from MySQL
-DBI::dbDisconnect(con)
-
-
-## (4c) Build GR dataframe
-df.gr <- df.cems %>%
-  
-  ## Merge net generation and grandfathering data
-  left_join(df.netgen_unit %>% 
-              select(ORISPL, EIA_GENERATOR_ID, YR, MTH, NETGEN), 
-            by=c("ORISPL","EIA_GENERATOR_ID","YR","MTH")) %>%
-  left_join(df.gf, by=c("ORISPL","GF_BOILER_ID","YR")) %>%
-  
-  ## Fill missing rows
-  arrange(ORISPL, GF_BOILER_ID, YR, MTH) %>%
-  group_by(ORISPL, GF_BOILER_ID) %>%
-  fill(GF, OWNER, INSERVICE, CAP, SULFUR_DIST) %>%
-  mutate(AGE = ifelse(is.na(AGE), YR - INSERVICE, AGE)) %>%
-  ungroup() %>%
-  filter(!is.na(GF)) %>%
-  
-  ## Calculate GR
-  ## NB - There appears to be quite a few instances where the ratio is either greater than one
-  ##      or equal to zero.  These are likely a result of poor matching between boilers within
-  ##      plants.
-  mutate(GR = NETGEN/GLOAD,
-         GR = ifelse(GR>0 & GR<1, GR, NA)) %>%
-  
-  ## Create clustering ID
-  mutate(ID = paste0(ORISPL, "|", GF_BOILER_ID)) %>%
-  relocate(ID) %>%
-  
-  ## Finalize dataframe
-  select(ID, ORISPL, GF_BOILER_ID, EPA_UNIT_ID, EIA_GENERATOR_ID, REPORTING, GF, YR, MTH, DURATION, 
-         GLOAD, SLOAD, NETGEN, GR, OWNER, AGE, CAP, HEAT, SULFUR, SULFUR_DIST) %>%
-  arrange(ORISPL, GF_BOILER_ID, YR, MTH)
-
-## Save dataframe
-# saveRDS(df.gr, here::here("data/df_gr.rds"))
+## (4a) Read generation ratio dataset
+df.gr <- readRDS(here::here("data/df_gr.rds"))
 
 
 # (5) MONTHLY ANALYSIS ----------------------------------------------------------------------------
@@ -359,7 +226,6 @@ df.gr %>%
 l.spec <- list(
   Base = as.formula(GR ~ GF),
   `+Chars` = as.formula(GR ~ GF + AGE + CAP),
-  # `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + factor(YR) + factor(MTH)),
   `+Heat` = as.formula(GR ~ GF + AGE + CAP + HEAT),
   `+Sulfur` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR),
   `+OwnerFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER)),
@@ -496,7 +362,8 @@ regtbl <- function(df, cluster=FALSE, tbl.type="text") {
 }
 
 ## Build regtbl
-regtbl(df.reg %>% slice(1:2), cluster=TRUE)
+## NB -- Table 2 in paper.
+# regtbl(df.reg %>% slice(1:2), cluster=TRUE)
 regtbl(df.reg %>% slice(1:2), cluster=TRUE, tbl.type="latex")
 
 ## Caption
@@ -507,97 +374,6 @@ regtbl(df.reg %>% slice(1:2), cluster=TRUE, tbl.type="latex")
 # conditional on age and size. They rely on CEMS and EIA-923 data from 2008 to 2017.  
 # Boiler-level clustered standard errors used, with *** p$<$0.01,  ** p$<$0.05,  
 # * p$<$0.10 and \\textit{t}-statistics in parentheses.
-
-
-## (5d) Perform regressions on monthly reporters only
-## NB - Regressions including only those plants with monthly reporting of form EIA-923
-
-## Check GR weighted average by DURATION
-df.gr %>%
-  filter(REPORTING=="M") %>%
-  filter(!is.na(GR)) %>%
-  group_by(GF) %>%
-  summarise(N = n(),
-            GR = sum(DURATION*GR)/sum(DURATION))
-
-## Display regressions
-map(
-  l.spec,
-  ~lm_gr(formula=.x, data=filter(df.gr, REPORTING=="M"), cluster=TRUE, print=TRUE)
-)
-
-
-## (5e) Perform fe regressions
-## NB - Regressions with ORISPL FEs are not necessarily appropriate given that they are
-##      likely to be collinear with initial GF status.  A time-varying GF indicator may
-##      avoid these issues but reintroduce endogeneity, as GF status then becomes a 
-##      choice variable.
-# library(fixest)
-# 
-# ## List specifications
-# l.spec_fe <- list(
-#   Base = as.formula(GR ~ GF | ORISPL),
-#   `+Chars` = as.formula(GR ~ GF + AGE + CAP | ORISPL),
-#   `+TimeFE` = as.formula(GR ~ GF + AGE + CAP | ORISPL + YR + MTH)
-# )
-# 
-# ## Display regressions
-# map(l.spec_fe,
-#     ~feols(fml=.x,
-#            data=df.gr %>% mutate(DATE = ydm(paste(YR, MTH, "01", sep="-"))),
-#            cluster="ORISPL",
-#            panel.id=c("ORISPL","DATE")))
-
-
-# (5) YEARLY ANALYSIS -----------------------------------------------------------------------------
-
-## (5a) Check GR weighted average by DURATION
-df.gr_yr <- df.gr %>%
-  group_by(ORISPL, GF_BOILER_ID, EPA_UNIT_ID, EIA_GENERATOR_ID, GF, YR) %>%
-  summarise(across(DURATION:NETGEN, sum), 
-            GR = NETGEN/GLOAD,
-            OWNER = first(OWNER),
-            across(AGE:CAP, mean),
-            HEAT = sum(HEAT),
-            across(SULFUR:SULFUR_DIST, mean),
-            .groups="drop") %>%
-  filter(!(is.na(GR) | abs(GR)==Inf))
-
-df.gr_yr %>%
-  group_by(GF) %>%
-  summarise(N = n(),
-            GR = sum(DURATION*GR)/sum(DURATION))
-
-
-## (5b) Perform naive linear regressions
-## List specifications
-l.spec <- list(
-  Base = as.formula(GR ~ GF),
-  `+Chars` = as.formula(GR ~ GF + AGE + CAP),
-  # `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + factor(YR),
-  `+Heat` = as.formula(GR ~ GF + AGE + CAP + HEAT),
-  `+Sulfur` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR),
-  `+OwnerFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER)),
-  `+TimeFE` = as.formula(GR ~ GF + AGE + CAP + HEAT + SULFUR + factor(OWNER) + factor(YR))
-)
-
-## Display regressions
-map(
-  l.spec,
-  ~lm_gr(formula=.x, data=df.gr_yr, cluster=TRUE, print=TRUE)
-)
-
-## Capture regressions
-df.reg <- tibble(as.list(names(l.spec)),
-                 l.spec) %>%
-  select(name=`as.list(names(l.spec))`, formula=l.spec) %>%
-  mutate(model = map(formula, ~lm_gr(formula=.x, data=df.gr_yr)))
-
-
-## (5c) Regression table
-## Build regtbl
-regtbl(df.reg %>% slice(1:2), cluster=TRUE)
-regtbl(df.reg %>% slice(1:2), cluster=TRUE, tbl.type="latex")
 
 
 ### END CODE ###

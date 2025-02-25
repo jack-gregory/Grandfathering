@@ -30,47 +30,41 @@
 # (1) SETUP --------------------------------------------------------------------------------------
 
 ## (1a) Initiate packages
-source(here::here("src/preamble.R"))
+pkgs <- c(
+  "here"                              # File system
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
 
-# install.packages(setdiff(c("sf"), rownames(installed.packages())))
-# library(sf)
+source(here("src/preamble.R"))
 
-## RStata -- Glue between R & Stata
+## (1b) Initiate RStata -- Glue between R & Stata
 if(!("RStata" %in% installed.packages())) install.packages("RStata")
 library(RStata)
-if (Sys.info()[["user"]]=="Jack") {
-  options("RStata.StataPath"="\"C:\\Program Files (x86)\\Stata14\\StataSE-64\"")
-  options("RStata.StataVersion"=14.2)
-} else if (Sys.info()[["user"]]=="ajg") {
-  options("RStata.StataPath"="\"C:\\Program Files\\Stata16\\StataIC-64\"")
-  options("RStata.StataVersion"=16.1)
-} else if (Sys.info()[["user"]]=="Bialek-S") {
-  options("RStata.StataPath"="\"C:\\Program Files\\Stata16\\StataSE-64\"")
+if (Sys.info()[["user"]]=="user") {
+  options("RStata.StataPath"="...")
   options("RStata.StataVersion"=16.1)
 } else {
-  stop("User not recognized, please see RStata package in <preamble.R>.")
+  stop("User not recognized.")
 }
-
-
-## (1b) Initiate paths
-source(here("src/def_paths.R"))
 
 
 # (2) IMPORT DATA ---------------------------------------------------------------------------------
 
-source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "2_data.R")))
+source(dir_ls(here("build/03_analysis")) %>% keep(str_detect(., "2_data.R")))
 
 
 # (3) REGRESSIONS --------------------------------------------------------------------------------
 
-source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "3_regs_main.R")))
-source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "4_regs_robust.R")))
-source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "5_regs_netgen.R")))
+source(dir_ls(here("build/03_analysis")) %>% keep(str_detect(., "3_regs_main.R")))
+source(dir_ls(here("build/03_analysis")) %>% keep(str_detect(., "4_regs_robust.R")))
+source(dir_ls(here("build/03_analysis")) %>% keep(str_detect(., "5_regs_netgen.R")))
 
 
 # (4) PLOTS ---------------------------------------------------------------------------------------
 
-source(dir_ls(path(l.path$build, "02_analysis")) %>% keep(str_detect(., "6_plots_coefyr.R")))
+source(dir_ls(here("build/03_analysis")) %>% keep(str_detect(., "6_plots_coefyr.R")))
 
 
 ### END CODE ###

@@ -11,14 +11,13 @@
 
 # DEFINE ------------------------------------------------------------------------------------------
 
-## Initiate regression functions
+## Initiate
+## ... Functions
 source(here("src/stata_regs.R"))
 
-
-## Create output folder
+## ... Date
 date <- format(Sys.Date(), "%Y%m%d")
-# date <- "20240629"
-dir_create(path(l.path$out, date))
+dir_create(here("out", date))
 
 
 # YEARLY COEFFICIENT PLOTS ------------------------------------------------------------------------
@@ -74,10 +73,6 @@ df.reg <- tibble(l.type, l.rhs, l.cond) %>%
          sample = ifelse(lhs=="survive", cond_survive, ""),
          fml = paste(lhs, rhs, ctrl, cond, sample, sep=" ")) %>%
   
-  ## Exclude market controls
-  # mutate(cond = as.character(cond),
-  #        fml = paste(lhs, rhs, cond, sep=" ")) %>%
-  
   ## Run regressions
   mutate_at(vars(-model_id), as.character) %>%
   mutate(bs = ifelse(type=="iv", TRUE, FALSE)) %>%
@@ -117,14 +112,14 @@ p.coef_yr <- map2(
         theme(axis.line.y = element_blank(),
               axis.ticks.y = element_blank(),
               panel.grid.major.y = element_line(color="grey85", size=0.3),
-              # panel.grid.minor.y = element_line(color="grey85", size=0.3),
               plot.caption = element_text(hjust=0))
   }) %>%
   set_names(nm=unlist(l.name))
 
 ## Save plots
-walk(l.name, 
-     ~ggsave(path(l.path$out, date, glue("fig.coefyr_{.x}.pdf")),
+walk2(l.name,
+      list("a","b","c")
+     ~ggsave(here("out", date, glue("fig4{.y}.pdf")),
              plot=p.coef_yr[[.x]],
              width=8, height=3.5, units="in"))
 

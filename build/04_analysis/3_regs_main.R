@@ -11,14 +11,19 @@
 
 # PREAMBLE ----------------------------------------------------------------------------------------
 
-## Initiate regression functions
+## Initiate
+## ... Functions
 source(here("src/stata_regs.R"))
 
-
-## Create output folder
+## ... Date
 date <- format(Sys.Date(), "%Y%m%d")
-# date <- "20221117"
-dir_create(path(l.path$out, date))
+dir_create(here("out", date))
+
+## ... Files
+l.file <- list(
+  tbl1 = here("out", date, "tbl1.tex"),
+  tbl7 = here("out", date, "tbl7.tex")
+)
 
 
 # MAIN REGRESSIONS --------------------------------------------------------------------------------
@@ -148,20 +153,12 @@ tbl_coef <- df.reg %>%
   select(-stat)
 
 ## Construct table summary
-l.sum <- list(#"fe_yr","fe_st","fe_ut","fe_man",
-              "ctrl_mkt","ctrl_so2","N","r2")
-l.sum_labs <- list(#"Year FE","State FE","Utility FE","Manufacture FE",
-                   "Market Controls","Sulfur Controls","Observations","R$^{2}$")
+l.sum <- list("ctrl_mkt","ctrl_so2","N","r2")
+l.sum_labs <- list("Market Controls","Sulfur Controls","Observations","R$^{2}$")
 tbl_summary <- df.reg %>%
   distinct(lhs, model_id, type, fml, N, r2) %>%
   mutate_at(vars(N), ~formatC(., format="d", digits=0, big.mark=",")) %>%
   mutate_at(vars(r2), ~formatC(round(., digits=3), format="f", digits=3)) %>%
-  # mutate(fe_yr = ifelse(str_detect(fml, "i.year"), "X", ""),
-  #        fe_st = ifelse(str_detect(fml, "i.states"), "X", ""),
-  #        fe_ut = ifelse(str_detect(fml, "i.ut_type"), "X", ""),
-  #        fe_man = ifelse(str_detect(fml, "i.manufact"), "X", ""),
-  #        ctrl_mkt = ifelse(str_detect(fml, ctrl_mkt), "X", ""),
-  #        ctrl_so2 = ifelse((type=="iv"|str_detect(fml, "sulfur_content_tot")), "X", "")) %>%
   select(lhs, model_id, starts_with("fe"), starts_with("ctrl"), N, r2) %>%
   mutate_at(vars(starts_with("fe"), starts_with("ctrl")), 
             ~case_when(is.na(.) ~ "\\textit{}",
@@ -231,113 +228,52 @@ tbl_footer <- c("\\hline\\hline",
                 "\\end{center}")
 
 ## Output TeX table file
-file <- here::here(l.path$out, date, "tbl.reg_main.tex")
-f_header %>% write_lines(file, append=FALSE)
-tbl_header1 %>% write_lines(file, append=TRUE)
-tbl_colnames %>% write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
-tbl_header2 %>% write_lines(file, append=TRUE)
-tbl_colnames %>% write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
-tbl_header3 %>% write_lines(file, append=TRUE)
+f_header %>% write_lines(l.file$tbl1, append=FALSE)
+tbl_header1 %>% write_lines(l.file$tbl1, append=TRUE)
+tbl_colnames %>% write_tsv(l.file$tbl1, append=TRUE, col_names=FALSE, escape=NULL)
+tbl_header2 %>% write_lines(l.file$tbl1, append=TRUE)
+tbl_colnames %>% write_tsv(l.file$tbl1, append=TRUE, col_names=FALSE, escape=NULL)
+tbl_header3 %>% write_lines(l.file$tbl1, append=TRUE)
 
-subtbl_headerA %>% write_lines(file, append=TRUE)
+subtbl_headerA %>% write_lines(l.file$tbl1, append=TRUE)
 tbl_coef %>% 
   filter(lhs=="Utilization") %>%
   select(-lhs) %>%
-  write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
-tbl_midder %>% write_lines(file, append=TRUE)
+  write_tsv(l.file$tbl1, append=TRUE, col_names=FALSE, escape=NULL)
+tbl_midder %>% write_lines(l.file$tbl1, append=TRUE)
 tbl_summary %>% 
   filter(lhs=="Utilization") %>%
   select(-lhs) %>%
-  write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
+  write_tsv(l.file$tbl1, append=TRUE, col_names=FALSE, escape=NULL)
 
-subtbl_headerB %>% write_lines(file, append=TRUE)
+subtbl_headerB %>% write_lines(l.file$tbl1, append=TRUE)
 tbl_coef %>% 
   filter(lhs=="Survival") %>%
   select(-lhs) %>%
-  write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
-tbl_midder %>% write_lines(file, append=TRUE)
+  write_tsv(l.file$tbl1, append=TRUE, col_names=FALSE, escape=NULL)
+tbl_midder %>% write_lines(l.file$tbl1, append=TRUE)
 tbl_summary %>% 
   filter(lhs=="Survival") %>%
   select(-lhs) %>%
-  write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
+  write_tsv(l.file$tbl1, append=TRUE, col_names=FALSE, escape=NULL)
 
-subtbl_headerC %>% write_lines(file, append=TRUE)
+subtbl_headerC %>% write_lines(l.file$tbl1, append=TRUE)
 tbl_coef %>%
   filter(lhs=="Emissions") %>%
   select(-lhs) %>%
-  write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
-tbl_midder %>% write_lines(file, append=TRUE)
+  write_tsv(l.file$tbl1, append=TRUE, col_names=FALSE, escape=NULL)
+tbl_midder %>% write_lines(l.file$tbl1, append=TRUE)
 tbl_summary %>%
   filter(lhs=="Emissions") %>%
   select(-lhs) %>%
-  write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
+  write_tsv(l.file$tbl1, append=TRUE, col_names=FALSE, escape=NULL)
 
-tbl_footer %>% write_lines(file, append=TRUE)
+tbl_footer %>% write_lines(l.file$tbl1, append=TRUE)
 
 
 ## Clean environment ----------------------------------------------------------
 rm(list=ls(pattern="^(f|tbl|subtbl|txt)_"))
 rm(l.lhs, l.var, l.var_labs, l.sum, l.sum_labs)
-
-
-# MAIN REGRESSIONS (fixest) -----------------------------------------------------------------------
-# 
-# library(fixest)
-# 
-# ## Stata global definitions
-# # global controls_env so2_nonattain applic_reg ARPprice_sp
-# # global controls_env_interact grand_NSR_in_nonnat_const applic_reg_const
-# # global controls_gen_common age max_boi_nameplate
-# 
-# ## fixest conversions of Stata commands
-# # (1) reg `i' grand_NSR_const $controls_gen_common i.year i.states i.ut_type, vce(robust)
-# feols(fml=DURATION ~ grand_NSR_const + age + max_boi_nameplate | year + states + ut_type,
-#       data=df.gf,
-#       se="hetero") %>%
-#   summary()
-# 
-# # (2) reg `i' grand_NSR_const capacity_gf $controls_env $controls_env_interact $controls_gen_common \\\
-# #       i.year i.states i.ut_type, vce(robust)
-# feols(fml=DURATION ~ grand_NSR_const + age + max_boi_nameplate +
-#         i(grand_NSR_const, max_boi_nameplate, 0) + so2_nonattain + applic_reg + ARPprice_sp +
-#         grand_NSR_in_nonnat_const + applic_reg_const | year + states + ut_type,
-#       data=df.gf,
-#       se="hetero") %>%
-#   summary()
-# 
-# feols(fml=DURATION ~ grand_NSR_const + age + max_boi_nameplate +
-#         i(grand_NSR_const, max_boi_nameplate, 0) + so2_nonattain + applic_reg + ARPprice_sp +
-#         i(grand_NSR_const, so2_nonattain, 0) + i(grand_NSR_const, applic_reg, 0) |
-#         year + states + ut_type,
-#       data=df.gf,
-#       se="hetero") %>%
-#   summary()
-# 
-# 
-# # DURATION Gf age capacity capacity_gf efficiency_100_pct_load so2_nonattain so2_nonat_Gf applic_reg applic_reg_Gf ARPprice
-# # i.year i.states i.ut_type i.manufact state_cap_growth coal2gas_price d_growth 
-# #if (ut_type==4 | ut_type==5 | ut_type==2) & (inservice_y>=1950 & inservice_y<=2006)
-# s1 <- feols(fml=sulfur_content_tot ~ sulfur_net_iv + Gf + age + capacity + capacity_gf + efficiency_100_pct_load +
-#         so2_nonattain + so2_nonat_Gf + applic_reg + applic_reg_Gf + ARPprice +
-#         state_cap_growth + coal2gas_price + d_growth |
-#         year + states + ut_type + manufact,
-#       data=df.gf |>
-#         filter(ut_type %in% c(2,4,5)) |>
-#         filter(inservice_y>=1950 & inservice_y<=2006),
-#       vcov=cluster ~ ID)
-# df.gf_test <- df.gf |>
-#   filter(ut_type %in% c(2,4,5)) |>
-#   filter(inservice_y>=1950 & inservice_y<=2006) |>
-#   slice(s1[["obs_selection"]][["obsRemoved"]]) |>
-#   bind_cols(fitted_values = fitted(s1)) |>
-#   mutate(interaction_term = fitted_values * ARPprice)
-# feols(fml=DURATION ~ fitted_values + Gf + age + capacity + capacity_gf + efficiency_100_pct_load +
-#         so2_nonattain + so2_nonat_Gf + applic_reg + applic_reg_Gf + ARPprice + interaction_term +
-#         state_cap_growth + coal2gas_price + d_growth |
-#         year + states + ut_type + manufact,
-#       data=df.gf_test,
-#       vcov=cluster ~ ID) %>%
-#   summary()
 
 
 # FIRST STAGE REGRESSIONS--------------------------------------------------------------------------
@@ -424,19 +360,12 @@ tbl_coef <- df.reg %>%
   select(-stat)
 
 ## Construct table summary
-l.sum <- list(#"fe_yr","fe_st","fe_ut","fe_man",
-              "ctrl_mkt","N","r2")
-l.sum_labs <- list(#"Year FE","State FE","Utility FE","Manufacture FE",
-                   "Market Controls","Observations","R$^{2}$")
+l.sum <- list("ctrl_mkt","N","r2")
+l.sum_labs <- list("Market Controls","Observations","R$^{2}$")
 tbl_summary <- df.reg %>%
   distinct(model_id, type, fml, N, r2) %>%
   mutate_at(vars(N), ~formatC(., format="d", digits=0, big.mark=",")) %>%
   mutate_at(vars(r2), ~formatC(round(., digits=3), format="f", digits=3)) %>%
-  # mutate(fe_yr = ifelse(str_detect(fml, "i.year"), "X", ""),
-  #        fe_st = ifelse(str_detect(fml, "i.states"), "X", ""),
-  #        fe_ut = ifelse(str_detect(fml, "i.ut_type"), "X", ""),
-  #        fe_man = ifelse(str_detect(fml, "i.manufact"), "X", ""),
-  #        ctrl_mkt = ifelse(str_detect(fml, ctrl_mkt), "X", "")) %>%
   select(model_id, starts_with("fe"), starts_with("ctrl"), N, r2) %>%
   mutate_at(vars(starts_with("fe"), starts_with("ctrl")),
             ~case_when(is.na(.) ~ "\\textit{}",
@@ -485,20 +414,19 @@ tbl_footer <- c("\\hline",
                 "\\end{table}")
 
 ## Output TeX table file
-file <- here::here(l.path$out, date, paste0("tbl.reg_main_fs.tex"))
-f_header %>% write_lines(file, append=FALSE)
-tbl_header %>% write_lines(file, append=TRUE)
-tbl_colnames %>% write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
-tbl_midder %>% write_lines(file, append=TRUE)
-tbl_coef %>% write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
-tbl_midder %>% write_lines(file, append=TRUE)
-tbl_summary %>% write_tsv(file, append=TRUE, col_names=FALSE, escape=NULL)
-tbl_footer %>% write_lines(file, append=TRUE)
+f_header %>% write_lines(l.file$tbl7, append=FALSE)
+tbl_header %>% write_lines(l.file$tbl7, append=TRUE)
+tbl_colnames %>% write_tsv(l.file$tbl7, append=TRUE, col_names=FALSE, escape=NULL)
+tbl_midder %>% write_lines(l.file$tbl7, append=TRUE)
+tbl_coef %>% write_tsv(l.file$tbl7, append=TRUE, col_names=FALSE, escape=NULL)
+tbl_midder %>% write_lines(l.file$tbl7, append=TRUE)
+tbl_summary %>% write_tsv(l.file$tbl7, append=TRUE, col_names=FALSE, escape=NULL)
+tbl_footer %>% write_lines(l.file$tbl7, append=TRUE)
 
 
 ## Clean environment ------------------------------------------------------------------------------
 rm(list=ls(pattern="^(f|tbl|txt)_"))
-rm(list=ls(pattern="^ctrl_"), fes, file)
+rm(list=ls(pattern="^ctrl_"), fes)
 rm(l.lhs, l.rhs, l.cond, l.type, l.var, l.var_labs, l.sum, l.sum_labs)
 
 

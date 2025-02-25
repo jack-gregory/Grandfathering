@@ -10,11 +10,11 @@
 
 
 # IMPORT DATA -------------------------------------------------------------------------------------
-## Import pre-processed GF data from <../data/gf_original> folder.
+## Import pre-processed GF data
 
 ## Define import files
 l.file <- list(
-  gf = path(l.path$data, "gf_original/regressions_ready_data3.dta")
+  gf = here("data/use_data/regressions_ready_data.dta")
 )
 
 ## Import GF dataset
@@ -75,7 +75,6 @@ df.gf <- read_dta(l.file$gf) %>%
   ## Create additional variables
   mutate(across(contains("capacity"), \(x) x/1e3)) %>%
   mutate(UNIT = ifelse(UNIT=="", NA, UNIT),
-         # DURATION = DURATION / 10^3,
          survive = survive * 1e2,
          
          pre_Gf = (inservice_y<1957) * Gf,
