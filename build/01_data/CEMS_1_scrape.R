@@ -7,7 +7,7 @@
 
 
 ## INTRODUCTION -----------------------------------------------------------------------------------
-## This program scrapes Continuous Emissions Montitoring Systems (CEMS) data from the US 
+## This program scrapes Continuous Emissions Monitoring Systems (CEMS) data from the US 
 ## Environmental Protection Agency (EPA).
 
 ## EPA websites:
@@ -15,6 +15,9 @@
 ##    <https://www.epa.gov/emc/emc-continuous-emission-monitoring-systems>
 ##  - Database:
 ##    <https://gaftp.epa.gov/dmdnload/emissions>
+
+## NB - Before running, please update the l.path$cems element to reflect your local CEMS storage 
+##      location.  See step (1c) below.
 
 
 ## VERSION HISTORY --------------------------------------------------------------------------------
@@ -33,42 +36,31 @@
 
 
 ## (1b) Initiate packages
-## File System
-## fs
-if (!("tidyverse" %in% installed.packages())) install.packages("tidyverse")
-library(fs)
-
-## Web Scraping
-## See <https://github.com/yusuzech/r-web-scraping-cheat-sheet/blob/master/README.md#rselenium3.2>
-install.packages(setdiff(c("httr","hvest"), rownames(installed.packages())))
-library(httr)       ## See <https://cran.r-project.org/web/packages/httr/vignettes/quickstart.html>
-library(rvest)
-# library(RSelenium)  ## See <https://cran.r-project.org/web/packages/RSelenium/vignettes/basics.html>
-# library(downloader)
-
-## Data Wrangling
-## tidyverse
-## Comprehensive data science package
-## Includes tibble, readr, tidyr, dplyr, stringr, forcats, purrr, ggplot2
-if (!("tidyverse" %in% installed.packages())) install.packages("tidyverse")
-library(tidyverse)
+pkgs <- c(
+  "fs","here",                # File system
+  "httr","hvest",             # Data scraping
+  "tidyverse"                 # Data wrangling
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
 
 
 ## (1c) Define lists
-## paths
+## ... paths
+## NB - The 'cems' folder will require many GBs of storage space, so consider whether it may be
+##      preferable to use a folder outside of the repository.
 l.path <- list(
-  home = fs::path("C:/Users/Jack/Dropbox/Grandfathering"),
-  data = fs::path("E:/My Data/EPA/CEMS")
+  # cems = fs::path("E:/My Data/EPA/CEMS")
+  cems = here::here("data/epa/cems")
 )
+fs::dir_create(l.path$cems)
 
-## urls
+## ... urls
 l.url <- list(
   home = "https://gaftp.epa.gov/dmdnload/emissions",
   root = "https://gaftp.epa.gov/dmdnload/emissions/hourly/monthly/"
 )
-
-## (1d) Set working directory
-# setwd(l.path$home)
 
 
 ## (2) FUNCTIONS ----------------------------------------------------------------------------------
@@ -96,7 +88,7 @@ itr_yr <- function(yr) {
   
   ## Create year directory, if necessary
   if (length(l.zip)>0) {
-    fs::dir_create(fs::path(l.path$data, yr))  
+    fs::dir_create(fs::path(l.path$cems, yr))  
   }
   
   cat("Iterate over ", length(l.zip), " zipfiles\n", sep="")
@@ -121,7 +113,7 @@ itr_zip <- function(yr, zip) {
   cat(zip, "\n", sep="")
   
   download.file(url=paste0(l.url$root, yr, zip), 
-                destfile=fs::path(l.path$data, yr, zip),
+                destfile=fs::path(l.path$cems, yr, zip),
                 quiet=TRUE)
 }
 
@@ -141,7 +133,7 @@ v.yrs_web <- l.url$root %>%
 
 ## (3b) Import vector of data years from external hard drive
 ## NB - The last year is removed to ensure download of all missing data
-v.yrs_ehd <- fs::dir_ls(fs::path(l.path$data)) %>%
+v.yrs_ehd <- fs::dir_ls(fs::path(l.path$cems)) %>%
   fs::path_file() %>%
   paste("/", sep="") %>%
   sort() %>%

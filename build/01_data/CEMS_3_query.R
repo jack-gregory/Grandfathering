@@ -8,15 +8,12 @@
 
 # INTRODUCTION ------------------------------------------------------------------------------------
 ## This program queries US Environmental Protection Agency (EPA) Continuous Emissions Monitoring 
-## System (CEMS) data from the MySQL epa database.  
+## System (CEMS) data from the MySQL epa database.
 
 
 # VERSION HISTORY ---------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
 ## 1.0  15May2021 Jack Gregory  Initial version
-## ...
-## 2.0  05Aug2020 Jack Gregory  New version; ...
-## 2.1  26Aug2020 Jack Gregory  New draft; ...
 
 
 ### START CODE ###
@@ -24,38 +21,23 @@
 
 # (1) PREAMBLE ------------------------------------------------------------------------------------
 
-## (1?) Alternative package initiation
-# ## Install magrittr
-# if (!("magrittr" %in% installed.packages())) install.packages("magrittr")
-# library(magrittr)
-# 
-# ## Initiate 
-# ## ... source files
-# fs::dir_ls(fs::path(here::here(), "src")) %>%
-#   as.list() %>%
-#   purrr::set_names(., nm=purrr::map_chr(., ~fs::path_ext_remove(fs::path_file(.x)))) %>%
-#   .[c("preamble","def_paths", setdiff(names(.), c("preamble","def_paths")))] %>%
-#   purrr::walk(source)
-
-
 ## (1a) Initiate 
 ## ... Packages
-source(fs::path(here::here(), "src/preamble.R"))
+pkgs <- c(
+  "here"                # File system
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
 
-if (!("haven" %in% installed.packages())) install.packages("haven")
-library(haven)
-
-## ... Paths
-source(fs::path(here::here(), "src/def_paths.R"))
-l.path <- append(l.path, list(cems = "E:/My Data/EPA/CEMS"))
+source(here::here("src/preamble.R"))
 
 ## ... Functions
-source(fs::path(l.path$src, "find_newfiles.R"))
-source(fs::path(l.path$src, "sql_data_transfer.R"))
+source(here::here("src/find_newfiles.R"))
+source(here::here("src/sql_data_transfer.R"))
 
 ## ... Data
-# df.gf <- read_csv(path(l.path$data, "all_years_all_plants_and_features.csv")) %>%
-df.gf <- read_csv(path(l.path$data, "gf_original/regression_vars.csv")) %>%
+df.gf <- read_csv(here::here("data/regression_vars.csv")) %>%
   distinct(ORISPL = plant_code) %>%
   arrange(ORISPL)
 
@@ -113,7 +95,7 @@ itr_year <- function(yr) {
   
   ## Save query
   cat("  Save query\n")
-  saveRDS(df, fs::path(here::here(), glue::glue("data/epa/cems_{yr}.rds")))
+  saveRDS(df, here::here("data/epa/cems_{yr}.rds"))
   return(df)
 }
 
@@ -142,8 +124,7 @@ DBI::dbClearResult(res)
 
 # ## (3b) Join GF & CEMS units
 # ## Import grandfathering dataset and check ORISPL & UNIT matches
-# df.gf <- read_csv(path(l.path$data, "gf_original/in_regression_vars_BP.csv"), guess_max=50000) %>%
-# df.gf <- read_csv(path(l.path$data, "gf_original/regression_vars.csv"), guess_max=50000) %>%
+# df.gf <- read_csv(here::here("data/regression_vars.csv"), guess_max=50000) %>%
 #   select(plant_code, boiler_id, year, plant_name, plt_county) %>%
 #   filter(year>=1995) %>%
 #   mutate_at(vars(plant_name, plt_county), str_to_upper) %>%
@@ -178,8 +159,8 @@ DBI::dbClearResult(res)
 
 ## (3d) Import GF-CEMS xwalk
 ## NB - This step was assisted by a manual matching exercise
-# df.xwalk_gf_cems <- readr::read_csv(here::here("data/gf_cems_xwalk.csv"))
-df.xwalk_gf_cems <- readxl::read_excel(here::here("data/gf_cems_xwalk.xlsx"))
+# df.xwalk_gf_cems <- readr::read_csv(here::here("data/xwalk/gf_cems_xwalk.csv"))
+df.xwalk_gf_cems <- readxl::read_excel(here::here("data/xwalk/gf_cems_xwalk.xlsx"))
 
 
 ## (3e) Create GF-CEMS xwalk for Stata
@@ -197,7 +178,7 @@ df.xwalk <- df.xwalk_epa_eia %>%
 
 ## Save dta
 haven::write_dta(df.xwalk, 
-                 here::here("data/gf_cems_xwalk.dta"),
+                 here::here("data/xwalk/gf_cems_xwalk.dta"),
                  version=14.2)
 
 
@@ -291,9 +272,9 @@ dbDisconnect(con)
 # readr::write_csv(df.cems_hr, here::here("data/cems_hr.csv"))
 
 
-## APPENDIX -- NETGEN -----------------------------------------------------------------------------
-## This appendix prepares the net-gross generation ratio using EIA-923 data for the net 
-## component and CEMS data for the gross.
+# APPENDIX -- NETGEN ------------------------------------------------------------------------------
+## This section prepares the net-gross generation ratio using EIA-923 data for the net component 
+## and CEMS data for the gross.
 
 ## Query hourly data for one year
 ## NB - Later versions could aggregate the query to the year-month level, if they could be joined
@@ -324,7 +305,7 @@ df.cems <- df.cems %>%
   relocate(GF_BOILER, .after=UNIT)
 
 ## Import EIA net generation data
-df.netgen <- read_csv(path(l.path$data, "eia_netgen.csv")) %>%
+df.netgen <- read_csv(here::here("eia_netgen.csv")) %>%
   inner_join(df.xwalk_gf_cems %>% distinct(ORISPL), by=c("ORISPL")) %>%
   filter(YR==2010)
 

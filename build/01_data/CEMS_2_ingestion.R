@@ -34,13 +34,13 @@
 ##      The CEMS characteristics table should include the following (as defined in the CEMS raw 
 ##      data): STATE, FACILITY_NAME, ORISPL_CODE, UNITID, OP_DATE, FAC_ID, UNIT_ID.
 
+## NB - Before running, please update the l.path$cems element to reflect your local CEMS storage 
+##      location.  See step (1a) below.
+
 
 # VERSION HISTORY ---------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
 ## 1.0  16Apr2021 Jack Gregory  Initial version
-## ...
-## 2.0  05Aug2020 Jack Gregory  New version; ...
-## 2.1  26Aug2020 Jack Gregory  New draft; ...
 
 
 ### START CODE ###
@@ -48,47 +48,41 @@
 
 # (1) PREAMBLE ------------------------------------------------------------------------------------
 
-## (1?) Alternative package initiation
-# ## Install magrittr
-# if (!("magrittr" %in% installed.packages())) install.packages("magrittr")
-# library(magrittr)
-# 
-# ## Initiate 
-# ## ... source files
-# fs::dir_ls(fs::path(here::here(), "src")) %>%
-#   as.list() %>%
-#   purrr::set_names(., nm=purrr::map_chr(., ~fs::path_ext_remove(fs::path_file(.x)))) %>%
-#   .[c("preamble","def_paths", setdiff(names(.), c("preamble","def_paths")))] %>%
-#   purrr::walk(source)
-
-
 ## (1a) Initiate 
 ## ... Packages
-source(fs::path(here::here(), "src/preamble.R"))
+pkgs <- c(
+  "here"                # File system
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
+
+source(here::here("src/preamble.R"))
 
 ## ... Paths
-source(fs::path(here::here(), "src/def_paths.R"))
-l.path <- append(l.path, list(cems = "D:/My Data/EPA/CEMS"))
+l.path <- list(
+  # cems = fs::path("E:/My Data/EPA/CEMS")
+  cems = here::here("data/epa/cems")
+)
 
 ## ... Functions
-source(fs::path(l.path$src, "find_newfiles.R"))
-source(fs::path(l.path$src, "sql_data_transfer.R"))
+source(here::here("src/find_newfiles.R"))
+source(here::here("src/sql_data_transfer.R"))
 
 ## ... Data
-# df.gf <- read_csv(path(l.path$data, "all_years_all_plants_and_features.csv")) %>%
-df.gf <- read_csv(path(l.path$data, "gf_original/regression_vars.csv")) %>%
+df.gf <- read_csv(here::here("data/regression_vars.csv")) %>%
   distinct(ORISPL = plant_code) %>%
   arrange(ORISPL)
 
 
 ## (1b) Create MySQL epa schema & tables, if necessary
 ## database
-source(fs::path(l.path$src, "sql_db_epa.R"))
+source(here::here("src/sql_db_epa.R"))
 
 ## tables
-source(fs::path(l.path$src, "sql_tbl_filelog.R"))
-source(fs::path(l.path$src, "sql_tbl_cems.R"))
-source(fs::path(l.path$src, "sql_tbl_xwalk.R"))
+source(here::here("src/sql_tbl_filelog.R"))
+source(here::here("src/sql_tbl_cems.R"))
+source(here::here("src/sql_tbl_xwalk.R"))
 
 
 ## (1c) Connect to MySQL burbank_com database
@@ -104,10 +98,10 @@ con <- DBI::dbConnect(RMySQL::MySQL(),
 ## (2a) Access latest crosswalk
 ## Download
 url <- paste0("https://github.com/USEPA/camd-eia-crosswalk/raw/master/epa_eia_crosswalk.csv")
-download.file(url, destfile=fs::path(l.path$data, "epa/epa_eia_crosswalk.csv"))
+download.file(url, destfile=here::here("data/epa/epa_eia_crosswalk.csv"))
 
 ## Import
-df.xwalk_new <- readr::read_csv(fs::path(l.path$data, "epa/epa_eia_crosswalk.csv"))
+df.xwalk_new <- readr::read_csv(here::here("data/epa/epa_eia_crosswalk.csv"))
 
 
 ## (2b) Access MySQL crosswalk
