@@ -1,6 +1,5 @@
----
-title:  "Census Bureau (CB)"
----
+Census Bureau (CB)
+==================
 
 CB data include:
 

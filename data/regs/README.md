@@ -1,6 +1,5 @@
----
-title:  "Regulations"
----
+Regulations
+===========
 
 
 # NSR grandfathering
