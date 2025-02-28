@@ -7,7 +7,8 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script combines data from form EIA-860 between 2007 and 2018.
+## This program creates the boiler sample from 2007 to 2018, where it synthesizes data from Form 
+## EIA-860.
 
 
 ### START CODE ###

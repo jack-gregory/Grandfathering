@@ -49,10 +49,9 @@ fs::dir_create(path(l.path$out, date))
 
 ## ... Files
 l.file <- list(
-  gf_raw = here("data/use_data/regression_vars.csv"),
-  gf_cln = here("data/use_data/regressions_ready_data.dta"),
+  gf_raw = here("data/regression_vars.csv"),
+  gf_cln = here("data/regressions_ready_data.dta"),
   epa_eia_xwalk = here("data/epa/epa_eia_crosswalk.csv"),
-  gf_cems_xwalk = here("data/gf_cems_xwalk.xlsx"),
   epa = here("data/epa/Facility_Attributes.zip"),
   state = here("data/eia/shp/USA_States_Generalized.shp"),
   fig2 = here("out", date, "fig2.pdf"),
@@ -377,7 +376,6 @@ This subsection produces Table 5 in the paper.
 ```{r analysis}
 
 ## NB - See <http://www.stat.yale.edu/Courses/1997-98/101/meancomp.htm>
-
 
 levels <- c("NONATTAIN","ARP","LOCALREG","LAT","LON","AGE","INSERVICE","RETIREMENT","RETIRE","CAPACITY",
             "EFFICIENCY","DURATION","GLOAD","HEATRATE","SO2_RATE","SULFUR_DIST","UT_CI","UT_IOU","UT_OTH",

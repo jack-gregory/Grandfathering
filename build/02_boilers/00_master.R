@@ -1,13 +1,13 @@
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ## Grandfathering
-## Boiler -- 0_Master
+## Boiler -- 00_Master
 ## Jack Gregory
 ## 08 December 2024
 ## %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script performs boiler data cleaning for the Grandfathering project.
+## This program performs boiler data cleaning for the Grandfathering project.
 
 
 ### START CODE ###
@@ -22,7 +22,7 @@ pkgs <- c(
   "readxl",                                         # Data reading
   "dplyr","lubridate","purrr","stringr","tidyr",    # Tidyverse
   "data.table","foreign","Hmisc","reshape2","zoo",  # Other data wrangling
-  "maptools","rgeos"                                # Spatial data
+  "sf"                                              # Spatial data
 )
 install.packages(setdiff(pkgs, rownames(installed.packages())))
 lapply(pkgs, library, character.only = TRUE)

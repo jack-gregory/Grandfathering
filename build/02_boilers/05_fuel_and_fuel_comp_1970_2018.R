@@ -7,8 +7,8 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script merges EIA forms 767, 923, and 869 to get coal plant location, heat rate, nameplate,
-## and scrubber information.
+## This program merges fuel data from Forms EIA-767, EIA-923, and EIA-867 between 1970 and 2018.
+## It synthesizes coal plant location, heat rate, nameplate, and scrubber information.
 
 
 ### START CODE ###

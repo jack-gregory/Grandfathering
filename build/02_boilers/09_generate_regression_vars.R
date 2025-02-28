@@ -7,7 +7,8 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## Final data cleaning to generate features for the model.
+## This program among other things generates a variable to indicate boiler modification, creates 
+## rolling variables for generation and sulfur content, and performs additional data cleaning.
 
 
 ### START CODE ###
@@ -239,6 +240,8 @@ str(boilers[100:200])
 
 write.csv(boilers, here::here("data/regression_vars.csv"))
 
+## Some additional tests/notes on the data
+
 cor(data.frame(boilers$mod_fed_in_y, boilers$nsr_in_y, boilers$mod_D_in_y))
 cor(data.frame(boilers$mod_federal, boilers$mod_D, boilers$nsr_d_calc))
 
@@ -263,24 +266,6 @@ sum(test$nsr_d_calc == 1 & test$mod_any == 1, na.rm = TRUE)/sum(test$mod_any == 
 sum(test$nsr_d_calc == 1 & test$mod_federal == 1, na.rm = TRUE)
 
 sum(test$mod_D == 1 & test$mod_federal == 1)
-
-
-## Summary of vars ------------------------------------------------------------
-
-## Create some summary statistics
-sink(here::here("out", date, "summary_statistics_reg_vars.txt"))
-
-describe(boilers)
-
-sink()
-
-names(boilers)
-
-summary <- boilers %>%
-  group_by(year) %>%
-  summarise_each(funs(sum(!is.na(.))))
-
-write.csv(summary, here::here("out", date, "non_missing_values_by_year_reg_var.csv"))
 
 
 ### END CODE ###

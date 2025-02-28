@@ -7,8 +7,8 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script combines data from form EIA-767 on coal plants, in particular location, heat rate, 
-## nameplate, and scrubbers.
+## This program creates the boiler sample from 1985 to 2005.  It combines data from form EIA-767 on
+## coal plants, in particular location, heat rate, nameplate, and scrubbers.
 
 
 ### START CODE ###

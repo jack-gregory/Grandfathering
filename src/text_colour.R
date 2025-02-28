@@ -7,7 +7,7 @@
 
 
 # INTRODUCTION -----------------------------------------------------------------------------------
-## This script provides a text colouring function for the GII 2021 Data Audits.
+## This script provides a text colouring function for workbooks within the Grandfathering project.
 
 ## It has the following dependencies:
 ##  - knitr
@@ -16,11 +16,7 @@
 
 # VERSION HISTORY ---------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
-## 1.0  25Mar2021 Jack Gregory  Initial version; Based on plots originally in <audit_tmpl.Rmd>
-## ...
-## 2.0  05Aug2020 Jack Gregory  New version; ...
-## 2.1  17Jul2017 Jack Gregory  New draft; ...
-## ...
+## 1.0  25Mar2021 Jack Gregory  Initial version
 
 
 ### START CODE ###

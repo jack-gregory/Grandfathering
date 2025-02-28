@@ -18,7 +18,21 @@ output:
 ___
 
 ```{r preamble, include=FALSE}
-library(knitr)
+
+## Initiate 
+## ... Packages
+pkgs <- c(
+  "here",               # File system
+  "knitr",              # Reproducible reporting
+  "geofacet"            # Spatial data
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
+
+source(here::here("src/preamble.R"))
+
+## ... Options
 knitr::opts_chunk$set(
   echo = TRUE,
   message=FALSE, 
@@ -27,15 +41,8 @@ knitr::opts_chunk$set(
   fig.show="hold",
   fig.align="center",
   fig.width=7, 
-  fig.height=4.6)
-
-
-## Initiate 
-## ... Packages
-source(here::here("src/preamble.R"))
-
-if (!("geofacet" %in% installed.packages())) install.packages("geofacet")
-library(geofacet)
+  fig.height=4.6
+)
 
 ## Functions
 source(here("src/def_paths.R"))

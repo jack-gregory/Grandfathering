@@ -7,7 +7,7 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script performs preprocessing for the Grandfathering project.
+## This program performs preprocessing for the Grandfathering project.
 
 ## It is composed of the following scripts:
 ##  (1) sulfur.Rmd -- prepares the sulfur instrumental variable
@@ -26,14 +26,15 @@
 
 ## Initiate
 ## ... Packages
-source(here::here("src/preamble.R"))
-
 pkgs <- c(
-  "knitr","rmarkdown"      # Reproducible reporting
+  "here",                   # File system
+  "knitr","rmarkdown"       # Reproducible reporting
 )
 install.packages(setdiff(pkgs, rownames(installed.packages())))
 lapply(pkgs, library, character.only = TRUE)
 rm(pkgs)
+
+source(here::here("src/preamble.R"))
 
 ## ... Stata
 if(!("RStata" %in% installed.packages())) install.packages("RStata")
@@ -45,7 +46,7 @@ if (Sys.info()[["user"]]=="ajrg2") {
   options("RStata.StataPath"="\"C:\\Program Files\\Stata16\\StataSE-64\"")
   options("RStata.StataVersion"=16.1)
 } else {
-  stop("User not recognized, please see RStata package in <preamble.R>.")
+  stop("User not recognized.")
 }
 
 
@@ -72,7 +73,7 @@ stata_do <- readLines(here::here("build/03_preprocessing/02_regression_data.do")
 stata_do <- stringr::str_replace_all(stata_do, "your_path_here", here::here())
 
 ## Run code
-stata(stata_do)
+Rstata::stata(stata_do)
 
 
 ### END CODE ###

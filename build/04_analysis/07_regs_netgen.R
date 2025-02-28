@@ -49,9 +49,9 @@ dir_create(here("out", date))
 ## ... Files
 l.file <- list(
   epa_eia_xwalk = here("data/epa/epa_eia_crosswalk.csv"),
-  gf_cems_xwalk = here("data/gf_cems_xwalk.xlsx"),
+  gf_cems_xwalk = here("data/xwalk/gf_cems_xwalk.xlsx"),
   epa = here("data/epa/Facility_Attributes.zip"),
-  gf = here("data/use_data/regressions_ready_data.dta"),
+  gf = here("data/regressions_ready_data.dta"),
   netgen_unit = here("data/eia_netgen_unit.csv"),
   plant = here("data/eia_plant.csv"),
   tbl2 = here("out", date, "tbl2.tex")

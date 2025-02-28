@@ -7,17 +7,13 @@
 
 
 # INTRODUCTION -----------------------------------------------------------------------------------
-## This script provides functions which (1) extract a path's base folder name and (2) add that 
-## name as a class type.
+## This script provides helper functions for <def_paths.R>, namely to (1) extract a path's base 
+## folder name and (2) add that name as a class type.
 
 
 # VERSION HISTORY --------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
-## 1.0  20Feb2020 Jack Gregory  Initial version; Based on BWP Project
-## ...
-## 2.0  05Aug2020 Jack Gregory  New version; ...
-## 2.1  17Jul2017 Jack Gregory  New draft; ...
-## ...
+## 1.0  20Feb2020 Jack Gregory  Initial version
 
 
 ### START CODE ###

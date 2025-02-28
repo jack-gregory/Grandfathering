@@ -1,13 +1,13 @@
 ** %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ** Grandfathering
 ** regression_data
-** Jack Gregory
+** Sylwia Bialek
 ** 08 December 2024
 ** %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 ** INTRODUCTION -----------------------------------------------------------------------------------
-** This script preprocesses the data in advance of the analysis for the Grandfathering project.
+** This program preprocesses the data in advance of the analysis for the Grandfathering project.
 
 
 *** START CODE ***
@@ -17,9 +17,8 @@
 
 ** Set definitions
 set matsize  900, permanently
-global path_orig_data "your_path_here\data\orig_data"
-global path_code "your_path_here\code\3_Final_dataset_creation" 
 global path_data "your_path_here\data"
+global path_code "your_path_here\code\3_Final_dataset_creation" 
 global path_output "your_path_here\out"
 
 ** Define program
@@ -82,7 +81,7 @@ end
 
 ** Get demand data by state
 clear
-import delimited "$path_orig_data\EIA electricity demand data.csv", varnames(1) 
+import delimited "$path_data\eia\EIA electricity demand data.csv", varnames(1) 
 keep if msn=="ESTCB"
 reshape long y, i(state) j(year)
 drop data_status msn
@@ -108,7 +107,7 @@ save "$path_data\utility_data.dta", replace
 
 ** Get info about grandfathering status
 clear
-import excel "$path_data\gf_status_born_around_1978",  firstrow
+import excel "$path_data\regs\gf_status_born_around_1978",  firstrow
 keep plant_code boiler_id gf
 rename gf pre_1978
 drop if plant_code==.
@@ -117,7 +116,7 @@ save "$path_data\gf_status_born_around_1978.dta", replace
 ** Get additional info on independent power producers
 ** NB: data is from EIA 867 available for years 1989 - 1998
 clear
-import excel "$path_orig_data\1989_1998_Nonutility_Power_Producer.xls", sheet("Data") firstrow
+import excel "$path_data\eia\1989_1998_Nonutility_Power_Producer.xls", sheet("Data") firstrow
 gen sect=8 if (Sector==2| Sector==3)
 replace sect=2 if (Sector==4| Sector==5)
 replace sect=5 if (Sector==6| Sector==7)
@@ -134,13 +133,13 @@ save "$path_data\sulfur_iv.dta", replace
 
 ** Import data on which power plants were in the first phase of ACid Rain Program
 clear
-import delimited "$path_data\ARP_power_plants.csv", clear 
+import delimited "$path_data\regs\ARP_power_plants.csv", clear 
 gen ARP_subject=1
 save "$path_data\ARP_PhaseI.dta", replace
 
 ** Import data on ACid Rain Program permit prices
 clear
-import excel "$path_data\ARP_prices.xlsx", sheet("Data") firstrow
+import excel "$path_data\regs\ARP_prices.xlsx", sheet("Data") firstrow
 save "$path_data\ARP_prices.dta", replace
 
 ** Import data on coal trades (including sulfur intesity)
@@ -366,7 +365,7 @@ replace ut_type=5 if plant_code==52071 &  year!=2010
 replace ut_type=4 if utility_code==281 
 replace ut_type=5 if plant_code==6705 
  
-** Uunclear gf status
+** Unclear gf status
 drop if  plant_code==10495
 drop ut_type_aux* commerc_ind_aux commerc_ind IOU type_check other_aux other ///
   util_entity_type no_types nvals type
@@ -450,7 +449,7 @@ joinby year plant_code using "$path_data\coal_trades_data.dta", unmatched(master
 drop _merge fuel_cost_* heat_content_* quantity_received_*
 destring sulfur_content_tot, replace force
 
-joinby year  using "$path_data\ARP_prices.dta", unmatched(master)
+joinby year using "$path_data\ARP_prices.dta", unmatched(master)
 
 ** CAIR required that 2 permits required for one unit of emissions. Thus, double 
 ** prices *in SO2-CAIR subject states:
@@ -492,7 +491,7 @@ drop _merge
 
 ** Merge with data on low sulfur coal availability
 ** NB: sulfur_net - sulfur content of coal weighted by distance over the network 
-joinby plant_code  using "$path_data\sulfur_iv.dta", unmatched(master)
+joinby plant_code using "$path_data\sulfur_iv.dta", unmatched(master)
 drop _merge
 destring sulfur_net, generate(sulfur_net_iv) force
 drop sulfur_netlow sulfur_net
@@ -559,8 +558,8 @@ order year plt_state plant_code boiler_id new age retirement_y plant_status_code
 replace states=99 if states==33|states==35| states==42 | states==16 | states==15 ///
   | states==31 | states==9 | states==2| states==3 | states==37
 
-** As we have only extremely few commercial boilers in our sample and we use owner
-** type FE and boiler FE, we merge commercial boilers into industrial
+** As we have limited commercial boilers in our sample and we use owner type FE 
+** and boiler FE, we merge commercial boilers into industrial
 ** C = Cooperative, I = Investor-Owned Utility, Q = Independent Power Producer, 
 ** M = Municipally-Owned Utility, P = Political Subdivision, F = Federally-Owned Utility, 
 ** S = State-Owned Utility, IND = Industrial, COM = Commercial

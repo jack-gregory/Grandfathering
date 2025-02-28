@@ -7,7 +7,8 @@
 
 
 # INTRODUCTION -----------------------------------------------------------------------------------
-## This script provides helper functions related to the boiler dataset.
+## This script provides helper functions related to the boiler dataset prepared in 
+## <build/02_boilers>.
 
 ## It has the following dependencies:
 ##  - dplyr

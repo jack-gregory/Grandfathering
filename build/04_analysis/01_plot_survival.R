@@ -14,7 +14,7 @@
 ## (1a) Initiate 
 ## ... Packages
 pkgs <- c(
-  "here"                              # File system
+  "here"       # File system
 )
 install.packages(setdiff(pkgs, rownames(installed.packages())))
 lapply(pkgs, library, character.only = TRUE)
@@ -28,7 +28,7 @@ fs::dir_create(path(l.path$out, date))
 
 ## ... Files
 l.file <- list(
-  gf = here("data/use_data/regressions_ready_data.dta"),
+  gf = here("data/regressions_ready_data.dta"),
   fig1 = here("out", date, "fig1.pdf")
 )
 

@@ -52,7 +52,7 @@ source(here("src/networks.R"))
 ## ... Files
 l.file <- list(
   sulfur = here("data/eia_sulfur.rds"),
-  gf = here("data/use_data/regression_vars.csv"),
+  gf = here("data/regression_vars.csv"),
   epa = here("data/epa/Facility_Attributes.zip"),
   state = here("data/eia/shp/USA_States_Generalized.shp"),
   county = here("data/eia/shp/USA_Counties_(Generalized).shp"),

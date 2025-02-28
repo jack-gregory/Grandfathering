@@ -7,16 +7,13 @@
 
 
 # INTRODUCTION -----------------------------------------------------------------------------------
-## This program provides directory paths within the Grandfathering repository.
+## This program provides directory paths within the Grandfathering repository.  It is legacy code
+## primarily used in <build/01_eia>, and otherwise, replaced with the here package.
 
 
 # VERSION HISTORY --------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
-## 1.0  16Apr2021 Jack Gregory  Initial version; Based on BWP Project
-## ...
-## 2.0  05Aug2020 Jack Gregory  New version; ...
-## 2.1  17Jul2017 Jack Gregory  New draft; ...
-## ...
+## 1.0  16Apr2021 Jack Gregory  Initial version
 
 
 ### START CODE ###

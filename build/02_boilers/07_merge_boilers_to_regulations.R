@@ -7,7 +7,7 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script merges boiler and regulation data.
+## This program merges boiler and regulation data.
 
 
 ### START CODE ###
@@ -15,43 +15,42 @@
 
 # IMPORT ------------------------------------------------------------------------------------------
 
-aqcr2cty <- read.csv(here::here("data/xwalk/aqcrs_to_cty_xwalk.csv"), stringsAsFactors = FALSE, skip = 2)
+aqcr2cty <- read.csv(here::here("data/xwalk/aqcrs_to_cty_xwalk.csv"), stringsAsFactors=FALSE, skip=2)
 names(aqcr2cty)
 
 ## boiler-specific data
-boilers <- read.csv(here::here("data/boilers_1985-2018.csv"), stringsAsFactors = FALSE)
+boilers <- read.csv(here::here("data/boilers_1985-2018.csv"), stringsAsFactors=FALSE)
 
 ## read in fuel data to get early period plants that might have fallen out
-fuel <- read.csv(here::here("data/all_fuel_1970_2018.csv"), stringsAsFactors = FALSE)
+fuel <- read.csv(here::here("data/all_fuel_1970_2018.csv"), stringsAsFactors=FALSE)
 fuel <- fuel %>% select(-X)
 
 ## generators (for capacity data)
-gens <- read.csv(here::here("data/generators_1985-2018.csv"), stringsAsFactors = FALSE)
+gens <- read.csv(here::here("data/generators_1985-2018.csv"), stringsAsFactors=FALSE)
 
 ## plants (and add in non abbrev states)
-plants <- read.csv(here::here("data/plants_1985-2018.csv"), stringsAsFactors = FALSE)
-states <- read.csv(here::here("data/xwalk/state_code_xwalk.csv"), stringsAsFactors = FALSE)
-plants <- left_join(plants, states, by = "plt_state")
+plants <- read.csv(here::here("data/plants_1985-2018.csv"), stringsAsFactors=FALSE)
+states <- read.csv(here::here("data/xwalk/state_code_xwalk.csv"), stringsAsFactors=FALSE)
+plants <- left_join(plants, states, by="plt_state")
 
 ## regulations workbook
-regs <- read_excel(here::here("data/regs/20240213_regulations_by_state.xlsx"), skip = 1)
+regs <- read_excel(here::here("data/regs/so2_regulations_by_state_1976_to_2019.xlsx"), 
+                   skip=1, sheet=1)
 
-indiana <- read_excel(here::here("data/regs/indiana.xlsx"), skip = 1)
+indiana <- read_excel(here::here("data/regs/indiana.xlsx"), skip=1, sheet=1)
 
 
 # CLEAN REGULATIONS -------------------------------------------------------------------------------
 
 regs <- regs[,-1]
 
-names(regs) <- c("state", "geo_area", "aqcr", "plt_county", 
-                 "town", "manual", "min_cap_any_unit", "max_cap_any_unit",
-                 "min_cap", "max_cap", "cap_level", 
-                 "pre_post", "year_cutoff", "plant_name", "boiler_id",
-                 "utility_code", "plant_code", "other_limits", 
-                 "scrubber_est", "std_so2_lbs_mmbtu", 
-                 "std_fuel_content", "std_so2_ppm", "std_lbs_so2_hr", 
-                 "std_other", "year_adopted", "year_std_start", 
-                 "year_std_end", "time_period", "code_section", "notes")
+names(regs) <- c("state", "geo_area", "aqcr", "plt_county", "town", "manual", 
+                 "min_cap_any_unit", "max_cap_any_unit", "min_cap", "max_cap", 
+                 "cap_level", "pre_post", "year_cutoff", "plant_name", "boiler_id",
+                 "utility_code", "plant_code", "other_limits", "std_so2_lbs_mmbtu", 
+                 "std_fuel_content", "std_so2_ppm", "std_lbs_so2_hr", "std_other", 
+                 "year_adopted", "year_std_start", "year_std_end", "time_period", 
+                 "code_section", "notes")
 
 regs <- regs %>% 
   select(-code_section, -notes, -year_adopted, -utility_code) %>% 
@@ -70,7 +69,7 @@ regs <- regs %>%
   mutate(all_ages = ifelse(year_cutoff == "all", 1, 0))
 
 table(regs$all_ages)
-sum(is.na(regs$all_ages)) == sum(is.na(regs$year_cutoff))
+sum(is.na(regs$all_ages))
 
 regs$year_cutoff <- as.numeric(regs$year_cutoff)
 
@@ -79,7 +78,7 @@ table(regs$pre_post)
 
 ## We see that the regs with NA in year_cutoff map to those that were for "all" 
 ## boilers regardless of inservice year.
-sum(is.na(regs$year_cutoff)) == sum(regs$all_ages == 1)
+sum(is.na(regs$year_cutoff), na.rm = TRUE) == sum(regs$all_ages == 1, na.rm = TRUE)
 
 ## If we are unsure when started --> pre 1972 --> assume year 0 same if we don't
 ## have an end date --> persisted to present day.
@@ -127,14 +126,14 @@ regs <- regs %>% mutate(id = 1:n())
 # rm(test)
 
 ## New Mexico designates its AQCRs depending on whether a plant is on the east or west
-## side of the continental divide. We do this manually, as well. Masschusetts designates
+## side of the continental divide. We do this manually, as well. Massachusetts designates
 ## regulations by town/city, so that matching is also done by hand.
 handmatch <- plants %>% 
   filter(state %in% c("Pennsylvania", "Maine", "Massachusetts", "New Mexico")) %>%
   select(plant_code, plant_name, plt_state, state, plt_county, plt_st_address, plt_city) %>% 
   unique()
 
-write.csv(handmatch, "use_data/to_match_pa_maine_nm_mass.csv")
+write.csv(handmatch, here::here("data/xwalk/to_match_pa_maine_nm_mass.csv"))
 
 ## Handmatched plants to the correct region.  For Pennsylvania, counties are not 
 ## coterminous with AQCRs.  I relied on the map available at the below link and 
@@ -157,7 +156,7 @@ write.csv(handmatch, "use_data/to_match_pa_maine_nm_mass.csv")
 ## (e.g. the border of one of the AQCRs include only the part of a county east of 
 ## the continental divide).
 
-handmatch <- read.csv("use_data/handmatched_pa_maine_nm_mass.csv") %>%
+handmatch <- read.csv(here::here("data/xwalk/handmatched_pa_maine_nm_mass.csv")) %>%
   select(-plt_county, -plt_st_address, -plt_city)
 
 ## We have to fix something in Pennsylvania for our merge to work.
@@ -201,7 +200,7 @@ hm_regs_wide <- regs %>%
   separate(geo_area, c(paste0("geo_area", 1:30)), c(","))
 
 hm_regs_long <- hm_regs_wide %>% 
-  melt(id.vars = c("id", "state", "time_period")) %>%
+  reshape2::melt(id.vars = c("id", "state", "time_period")) %>%
   filter(!is.na(value)) %>% rename(match_name = value) %>%
   select(-variable, -state)
 
@@ -999,7 +998,7 @@ geo_regs <- geo_regs %>%
 
 ## We have to manage Illinois separately on account of needing to add in stack/flue 
 ## information.
-stacks <- read.csv("use_data/stackflues_1985-2018.csv") %>% select(-X)
+stacks <- read.csv(here::here("data/stackflues_1985-2018.csv")) %>% select(-X)
 names(stacks)
 
 ## We note the state data in here is not reliable, so we will drop it and fill it
@@ -1583,35 +1582,9 @@ unique_id(geotimecap_org, plant_code, boiler_id, year)
 
 geotimecap <- left_join(geotimecap_org, new_stds) %>%
   select(-year_std_end, -year_std_start, -month_cutoff, -indiana_county, -after_start_range,
-         -in_range, -id, -n, -co_drop, -specific_drop, -max_cap_any_unit, -scrubber_est)
+         -in_range, -id, -n, -co_drop, -specific_drop, -max_cap_any_unit)
 
-write.csv(geotimecap, "use_data/merged_regs_and_plants.csv")
-
-## Modifications --------------------------------------------------------------
- 
-# boilers <- read.csv("use_data/boilers_1985-2018.csv", stringsAsFactors = FALSE)
-# names(boilers)
-# 
-# table(boilers$nsr_d)
-# 
-# # we only have access to the NSR value post 2009
-# table(boilers$year, boilers$nsr_d)
-# 
-# hist(as.numeric(boilers$nsr_permit_y))
-# 
-# test <- boilers %>% mutate(nsr = ifelse(nsr_d == "Y", 1, 0)) %>%
-#   group_by(utility_code, plant_code) %>%
-#   mutate(ever_nsr = max(nsr)) %>% ungroup() %>%
-#        select(utility_code, plant_code, boiler_id, year, 
-#               type_of_boiler, ever_nsr, nsr_d, nsr_permit_y, inservice_y, 
-#               retirement_y) %>% 
-#        arrange(utility_code, plant_code, boiler_id, year)
-# 
-# View(test %>% filter(ever_nsr == 1))
-# 
-# nsr <- boilers %>% select(year, utility_code, plant_code, boiler_id,
-#                           type_of_boiler, nsr_d, nsr_permit_y, nsr_permit_num)
-# View(nsr)
+write.csv(geotimecap, here::here("data/merged_regs_and_plants.csv"))
 
 
 ### END CODE ###

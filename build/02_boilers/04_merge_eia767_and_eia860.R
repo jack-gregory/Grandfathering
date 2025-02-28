@@ -7,8 +7,9 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script merges EIA forms 767 and 860.
-
+## This program merges Forms EIA-767 and EIA-860, which contain most of the relevant boiler data, 
+## from different time periods.
+  
 
 ### START CODE ###
 
@@ -543,8 +544,7 @@ unique_id(month, utility_code, plant_code)
 
 boilers <- left_join(boilers, month)
 
-## Now, we investigate the NSR dummy.
-## 7486 boiler-year pairs with "Y" for NSR dummy  
+## Now, we investigate the NSR dummy, where 2,447 boiler-year pairs are "Y".  
 table(boilers$nsr_d)
 
 nsrtest <- boilers %>% 
@@ -556,7 +556,7 @@ table(nsrtest$nsr)
 
 table(boilers$type_of_boiler)
 
-## At least 1610 boilers are under some type of NSR and built before 1979.
+## At least 2,114 boilers are under some type of NSR and built before 1979.
 sum(boilers$type_of_boiler %in% c("d", "D", "da", "Da", "db", "Db", "DB", "Dc") &
       as.numeric(boilers$inservice_y) < 1979, na.rm = TRUE)
 
@@ -573,8 +573,6 @@ boilers$type_of_boiler[boilers$type_of_boiler == "d"] <- "D"
 ## we quickly make our character vars all caps
 boilers$type_of_boiler <- toupper(boilers$type_of_boiler)
 boilers$boiler_status <- toupper(boilers$boiler_status)
-
-write.csv(boilers, here::here("data/boilers_1985_2018.csv"))
 
 ## FGDs -----------------------------------------------------------------------
 

@@ -29,7 +29,7 @@ fs::dir_create(path(l.path$out, date))
 
 ## ... Files
 l.file <- list(
-  gf = here("data/use_data/regressions_ready_data.dta"),
+  gf = here("data/regressions_ready_data.dta"),
   state = here("data/eia/shp/USA_States_Generalized.shp"),
   fig3 = here("out", date, "fig3.pdf")
 )

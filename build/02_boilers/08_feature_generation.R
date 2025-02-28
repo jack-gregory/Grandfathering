@@ -7,8 +7,9 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script merges all data.
-
+## This program merges all data, generates additional useful features, eliminates unnecessary
+## variables, and conducts additional data cleaning.
+  
 
 ### START CODE ###
 
@@ -736,7 +737,7 @@ full <- full %>%
 full <- full %>%
   filter(!(plt_state == "NC" & year > 2009))
 
-states <- read.csv("use_data/crosswalks/state_code_xwalk.csv", stringsAsFactors = FALSE)
+states <- read.csv(here::here("data/xwalk/state_code_xwalk.csv"), stringsAsFactors = FALSE)
 full <- left_join(full, states, by = "plt_state")
 
 # No observations matched to multiple regs, which is as it should be.

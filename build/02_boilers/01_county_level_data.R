@@ -7,9 +7,7 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script synthesizes the following datasets:
-##  - county centerpoints; and,
-##  - county non-attainment by year. 
+## This program synthesizes county centerpoints and non-attainment by year. 
 
 
 ### START CODE ###
@@ -20,8 +18,8 @@
 ## Initiate
 ## ... Paths
 l.file <- list(
-  st_abbr = here::here("data/xwalk/state_code_xwalk.csv"),
-  st_fips = here::here("data/xwalk/xwalk_state_codes.csv"),
+  st_abbr = here::here("data/xwalk/xwalk_state_codes.csv"),
+  st_fips = here::here("data/xwalk/state_fips_xwalk.csv"),
   cb = here::here("data/cb/cb_2018_us_county_500k.zip"),
   epa = here::here("data/epa/phistory.csv"),
   epa_old = here::here("data/epa/phistory_1978_1990.csv")
@@ -33,15 +31,17 @@ l.file <- list(
 statefips <- l.file$st_fips %>%
   read.csv() %>%
   dplyr::mutate(state = stringr::str_trim(state)) %>%
-  dplyr::inner_join(read.csv(l.file$st_abbr), by="state") %>%
-  dplyr::rename(st_abbr = plt_state, fips_st = state_code)
+  dplyr::rename(st_abbr = state_Code, fips_st = fips)
 
 l.zip <- zip::zip_list(l.file$cb) %>%
   dplyr::pull(filename) %>%
   as.list()
 zip::unzip(l.file$cb, exdir=fs::path_dir(l.file$cb))
 
-counties <- readShapePoly(fs::path_ext_remove(l.file$cb))
+counties <- sf::read_sf(
+  dsn=here::here("data/cb"), 
+  layer=fs::path_file(l.file$cb) %>% fs::path_ext_remove()
+)
 
 l.zip %>%
   purrr::map_chr(\(x) fs::path(fs::path_dir(l.file$cb), x)) %>%
@@ -57,11 +57,10 @@ phist_old <- read.csv(l.file$epa_old, stringsAsFactors = FALSE)
 
 ids <- as.data.frame(counties) %>% select(fips_st = STATEFP, fips_cnty = COUNTYFP, county = NAME)
 
-centers <- gCentroid(counties, byid = TRUE)
-centers <- as.data.frame(centers)
+centers <- st_centroid(counties$geometry) %>% st_coordinates()
 
 data <- cbind(ids, as.data.frame(centers))
-data <- data %>% rename(cty_lat = x, cty_lon = y)
+data <- data %>% rename(cty_lat = X, cty_lon = Y)
 
 unique(data$fips)
 

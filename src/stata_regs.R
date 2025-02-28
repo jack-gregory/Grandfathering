@@ -11,19 +11,14 @@
 
 ## It has the following dependencies:
 ##  - dplyr
+##  - glue
 ##  - purrr
-##  - sf
-##  - sfnetworks
-##  - tidygraph
+##  - rlang
 
 
 # VERSION HISTORY ---------------------------------------------------------------------------------
 ## V    DATE      EDITOR        NOTES
 ## 1.0  28Jun2024 Jack Gregory  Initial version
-## ...
-## 2.0  05Aug2020 Jack Gregory  New version; ...
-## 2.1  17Jul2017 Jack Gregory  New draft; ...
-## ...
 
 
 ### START CODE ###

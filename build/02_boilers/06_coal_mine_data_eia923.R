@@ -7,7 +7,7 @@
 
 
 # INTRODUCTION ------------------------------------------------------------------------------------
-## This script merges EIA forms 423 and 923 to get coal mine data.
+## This program merges coal mine data from Forms EIA-423 and EIA-923 between 1970 and 2018.
 
 
 ### START CODE ###
