@@ -1,13 +1,13 @@
 AQCR codes/names/state name comes from: https://aqs.epa.gov/aqsweb/documents/codetables/aqcrs.html,,,,,,,,,
 ,,,,,,,,,
 aqcr,aqcr_name,state,counties,towns,other,cfr_section,history,year_start,year_end
-1,ALABAMA AND TOMBIGBEE RIVERS,Alabama,"Choctaw County, Clarke County, Conecuh County, Dallas County, Marengo County, Monroe County, Perry County, Washington County, Wilcox County",,,40 CFR 81.266,11/25/1971,1971,
-2,COLUMBUS-PHENIX CITY,Alabama,"Autauga County, Bullock County, Butler County, Crenshaw County, Elmore County, Lee County, Lowndes County, Macon County, Montgomery County, Pike County, Russell County",,,40 CFR 81.58,11/25/1971,1971,
-3,EAST ALABAMA,Alabama,"Calhoun County, Chambers County, Cherokee County, Clay County, Cleburne County, Coosa County, Etowah County, Randolph County, Talladega County, Tallapoosa County",,,40 CFR 81.199,11/25/1971,1971,
-4,METROPOLITAN BIRMINGHAM,Alabama,"Bibb County, Blount County, Chilton County, Fayette County, Greene County, Hale County, Jefferson County, Lamar County, Pickens County, St. Clair County, Shelby County, Sumter County, Tuscaloosa County, Walker County",,,40 CFR 81.41,11/25/1971,1971,
-5,MOBILE-PENSACOLA-PANAMA CITY-SOUTHERN MISSISSIPPI,Alabama,"Baldwin County, Escambia County, Mobile County",,,40 CFR 81.68,11/25/1971,1971,
-6,SOUTHEAST ALABAMA,Alabama,"Barbour County, Coffee County, Covington County, Dale County, Geneva County, Henry County, Houston County",,,40 CFR 81.267,11/25/1971,1971,
-7,TENNESSEE RIVER VALLEY-CUMBERLAND MOUNTAINS,Alabama,"Colbert County, Cullman County, De Kalb County, Franklin County, Jackson County, Lauderdale County, Lawrence County, Limestone County, Madison County, Marion County, Marshall County, Morgan County, Winston County",,,40 CFR 81.72,11/25/1971,1971,
+1,ALABAMA AND TOMBIGBEE RIVERS,Alabama,"Choctaw County, Clarke County, Conecuh County, Dallas County, Marengo County, Monroe County, Perry County, Washington County, Wilcox County",,,40 CFR 81.266,11/25/71,1971,
+2,COLUMBUS-PHENIX CITY,Alabama,"Autauga County, Bullock County, Butler County, Crenshaw County, Elmore County, Lee County, Lowndes County, Macon County, Montgomery County, Pike County, Russell County",,,40 CFR 81.58,11/25/71,1971,
+3,EAST ALABAMA,Alabama,"Calhoun County, Chambers County, Cherokee County, Clay County, Cleburne County, Coosa County, Etowah County, Randolph County, Talladega County, Tallapoosa County",,,40 CFR 81.199,11/25/71,1971,
+4,METROPOLITAN BIRMINGHAM,Alabama,"Bibb County, Blount County, Chilton County, Fayette County, Greene County, Hale County, Jefferson County, Lamar County, Pickens County, St. Clair County, Shelby County, Sumter County, Tuscaloosa County, Walker County",,,40 CFR 81.41,11/25/71,1971,
+5,MOBILE-PENSACOLA-PANAMA CITY-SOUTHERN MISSISSIPPI,Alabama,"Baldwin County, Escambia County, Mobile County",,,40 CFR 81.68,11/25/71,1971,
+6,SOUTHEAST ALABAMA,Alabama,"Barbour County, Coffee County, Covington County, Dale County, Geneva County, Henry County, Houston County",,,40 CFR 81.267,11/25/71,1971,
+7,TENNESSEE RIVER VALLEY-CUMBERLAND MOUNTAINS,Alabama,"Colbert County, Cullman County, De Kalb County, Franklin County, Jackson County, Lauderdale County, Lawrence County, Limestone County, Madison County, Marion County, Marshall County, Morgan County, Winston County",,,40 CFR 81.72,11/25/71,1971,
 8,COOK INLET,Alaska,,,,,,,
 9,NORTHERN ALASKA,Alaska,,,,,,,
 10,SOUTH CENTRAL ALASKA,Alaska,,,,,,,
@@ -23,7 +23,7 @@ aqcr,aqcr_name,state,counties,towns,other,cfr_section,history,year_start,year_en
 20,NORTHEAST ARKANSAS,Arkansas,,,,,,,
 21,NORTHWEST ARKANSAS,Arkansas,,,,,,,
 22,SHREVEPORT-TEXARKANA-TYLER,Arkansas,,,,,,,
-23,GREAT BASIN VALLEY,California,"Alpine County, Inyo County, Mono County",,,40 CFR 81.159,11/25/1971,1971,
+23,GREAT BASIN VALLEY,California,"Alpine County, Inyo County, Mono County",,,40 CFR 81.159,11/25/71,1971,
 24,METROPOLITAN LOS ANGELES,California,,,,,,,
 25,NORTH CENTRAL COAST,California,,,,,,,
 26,NORTH COAST,California,,,,,,,
@@ -51,13 +51,13 @@ aqcr,aqcr_name,state,counties,towns,other,cfr_section,history,year_start,year_en
 45,METROPOLITAN PHILADELPHIA,Delaware,,,,,,,
 46,SOUTHERN DELAWARE,Delaware,,,,,,,
 47,NATIONAL CAPITAL,District Of Columbia,,,,,,,
-5,MOBILE-PENSACOLA-PANAMA CITY-SOUTHERN MISSISSIPPI,Florida,"Bay County, Calhoun County, Escambia County, Gulf County, Holmes County, Jackson County, Okaloosa County, Santa Rosa County, Walton County, Washington County",,,40 CFR 81.68,11/25/1971,1971,
+5,MOBILE-PENSACOLA-PANAMA CITY-SOUTHERN MISSISSIPPI,Florida,"Bay County, Calhoun County, Escambia County, Gulf County, Holmes County, Jackson County, Okaloosa County, Santa Rosa County, Walton County, Washington County",,,40 CFR 81.68,11/25/71,1971,
 48,CENTRAL FLORIDA,Florida,,,,,,,
 49,JACKSONVILLE-BRUNSWICK,Florida,,,,,,,
 50,SOUTHEAST FLORIDA,Florida,,,,,,,
 51,SOUTHWEST FLORIDA,Florida,,,,,,,
 52,WEST CENTRAL FLORIDA,Florida,,,,,,,
-2,COLUMBUS-PHENIX CITY,Georgia,"Chattahoochee County, Dooly County, Harris County, Marion County, Muscogee County, Quitman County, Schley County, Stewart County, Sumter County, Talbot County, Taylor County, Webster County",,,40 CFR 81.58,11/25/1971,1971,
+2,COLUMBUS-PHENIX CITY,Georgia,"Chattahoochee County, Dooly County, Harris County, Marion County, Muscogee County, Quitman County, Schley County, Stewart County, Sumter County, Talbot County, Taylor County, Webster County",,,40 CFR 81.58,11/25/71,1971,
 49,JACKSONVILLE-BRUNSWICK,Georgia,,,,,,,
 53,AUGUSTA-AIKEN,Georgia,,,,,,,
 54,CENTRAL GEORGIA,Georgia,,,,,,,
@@ -161,14 +161,14 @@ aqcr,aqcr_name,state,counties,towns,other,cfr_section,history,year_start,year_en
 128,SOUTHEAST MINNESOTA-LA CROSSE,Minnesota,,,,,,,
 129,DULUTH-SUPERIOR,Minnesota,,,,,,,
 130,METROPOLITAN FARGO-MOORHEAD,Minnesota,,,,,,,
-131,MINNEAPOLIS-ST. PAUL,Minnesota,"Anoka County, Carver County, Dakota County, Hennepin County, Ramsey County, Scott County, Washington County",,,40 CFR 81.27,11/25/1971,1971,present
+131,MINNEAPOLIS-ST. PAUL,Minnesota,"Anoka County, Carver County, Dakota County, Hennepin County, Ramsey County, Scott County, Washington County",,,40 CFR 81.27,11/25/71,1971,present
 132,NORTHWEST MINNESOTA,Minnesota,,,,,,,
 133,SOUTHWEST MINNESOTA,Minnesota,,,,,,,
-5,MOBILE-PENSACOLA-PANAMA CITY-SOUTHERN MISSISSIPPI,Mississippi,"Adams County, Amite County, Clairborne County, Clarke County, Copiah County, Covington County, Forrest County, Franklin County, George County, Greene County, Hancock County, Harrison County, Hinds County, Jackson County, Jasper County, Jefferson County, Jefferson Davis County, Jones County, Lamar County, Lauderdale County, Lawrence County, Lincoln County, Madison County, Marion County, Newton County, Pearl River County, Perry County, Pike County, Rankin County, Scott County, Simpson County, Smith County, Stone County, Walthall County, Warren County, Wayne County, Wilkinson County",,,40 CFR 81.68,11/25/1971,1971,present
+5,MOBILE-PENSACOLA-PANAMA CITY-SOUTHERN MISSISSIPPI,Mississippi,"Adams County, Amite County, Clairborne County, Clarke County, Copiah County, Covington County, Forrest County, Franklin County, George County, Greene County, Hancock County, Harrison County, Hinds County, Jackson County, Jasper County, Jefferson County, Jefferson Davis County, Jones County, Lamar County, Lauderdale County, Lawrence County, Lincoln County, Madison County, Marion County, Newton County, Pearl River County, Perry County, Pike County, Rankin County, Scott County, Simpson County, Smith County, Stone County, Walthall County, Warren County, Wayne County, Wilkinson County",,,40 CFR 81.68,11/25/71,1971,present
 18,METROPOLITAN MEMPHIS,Mississippi,,,,,,,
 134,MISSISSIPPI DELTA,Mississippi,,,,,,,
 135,NORTHEAST MISSISSIPPI,Mississippi,,,,,,,
-70,METROPOLITAN ST. LOUIS,Missouri,"Franklin County, Jefferson County, St. Charles County, St. Louis City, St. Louis County",,,40 CFR 81.18,11/25/1971,1971,present
+70,METROPOLITAN ST. LOUIS,Missouri,"Franklin County, Jefferson County, St. Charles County, St. Louis City, St. Louis County",,,40 CFR 81.18,11/25/71,1971,present
 94,METROPOLITAN KANSAS CITY,Missouri,,,,,,,
 137,NORTHERN MISSOURI,Missouri,,,,,,,
 138,SOUTHEAST MISSOURI,Missouri,,,,,,,
@@ -199,7 +199,7 @@ aqcr,aqcr_name,state,counties,towns,other,cfr_section,history,year_start,year_en
 153,EL PASO-LAS CRUCES-ALAMOGORDO,New Mexico,,,,,,,
 154,NORTHEASTERN PLAINS,New Mexico,,,,,,,
 155,PECOS-PERMIAN BASIN,New Mexico,,,,,,,
-156,SOUTHWESTERN MOUNTAINS-AUGUSTINE PLAINS,New Mexico,,,,,,,
+156,SOUTHWESTERN MOUNTAINS-AUGUSTINE PLAINS,New Mexico,"Catron County, Socorro County.Ê",,"Those portions of McKinley County lying east of the Continental Divide.ÊThose portions of Valencia County, excluding the Zuni and Ramah Navajo Indian Reservations, lying west of a line described as follows: Starting at the point at which the south boundary of Bernalillo County intersects with the section line between secs. 1 and 2 T. 7 N., R. 2 W.; thence south to the southern boundary of the Laguna Indian Reservation between secs. 35 and 36 T. 7 N., R. 2 W.; then southerly on section lines to the Socorro-Valencia County line at secs. 11, 12, 13, and 14, T. 5 N., R. 2 W.",,,,
 157,UPPER RIO GRANDE VALLEY,New Mexico,,,,,,,
 43,NEW JERSEY-NEW YORK-CONNECTICUT,New York,,,,,,,
 158,CENTRAL NEW YORK,New York,,,,,,,
@@ -268,7 +268,7 @@ aqcr,aqcr_name,state,counties,towns,other,cfr_section,history,year_start,year_en
 87,METROPOLITAN SIOUX FALLS,South Dakota,,,,,,,
 205,BLACKHILLS-RAPID CITY,South Dakota,,,,,,,
 206,SOUTH DAKOTA,South Dakota,,,,,,,
-7,TENNESSEE RIVER VALLEY-CUMBERLAND MOUNTAINS,Tennessee,"Bledsoe County, Coffee County, Cumberland County, Fentress County, Franklin County, Grundy County, Marion County, Morgan County, Overton County, Pickett County, Putnam County, Scott County, Sequatchie County, Warren County, White County, Van Buren County",,,40 CFR 81.72,11/25/1971,1971,
+7,TENNESSEE RIVER VALLEY-CUMBERLAND MOUNTAINS,Tennessee,"Bledsoe County, Coffee County, Cumberland County, Fentress County, Franklin County, Grundy County, Marion County, Morgan County, Overton County, Pickett County, Putnam County, Scott County, Sequatchie County, Warren County, White County, Van Buren County",,,40 CFR 81.72,11/25/71,1971,
 18,METROPOLITAN MEMPHIS,Tennessee,,,,,,,
 55,CHATTANOOGA,Tennessee,,,,,,,
 207,EASTERN TENNESSEE-SOUTHWESTERN VIRGINIA,Tennessee,,,,,,,
@@ -279,7 +279,7 @@ aqcr,aqcr_name,state,counties,towns,other,cfr_section,history,year_start,year_en
 106,SOUTHERN LOUISIANA-SOUTHEAST TEXAS,Texas,Walker County,,,56 FR 37288; 62 FR 30270,moved from Metropolitan Houston to Southern Louisiana in 1991 and back to Metropolitan Houston in 1997,1991,1997
 216,METROPOLITAN HOUSTON-GALVESTON,Texas,Walker County,,,56 FR 37288; 62 FR 30270,moved from Metropolitan Houston to Southern Louisiana in 1991 and back to Metropolitan Houston in 1997,1971,1991
 216,METROPOLITAN HOUSTON-GALVESTON,Texas,Walker County,,,56 FR 37288; 62 FR 30270,moved from Metropolitan Houston to Southern Louisiana in 1991 and back to Metropolitan Houston in 1997,1997,present
-153,EL PASO-LAS CRUCES-ALAMOGORDO,Texas,"Brewster County, Culberson County, El Paso County, Hudspeth County, Jeff Davis County, Presidio County",,,40 CFR 81.82,11/25/1971,1971,present
+153,EL PASO-LAS CRUCES-ALAMOGORDO,Texas,"Brewster County, Culberson County, El Paso County, Hudspeth County, Jeff Davis County, Presidio County",,,40 CFR 81.82,11/25/71,1971,present
 218,MIDLAND-ODESSA-SAN ANGELO,Texas,"Coke County, Concho County, Menard County, McColloch County",,,62 FR 30270,"move from Midland-Odessa to Abilene-Wichita approved by EPA in 1991, moved back to Midland-Odessa in 1997 ",1997,present
 210,ABILENE-WICHITA FALLS,Texas,"Coke County, Concho County, Menard County, McColloch County",,,62 FR 30270; 56 FR 37288,"move from Midland-Odessa to Abilene-Wichita approved by EPA in 1991, moved back to Midland-Odessa in 1997 ",1991,1997
 218,MIDLAND-ODESSA-SAN ANGELO,Texas,"Coke County, Concho County, Menard County, McColloch County",,,62 FR 30270; 56 FR 37288,"move from Midland-Odessa to Abilene-Wichita approved by EPA in 1991, moved back to Midland-Odessa in 1997 ",1971,1991
@@ -305,7 +305,7 @@ aqcr,aqcr_name,state,counties,towns,other,cfr_section,history,year_start,year_en
 159,CHAMPLAIN VALLEY,Vermont,,,,,,,
 221,VERMONT,Vermont,,,,,,,
 247,U.S. VIRGIN ISLANDS,Virgin Islands,,,,,,,
-47,NATIONAL CAPITAL,Virginia,Arlington County; Fairfax County; Loudoun County; Prince William County,"Alexandria, Fairfax, Falls Church",,40 CFR 81.12,no amendments,1971,present
+47,NATIONAL CAPITAL,Virginia,"Arlington County, Fairfax County, Loudoun County, Prince William County","Alexandria, Fairfax, Falls Church",,40 CFR 81.12,no amendments,1971,present
 207,EASTERN TENNESSEE-SOUTHWESTERN VIRGINIA,Virginia,"Bland County, Bristol City, Buchanan County, Carroll County, Dickenson County, Galax City, Grayson County, Lee County, Norton City, Russell County, Scott County, Smyth County, Tazewell County, Washington County, Wise County, Wythe County",,,40 CFR 81.57,no amendments,1971,present
 222,CENTRAL VIRGINIA,Virginia,"Amelia, Amherst, Appomattox, Bedford, Brunswick, Buckingham, Campbell, Charlotte, Cumberland, Franklin, Halifax, Henry, Lunenburg, Mecklenburg, Nottoway, Patrick, Pittsylvania, Prince Edward","Bedford, Danville, Lynchburg, Martinsville, South Boston, Blackstone, Farmville, Rocky Mount, South Hill",,40 CFR 81.143,no amendments,1971,present
 223,HAMPTON ROADS,Virginia,"Isle of Wight, James City, Nansemond, Southampton, York","Chesapeake, Franklin, Hampton, Newport News, Norfolk, Portsmouth, Suffolk, Virginia Beach, Williamsburg",,40 CFR 81.93,no amendments,1971,present

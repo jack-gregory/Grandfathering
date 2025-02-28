@@ -1,0 +1,66 @@
+plant_code,plt_state,plt_county,plt_st_address,plt_city,Region,match_name,AQCR,time_period
+3098,PA,WASHINGTON,30 Duquesne Light Way,Elrama,Monongahela Valley ,Monongahela Valley,,T1
+3098,PA,WASHINGTON,30 Duquesne Light Way,Elrama,Monongahela Valley ,Monongahela Valley,,T2
+3099,PA,ALLEGHENY,1249 Erie Ave.,Crescent Township,Allegheny County,Allegheny County,,T1
+3099,PA,ALLEGHENY,1249 Erie Ave.,Crescent Township,Allegheny County,Allegheny County,,T2
+3113,PA,NORTHAMPTON,5027 River Road,Mt. Bethel,Nonair basin area,Nonair basin area,,all
+3115,PA,BERKS,296 Poplar Neck Road,Birsboro,Reading,Reading,,T2
+3115,PA,BERKS,296 Poplar Neck Road,Birsboro,Reading,Other air basin,,T1
+3118,PA,INDIANA,1442 Power Plant Road,New Florence,Nonair basin area,Nonair basin area,,all
+3121,PA,ERIE,NA,NA,Erie,Other air basin,,T1
+3121,PA,ERIE,NA,NA,Erie,Erie,,T2
+3122,PA,INDIANA,10 Power Plant road,Homer City,Nonair basin area,Nonair basin area,,all
+3130,PA,INDIANA,595 Plant Road,New Florence,Nonair basin area,Nonair basin area,,all
+3131,PA,CLEARFIELD,250 Power Plant Drive,Shawville,Nonair basin area,Nonair basin area,,all
+3132,PA,WARREN,NA,NA,Nonair basin area,Nonair basin area,,all
+3136,PA,ARMSTRONG,313 Keystone Drive,Shelocta,Nonair basin area,Nonair basin area,,all
+3138,PA,LAWRENCE,2189 St. Rt. 168 South,West Pittsburg,Upper Beaver Valley,Beaver Valley,,T1
+3138,PA,LAWRENCE,2189 St. Rt. 168 South,West Pittsburg,Upper Beaver Valley,Upper Beaver Valley,,T2
+3140,PA,YORK,1295 Wago Road,York Haven,Nonair basin area,Nonair basin area,,all
+3148,PA,NORTHAMPTON,6605 Foul Rift Road,Bangor,Nonair basin area,Nonair basin area,,all
+3149,PA,MONTOUR,18 McMichael Road,Washingtonville,Nonair basin area,Nonair basin area,,all
+3152,PA,SNYDER,"N. Old Trail Road, PO Box 517",Shamokin Dam,Nonair basin area,Nonair basin area,,all
+3159,PA,CHESTER,Township Line & Cromby Rds.,Pheonixville,Southeast Pennsylvania Outer,Southeast Pennsylvania Air Basin,,T1
+3160,PA,PHILADELPHIA,NA,NA,Southeast Pennsylvania Inner,Southeast Pennsylvania Air Basin,,T1
+3161,PA,DELAWARE,#1 Industrial Hwy.,Eddystone,Southeast Pennsylvania Inner,Southeast Pennsylvania Air Basin,,T1
+3159,PA,CHESTER,Township Line & Cromby Rds.,Pheonixville,Southeast Pennsylvania Outer,Southeast Pennsylvania Air Basin Outer Zone,,T2
+3160,PA,PHILADELPHIA,NA,NA,Southeast Pennsylvania Inner,Southeast Pennsylvania Air Basin Inner Zone,,T2
+3161,PA,DELAWARE,#1 Industrial Hwy.,Eddystone,Southeast Pennsylvania Inner,Southeast Pennsylvania Air Basin Inner Zone,,T2
+3178,PA,ARMSTRONG,108 Power Plant Road,Adrian,Nonair basin area,Nonair basin area,,all
+3179,PA,GREENE,2907 E. Roy Furman Highway,Masontown,Nonair basin area,Nonair basin area,,all
+3181,PA,WASHINGTON,50 Electric Way,Cortney,Monongahela Valley,Monongahela Valley,,T1
+3181,PA,WASHINGTON,50 Electric Way,Cortney,Monongahela Valley,Monongahela Valley,,T2
+6094,PA,BEAVER,128 Ferry Hill Road,Shippingport,Lower Beaver Valley,Beaver Valley,,T1
+6094,PA,BEAVER,128 Ferry Hill Road,Shippingport,Lower Beaver Valley,Lower Beaver Valley,,T2
+8226,PA,ALLEGHENY,P. O. Box 65,Cheswick,Allegheny County,Allegheny County,,T1
+8226,PA,ALLEGHENY,P. O. Box 65,Cheswick,Allegheny County,Allegheny County,,T2
+10143,PA,CAMBRIA,141 Interpower Drive,Colver,Nonair basin area,Nonair basin area,,all
+10495,ME,OXFORD,35 Hartford St,Rumford,Androscoggin,Central Maine,107,T1
+10495,ME,OXFORD,35 Hartford St,Rumford,Androscoggin,Central Maine,107,T2
+10676,PA,BEAVER,394 Frankfort Rd.,Monaca,Lower Beaver Valley,Beaver Valley,,T1
+50130,PA,BEAVER,300 Frankfort Road,Monaca,Lower Beaver Valley,Beaver Valley,,T1
+10676,PA,BEAVER,394 Frankfort Rd.,Monaca,Lower Beaver Valley,Lower Beaver Valley,,T2
+50130,PA,BEAVER,300 Frankfort Road,Monaca,Lower Beaver Valley,Lower Beaver Valley,,T2
+50397,PA,YORK,228 S. Main Street,Spring Grove,Nonair basin area,Nonair basin area,,all
+50888,PA,NORTHAMPTON,1 Horwith Drive,Northampton,Allentown Bethlehem Easton,Other air basin,,T1
+50888,PA,NORTHAMPTON,1 Horwith Drive,Northampton,Allentown Bethlehem Easton,Allentown Bethlehem Easton,,T2
+55975,PA,INDIANA,NA,NA,Nonair basin area,Nonair basin area,,all
+56221,PA,CLEARFIELD,St Rt 879,Karthaus Township,Nonair basin area,Nonair basin area,,all
+56453,PA,WASHINGTON,Beech Hollow Road,Robinson Township,Nonair basin area,Nonair basin area,,all
+56664,PA,GREENE,Thomas Road,Nemacolin,Nonair basin area,Nonair basin area,,all
+1613,MA,BRISTOL,1606 Riverside Avenue,Somerset,,120,120,T1
+1613,MA,BRISTOL,1606 Riverside Avenue,Somerset,,other,120,T2
+1613,MA,BRISTOL,1606 Riverside Avenue,Somerset,,all,120,all
+1619,MA,BRISTOL,Brayton Point Road,Somerset,,120,120,T1
+1619,MA,BRISTOL,Brayton Point Road,Somerset,,other,120,T2
+1619,MA,BRISTOL,Brayton Point Road,Somerset,,all,120,all
+1626,MA,ESSEX,24 Fort Avenue,Salem,,other AQCR 119,119,T1
+1626,MA,ESSEX,24 Fort Avenue,Salem,,other,119,T2
+1626,MA,ESSEX,24 Fort Avenue,Salem,,all,119,all
+1606,MA,HAMPDEN,200 Northampton,Holyoke,,42,42,T1
+1606,MA,HAMPDEN,200 Northampton,Holyoke,,other,42,T2
+1606,MA,HAMPDEN,200 Northampton,Holyoke,,all,42,all
+2442,NM,SAN JUAN,End of County Rd 6675,Fruitland,,all,14,T2
+2451,NM,SAN JUAN,6800 County Road North,Waterflow,,all,14,T2
+87,NM,MCKINLEY,County Road 19,Prewitt,,other,156,T1
+87,NM,MCKINLEY,County Road 19,Prewitt,,all,156,T2

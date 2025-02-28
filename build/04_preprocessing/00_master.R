@@ -66,6 +66,17 @@ source(here::here("build/03_preprocessing/sulfur.R"))
 
 ## 02_regression_data.do ------------------------------------------------------
 
+## Unzip files
+l.zips <- list(
+  here::here("data/eia/EIA electricity demand data.zip"),
+  here::here("data/eia/1989_1998_Nonutility_Power_Producer.zip")
+)
+l.zip_contents <- purrr::map(
+  l.zips, 
+  \(x) {zip::zip_list(x) |> dplyr::pull(filename)}
+)
+purrr::walk(l.zips, \(x) zip::unzip(x, exdir=fs::path_dir(x)))
+
 ## Import do file
 stata_do <- readLines(here::here("build/03_preprocessing/02_regression_data.do"))
 
@@ -74,6 +85,10 @@ stata_do <- stringr::str_replace_all(stata_do, "your_path_here", here::here())
 
 ## Run code
 Rstata::stata(stata_do)
+
+## Remove unzipped files
+purrr::map2_chr(l.zips, l.zip_contents, \(x,y) fs::path(fs::path_dir(x), y)) |>
+  fs::file_delete()
 
 
 ### END CODE ###
