@@ -2,7 +2,7 @@ Energy Information Administration (EIA)
 =======================================
 
 
-# EIA-867
+## EIA-867
 
 *1989_1998_Nonutility_Power_Producer.zip*
 
@@ -11,7 +11,7 @@ available from 1989 to 1998 under the current Form
 [EIA-923](https://www.eia.gov/electricity/data/eia923/).
 
 
-# State electricity data
+## State electricity data
 
 *EIA electricity demand data.zip*
 
@@ -19,7 +19,7 @@ State-by-year panel of electricity demand available here:
 [https://www.eia.gov/electricity/data/state](https://www.eia.gov/electricity/data/state)
 
 
-# Geospatial data
+## Geospatial data
 
 *USA_States_Generalized.zip*
 

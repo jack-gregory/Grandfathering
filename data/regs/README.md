@@ -2,7 +2,7 @@ Regulations
 ===========
 
 
-# NSR grandfathering
+## NSR grandfathering
 
 *gf_status_born_around_1978.xlsx*
 
@@ -10,7 +10,7 @@ NSR-grandfathering status for those boilers which commenced operation shortly
 after 1978.  The data were manually collected through calls, news search, etc.
 
 
-# Acid Rain Program (ARP)
+## Acid Rain Program (ARP)
 
 *APR_power_plants.csv*
 
@@ -27,7 +27,7 @@ Data on annual ARP auction permit prices available here:
 [https://www.epa.gov/power-sector/so2-allowance-auctions](https://www.epa.gov/power-sector/so2-allowance-auctions).
 
 
-# Local regulations
+## Local regulations
 
 *so2_regulations_by_state_1976_to_2019.xlsx*
 
