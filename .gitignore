@@ -6,7 +6,7 @@ build/archive/
 rep/
 
 # Data
-data/*/
+data/*
 
 # Output
 out/
