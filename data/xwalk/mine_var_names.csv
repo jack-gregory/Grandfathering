@@ -1,4 +1,4 @@
-﻿orig_name,newname
+orig_name,newname
 ASH,ASH_CONTENT
 ASH_CONTENT,ASH_CONTENT
 "Average Ash
@@ -144,3 +144,4 @@ Natural Gas Supply Contract Type,NG_sUPPLY_CONTRACT_TYPE
 Natural Gas Delivery Contract Type,NG_DELIVERY_CONTRACT_TYPE
 MoistureContent,MOISTURE_CONTENT
 ChlorineContent,CHLORINE_CONTENT
+BalancingAuthority Code,BA_CODE

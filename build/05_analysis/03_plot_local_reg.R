@@ -25,7 +25,7 @@ source(here("src/preamble.R"))
 
 ## ... Definitions
 date <- format(Sys.Date(), "%Y%m%d")
-fs::dir_create(path(l.path$out, date))
+fs::dir_create(here("out", date))
 
 ## ... Files
 l.file <- list(

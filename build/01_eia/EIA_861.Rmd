@@ -400,8 +400,8 @@ l.zip_dir <- fs::dir_ls(l.path$f861, regexp="f861_\\d{4}\\.zip$")
 
 ## Build zip & file dataframe
 df.zip_dir <- l.zip_dir %>%
-  map_dfr(~unzip(.x, list=TRUE) %>% mutate(Zip = .x)) %>%
-  filter(str_detect(Name, "(TYP1|[Ff][Ii][Ll][Ee]2|Sales_Ult_Cust_\\d{4})")) %>%
+  map_dfr(~zip_list(.x) %>% mutate(zip = .x)) %>%
+  filter(str_detect(filename, "(TYP1|[Ff][Ii][Ll][Ee]2|Sales_Ult_Cust_\\d{4})")) %>%
   rename_with(.fn=str_to_upper)
 
 ## Import dataset
@@ -409,7 +409,7 @@ if (length(l.zip_dir)!=nrow(df.zip_dir)) {
   stop("Number of data files does not match the number of zip archives.")
 }
 df.sales <- map2_dfr(df.zip_dir %>% pull(ZIP) %>% as.list(),
-                     df.zip_dir %>% pull(NAME) %>% as.list(),
+                     df.zip_dir %>% pull(FILENAME) %>% as.list(),
                      ~extract_zip(.x, .y)) %>%
   select(UTILITY_ID, UTILITY_NAME, STATE, YEAR, OWNERSHIP, SERVICE, DATA, NERC,
          CAO, CAO_ID, BA_CODE, REVENUES, SALES, CUSTOMERS) %>%

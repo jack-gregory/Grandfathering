@@ -19,17 +19,17 @@ aqcr2cty <- read.csv(here::here("data/xwalk/aqcrs_to_cty_xwalk.csv"), stringsAsF
 names(aqcr2cty)
 
 ## boiler-specific data
-boilers <- read.csv(here::here("data/boilers_1985-2018.csv"), stringsAsFactors=FALSE)
+boilers <- read.csv(here::here("data/boilers_1985_2018.csv"), stringsAsFactors=FALSE)
 
 ## read in fuel data to get early period plants that might have fallen out
 fuel <- read.csv(here::here("data/all_fuel_1970_2018.csv"), stringsAsFactors=FALSE)
 fuel <- fuel %>% select(-X)
 
 ## generators (for capacity data)
-gens <- read.csv(here::here("data/generators_1985-2018.csv"), stringsAsFactors=FALSE)
+gens <- read.csv(here::here("data/generators_1985_2018.csv"), stringsAsFactors=FALSE)
 
 ## plants (and add in non abbrev states)
-plants <- read.csv(here::here("data/plants_1985-2018.csv"), stringsAsFactors=FALSE)
+plants <- read.csv(here::here("data/plants_1985_2018.csv"), stringsAsFactors=FALSE)
 states <- read.csv(here::here("data/xwalk/state_code_xwalk.csv"), stringsAsFactors=FALSE)
 plants <- left_join(plants, states, by="plt_state")
 
@@ -998,7 +998,7 @@ geo_regs <- geo_regs %>%
 
 ## We have to manage Illinois separately on account of needing to add in stack/flue 
 ## information.
-stacks <- read.csv(here::here("data/stackflues_1985-2018.csv")) %>% select(-X)
+stacks <- read.csv(here::here("data/stackflues_1985_2018.csv")) %>% select(-X)
 names(stacks)
 
 ## We note the state data in here is not reliable, so we will drop it and fill it

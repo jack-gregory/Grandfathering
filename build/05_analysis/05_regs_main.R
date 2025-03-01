@@ -176,7 +176,7 @@ tbl_summary <- df.reg %>%
 ## Prepare file header, table header and footer, and subtable headers
 f_header <- c("%% Grandfathering Project",
               "%% Main regression table",
-              glue::glue("%% Compiled on {base::Sys.time()} using <3_regs.R>"),
+              glue::glue("%% Compiled on {base::Sys.time()}"),
               "%% Written by Jack Gregory\n")
 tbl_header1 <- c("\\begin{center}",
                  "\\begin{singlespace}",
@@ -381,7 +381,7 @@ tbl_summary <- df.reg %>%
 ## Prepare file header and table header and footer
 f_header <- c("%% Grandfathering Project",
               "%% Main regression first-stage table",
-              glue::glue("%% Compiled on {base::Sys.time()} using <3_regs.R>"),
+              glue::glue("%% Compiled on {base::Sys.time()}"),
               "%% Written by Jack Gregory",
               "\n")
 tbl_header <- c("\\begin{table}[ht]",

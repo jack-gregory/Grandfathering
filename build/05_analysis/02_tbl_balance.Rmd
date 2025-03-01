@@ -45,7 +45,7 @@ source(here("src/preamble.R"))
 
 ## ... Definitions
 date <- format(Sys.Date(), "%Y%m%d")
-fs::dir_create(path(l.path$out, date))
+fs::dir_create(here("out", date))
 
 ## ... Files
 l.file <- list(
@@ -53,7 +53,7 @@ l.file <- list(
   gf_cln = here("data/regressions_ready_data.dta"),
   epa_eia_xwalk = here("data/epa/epa_eia_crosswalk.csv"),
   epa = here("data/epa/Facility_Attributes.zip"),
-  state = here("data/eia/shp/USA_States_Generalized.shp"),
+  state = here("data/eia/shp/USA_States_(Generalized).zip"),
   fig2 = here("out", date, "fig2.pdf"),
   tbl5 = here("out", date, "tbl5.tex"),
   tbl6 = here("out", date, "tbl6.tex")
@@ -237,9 +237,20 @@ The state spatial data is sourced from the [EIA](https://atlas.eia.gov/datasets/
 
 ```{r sf-state, fig.cap="State shapefile"}
 
+## Unzip state shapefile
+state_files <- zip::zip_list(l.file$state) %>%
+  dplyr::pull(filename)
+zip::unzip(l.file$state, file=state_files, exdir=fs::path_dir(l.file$state))
+
 ## Import state shapefile
-df.state <- read_sf(l.file$state) %>%
+df.state <- read_sf(fs::path_ext_set(l.file$state, "shp")) %>%
   filter(!(STATE_ABBR %in% c("AK","HI")))
+
+## Remove state files
+purrr::walk(
+  state_files,
+  ~fs::file_delete(fs::path(fs::path_dir(l.file$state), .x))
+)
 
 ## Display coordinate reference system
 st_crs(df.state)
@@ -373,7 +384,7 @@ This section prepares balance tables for the paper.
 
 This subsection produces Table 5 in the paper.
 
-```{r analysis}
+```{r gf-analysis}
 
 ## NB - See <http://www.stat.yale.edu/Courses/1997-98/101/meancomp.htm>
 
@@ -472,7 +483,7 @@ df.bal <- df.boiler %>%
   select(ORDER, VAR, GF_1, GF_0, DIFF)
 ```
 
-```{r balance-tbl}
+```{r gf-balance-tbl}
 
 if (knitr::is_html_output()) {
   df.bal %>%
@@ -486,7 +497,7 @@ if (knitr::is_html_output()) {
 
 This section exports the table to a tex file.
 
-```{r export}
+```{r gf-export}
 
 ## Build regression table (longtable) -----------------------------------------
 
@@ -562,7 +573,7 @@ tbl_footer %>% write_lines(l.file$tbl5, append=TRUE)
 
 This subsection produces Table 6 in the paper.
 
-```{r}
+```{r lr-analysis}
 
 df.boiler11 <- df.boiler |>
   mutate(LR = ifelse(LOCALREG<1.1, 1, 0))
@@ -633,7 +644,7 @@ df.bal <- df.boiler11 %>%
   select(ORDER, VAR, LR_1, LR_0, DIFF)
 ```
 
-```{r balance-tbl}
+```{r lr-balance-tbl}
 
 if (knitr::is_html_output()) {
   df.bal %>%
@@ -647,7 +658,7 @@ if (knitr::is_html_output()) {
 
 This section exports the table to a tex file.
 
-```{r export}
+```{r lr-export}
 
 ## Build regression table (longtable) -----------------------------------------
 

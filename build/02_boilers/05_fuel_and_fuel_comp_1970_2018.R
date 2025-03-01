@@ -34,7 +34,7 @@ for (i in c(1971:2000)) {
 
   l.zip %>%
     purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
-    fs::file_delete()
+    unlink(recursive=TRUE, force=TRUE)
   
   names(allplts)  
   print("# Plants by FUELDESC")
@@ -187,7 +187,7 @@ for (i in c(1:18)) {
   
   l.zip %>%
     purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
-    fs::file_delete()
+    unlink(recursive=TRUE, force=TRUE)
   
   ## Certain years have these characters randomly inserted in certain var names.
   names(allplts) <- gsub("\r\n", " ", names(allplts))
@@ -327,7 +327,7 @@ for (i in c(2:18)) {
   
   l.zip %>%
     purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
-    fs::file_delete()
+    unlink(recursive=TRUE, force=TRUE)
   
   names(stocks)
   names(stocks) <- tolower(names(stocks))
@@ -450,17 +450,17 @@ for (i in c(1985:2005, 2008:2018)) {
     fuel <- read_excel(here::here("data/eia/f767/2005 EIA-767 Master Files/F767_BOILER_FUEL.xls")) %>% unique()
   } else if (i %in% c(2008:2010)) {
     fuel <- read_excel(here::here("data/eia/f923", files[l]), sheet = 6, skip = 7)
-  } else if (i %in% c(2011:2016)) {
+  } else if (i %in% c(2011:2013)) {
     fuel <- read_excel(here::here("data/eia/f923", files[l]), sheet = 6, skip = 5)
-  } else if (i == 2017) {
+  } else if (i %in% c(2014:2016)) {
     fuel <- read_excel(here::here("data/eia/f923", files[l]), sheet = 7, skip = 5)
-  } else if (i == 2018) {
+  } else if (i %in% c(2017:2018)) {
     fuel <- read_excel(here::here("data/eia/f923", files[l]), sheet = 8, skip = 5)
   }
 
   l.zip %>%
     purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
-    fs::file_delete()
+    unlink(recursive=TRUE, force=TRUE)
   
   if ("YEAR" %in% names(fuel)) {
     fuel <- fuel %>% select(-YEAR)

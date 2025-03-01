@@ -11,22 +11,35 @@
 
 ** PREAMBLE ---------------------------------------------------------------------------------------
 
-** Set 
+** Install commands
+net install grc1leg, from("https://www.stata.com/users/vwiggins/")
+
+** Set
 ** ... definitions
 set matsize 900, permanently
 
 ** ... date
-global date = string(year("$S_DATE")) + string(month("$S_DATE"), "%02.0f") ///
-  + string(day("$S_DATE"), "%02.0f")
+local stata_date = date("$S_DATE", "DMY") 
+local year  = string(year(`stata_date'))
+local month = string(month(`stata_date'), "%02.0f") 
+local day   = string(day(`stata_date'), "%02.0f") 
+global date = "`year'`month'`day'"
 
 ** ... paths
-global path_data "your_path_here\data"
-global path_output "your_path_here\out\$date"
+global path_data "your_path_here/data"
+global path_output "your_path_here/out/$date"
 cap mkdir $path_output
 
 ** ... regressions
 global IOUplus_cond "(ut_type==4|ut_type==2|ut_type==5)"
 global LHS survive SO2 DURATION
+global iterations_i : word count $LHS
+global controls_basic age capacity efficiency_100_pct_load  i.year i.states i.ut_type i.manufact so2_nonattain applic_reg so2_nonat_Gf  applic_reg_Gf capacity_gf
+global controls_DURATION  coal2gas_price d_growth state_cap_growth
+global controls_survive  coal2gas_price d_growth state_cap_growth
+global full_DURATION  $controls_basic $controls_DURATION 
+global full_SO2     $controls_basic 
+global full_survive  $controls_basic $controls_survive 
 
 ** ... years
 ** A cutoff of 1950 for the birth of boilers is considered in most regressions
@@ -62,7 +75,7 @@ foreach i of global LHS {
 			putexcel G1 = "capacity_eff-SE"
 			putexcel H1 = "nonattain_eff-SE"
 			putexcel I1 = "applic_reg_eff-SE"
-			putexcel J1 = "GF- p-value"
+			putexcel J1 = "GF p-value"
 			putexcel K1 = "capacity_eff p-value"
 			putexcel L1 = "nonattain_eff p-value"
 			putexcel M1 = "applic_reg_eff p-value"
@@ -87,7 +100,7 @@ foreach i of global LHS {
 			*We construct a symmetric window 
 			drop if inservice_y<`j'| inservice_y>1978+`width'
 
-  		if `i'==survive {
+  		if "`i'"=="survive" {
 				drop if capacity<74 & ut_type==4
 				drop if ut_type==5 & year<1990
 				drop if year==2018
@@ -158,17 +171,21 @@ foreach i of global LHS {
 		(rarea applic_reg_highCI applic_reg_lowCI Window_width, color(gs13%45)) ///
 		(line  GF_eff  Window_width, lpattern(shortdash_dot) lwidth(thick)) ///
 		(line nonattain_eff Window_width) (line  applic_reg_eff Window_width, lpattern(dash)), ///
-		xtitle("Max. distance in years to 1978",size(vsmall)) ///
+		xtitle("Max. distance in years to 1978", size(vsmall)) ///
 		ytitle("Estimated coefficient", size(vsmall)) ///
-		title("`j'", position(16) ring(1) size(small)) saving(`i', replace) ///
+		title("`j'", position(16) ring(1) size(small)) saving("$path_output/`i'.gph", replace) ///
 		legend(order(4 "Grandfathering (Gf)" 5 "Nonattainment # Gf" ///
 		6 "Applicable regulations # Gf" 1 "95% Confidence interval") size(small)) ///
 		xlabel(, labsize(vsmall)) ylabel(, labsize(small)) ///
 		xline($windowCons) graphregion(color(white)) bgcolor(white)	   
 }
 
-grc1leg DURATION.gph SO2.gph survive.gph, col(3) iscale(1) graphregion(color(white))
-graph export "$path_output\fig5.png", as(png) name("Graph") replace
+grc1leg "$path_output/DURATION.gph" "$path_output/SO2.gph" "$path_output/survive.gph", ///
+  col(3) iscale(1) graphregion(color(white))
+graph export "$path_output/fig5.png", as(png) name("Graph") replace
+erase "$path_output/DURATION.gph"
+erase "$path_output/SO2.gph"
+erase "$path_output/survive.gph"
 
 
 *** END CODE ***

@@ -60,8 +60,9 @@ if (Sys.info()[["user"]]=="ajrg2") {
 # CODE --------------------------------------------------------------------------------------------
 
 ## Run scripts in order
-fs::dir_ls(here::here("build/04_analysis")) |>
+fs::dir_ls(here::here("build/05_analysis")) |>
   purrr::discard(\(x) stringr::str_detect(x, "master")) |>
+  purrr::keep(\(x) fs::path_ext(x) %in% c("R","Rmd","do")) |>
   purrr::walk(~{
     if (fs::path_ext(.x)=="R") {
       
@@ -77,6 +78,7 @@ fs::dir_ls(here::here("build/04_analysis")) |>
       out_file <- fs::path_ext_set(.x, "R")
       knitr::purl(input=.x, output=out_file)
       source(out_file)
+      fs::file_delete(out_file)
       
     } else if (fs::path_ext(.x)=="do") {
       
@@ -87,7 +89,7 @@ fs::dir_ls(here::here("build/04_analysis")) |>
       stata_do <- stringr::str_replace_all(stata_do, "your_path_here", here::here())
       
       ## Run code
-      Rstata::stata(stata_do)
+      RStata::stata(stata_do)
       
     }
   })

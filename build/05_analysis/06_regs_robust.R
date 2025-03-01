@@ -219,7 +219,7 @@ tbl_summary <- df.reg %>%
 ## Prepare file header, table header and footer, and subtable headers
 f_header <- c("%% Grandfathering Project",
               "%% Robustness regression table",
-              glue::glue("%% Compiled on {base::Sys.time()} using <5_regs_robust.R>"),
+              glue::glue("%% Compiled on {base::Sys.time()}"),
               "%% Written by Jack Gregory\n")
 tbl_header1 <- c("\\begin{center}",
                  "\\begin{singlespace}",
@@ -362,7 +362,7 @@ tbl_summary <- df.reg %>%
 ## Prepare file header, table header and footer, and subtable headers
 f_header <- c("%% Grandfathering Project",
               "%% Fully versus partially grandfathered regression table",
-              glue::glue("%% Compiled on {base::Sys.time()} using <5_regs_robust.R>"),
+              glue::glue("%% Compiled on {base::Sys.time()}"),
               "%% Written by Jack Gregory\n")
 tbl_header1 <- c("\\begin{center}",
                  "\\begin{singlespace}",
@@ -516,7 +516,7 @@ tbl_summary <- df.reg %>%
 ## Prepare file header, table header and footer, and subtable headers
 f_header <- c("%% Grandfathering Project",
               "%% Anticipation regression table",
-              glue::glue("%% Compiled on {base::Sys.time()} using <5_regs_robust.R>"),
+              glue::glue("%% Compiled on {base::Sys.time()}"),
               "%% Written by Jack Gregory\n")
 tbl_header1 <- c("\\begin{center}",
                  "\\begin{singlespace}",

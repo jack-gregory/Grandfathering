@@ -56,7 +56,7 @@ l.path$f923 <- path(l.path$data, "eia/f923")
 
 ## ... Files
 l.file <- list(
-  fuel = path(l.path$data, "eia923_fuel_dictionary.csv"),
+  fuel = path(l.path$data, "xwalk/eia923_fuel_dictionary.csv"),
   gen = path(l.path$data, "eia_netgen.csv"),
   genunit = path(l.path$data, "eia_netgen_unit.csv")
 )
@@ -535,7 +535,7 @@ df.zip1 <- df.zip1 %>%
   mutate(NAME = map(NAME, ~structure(.x, class=c(class(.x), "p1"))))
 
 ## Import dataset
-if ((length(l.zip1)+2)!=nrow(df.zip1)) {
+if ((length(l.zip1))!=nrow(df.zip1)) {
   stop("Number of data files does not match the number of zip archives.")
 }
 df.gen <- pmap_dfr(df.zip1 %>% select(ZIP, NAME, SHEET),
@@ -708,8 +708,8 @@ This section exports the cleaned net generation by ORISPL data to a csv and/or a
 
 ```{r export-1}
 
-# write_csv(df.gen_cln, l.file$gen)
-saveRDS(df.gen_cln, fs::path_ext_set(l.file$gen, "rds"))
+write_csv(df.gen_cln, l.file$gen)
+# saveRDS(df.gen_cln, fs::path_ext_set(l.file$gen, "rds"))
 ```
 
 ### Dictionary
@@ -941,8 +941,8 @@ This section exports the cleaned net generation by unit data to a csv and/or an 
 
 ```{r export}
 
-# write_csv(df.genunit_cln, l.file$genunit)
-saveRDS(df.genunit_cln, fs::path_ext_set(l.file$genunit, "rds"))
+write_csv(df.genunit_cln, l.file$genunit)
+# saveRDS(df.genunit_cln, fs::path_ext_set(l.file$genunit, "rds"))
 ```
 
 ### Dictionary

@@ -260,7 +260,7 @@ for (i in c(2007:2018)) {
   orig_name <- as.data.frame(names(emission_stand_sub), stringsAsFactors = FALSE)
   names(orig_name) <- "orig_name"
   
-  newname <- left_join(orig_name, l.vn$emission_stand)
+  newname <- left_join(orig_name, l.vn$emission_stand) %>% unique()
   
   print(paste("Number of NA in Name XWalk", sum(is.na(newname))))
   
@@ -473,7 +473,7 @@ for (i in c(2007:2018)) {
   
   l.zip %>%
     purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
-    fs::file_delete()
+    unlink(recursive=TRUE, force=TRUE)
 }
 
 ## Export ---------------------------------------------------------------------

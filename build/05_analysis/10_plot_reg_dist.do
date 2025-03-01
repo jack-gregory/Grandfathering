@@ -16,12 +16,15 @@
 set matsize 900, permanently
 
 ** ... date
-global date = string(year("$S_DATE")) + string(month("$S_DATE"), "%02.0f") ///
-  + string(day("$S_DATE"), "%02.0f")
+local stata_date = date("$S_DATE", "DMY") 
+local year  = string(year(`stata_date'))
+local month = string(month(`stata_date'), "%02.0f") 
+local day   = string(day(`stata_date'), "%02.0f") 
+global date = "`year'`month'`day'"
 
 ** ... paths
-global path_data "your_path_here\data"
-global path_output "your_path_here\out\$date"
+global path_data "your_path_here/data"
+global path_output "your_path_here/out/$date"
 cap mkdir $path_output
 
 ** ... regressions
@@ -40,19 +43,21 @@ gen applic_reg_notInverted=1/applic_reg
 
 twoway (histogram applic_reg if $IOUplus_cond & Gf==1, start(0) width(0.25) color(red%30)) ///
   (histogram applic_reg if $IOUplus_cond & Gf==0, start(0) width(0.25) fcolor(none) lcolor(black)), ///
-  legend(order(1 "Grandfathered" 2 "Subject to NSR" ) size(vsmall)) ///
+  legend(order(1 "Grandfathered" 2 "Subject to NSR") size(vsmall)) ///
   xtitle("Local regulations (MMBtu/lbs)", size(vsmall)) ytitle("Density", size(vsmall)) ///
   title("Distribution of the inverse of local SO2 regulations", position(12) ring(0) size(small)) ///
-  saving(Inverse, replace) graphregion(color(white)) bgcolor(white) 
+  saving("$path_output/Inverse.gph", replace) graphregion(color(white)) bgcolor(white) 
 	   
 twoway (histogram applic_reg_notInverted if $IOUplus_cond & Gf==1, start(0) width(0.5) color(red%30)) ///
   (histogram applic_reg_notInverted if $IOUplus_cond & Gf==0, start(0) width(0.5) fcolor(none) lcolor(black)), ///
   leg(off) xtitle("Local regulations (MMBtu/lbs)", size(vsmall)) ytitle("Density", size(vsmall)) ///
   title("Distribution of the local SO2 regulations", position(12) ring(0) size(small)) ///
-  saving(NotInverse, replace)  graphregion(color(white)) bgcolor(white)
+  saving("$path_output/NotInverse.gph", replace) graphregion(color(white)) bgcolor(white)
 
-gr combine NotInverse.gph Inverse.gph, col(1) iscale(1) graphregion(color(white)) 
-graph export "$path_output\fig6.png", as(png) name("Graph") replace
+gr combine "$path_output/NotInverse.gph" "$path_output/Inverse.gph", col(1) iscale(1) graphregion(color(white)) 
+graph export "$path_output/fig6.png", as(png) name("Graph") replace
+erase "$path_output/Inverse.gph"
+erase "$path_output/NotInverse.gph"
 
 
 *** END CODE ***

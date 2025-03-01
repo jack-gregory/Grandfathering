@@ -57,8 +57,8 @@ l.path$f923 <- path(l.path$data, "eia/f923")
 ## ... Files
 l.file <- list(
   fips = path(l.path$data, "cb/all-geocodes-v2020.xlsx"),
-  state = path(l.path$data, "eia/shp/USA_States_Generalized.shp"),
-  county = path(l.path$data, "eia/shp/USA_Counties_(Generalized).shp"),
+  state = path(l.path$data, "eia/shp/USA_States_(Generalized).zip"),
+  county = path(l.path$data, "eia/shp/USA_Counties_(Generalized).zip"),
   cln_fuel = path(l.path$data, "eia_fuel.xlsx"),
   cln_sulfur = path(l.path$data, "eia_sulfur.csv")
 )
@@ -1052,11 +1052,22 @@ pmap(list(
 ## Select viridis hex colours
 # scales::show_col(viridis::viridis_pal(option="D")(20))
 
+## Unzip state shapefile
+state_files <- zip::zip_list(l.file$state) %>%
+  dplyr::pull(filename)
+zip::unzip(l.file$state, file=state_files, exdir=fs::path_dir(l.file$state))
+
 ## Import state shapefile
-df.state <- read_sf(l.file$state) %>%
+df.state <- read_sf(fs::path_ext_set(l.file$state, "shp")) %>%
   filter(!(STATE_ABBR %in% c("AK","HI"))) %>%
   left_join(df.sulfur_stats %>% filter(TYPE=="State"), 
             by=c("STATE_FIPS"="ID"))
+
+## Remove state files
+purrr::walk(
+  state_files,
+  ~fs::file_delete(fs::path(fs::path_dir(l.file$state), .x))
+)
 
 ## Plot shapefile
 ggplot(data=df.state) +
@@ -1078,11 +1089,22 @@ ggplot(data=df.state) +
 
 ```{r sulfur-county-map}
 
-## Import state shapefile
-df.county <- read_sf(l.file$county) %>%
+## Unzip county shapefile
+county_files <- zip::zip_list(l.file$county) %>%
+  dplyr::pull(filename)
+zip::unzip(l.file$county, file=county_files, exdir=fs::path_dir(l.file$county))
+
+## Import county shapefile
+df.county <- read_sf(fs::path_ext_set(l.file$county, "shp")) %>%
   filter(!(STATE_NAME %in% c("Alaska","Hawaii"))) %>%
   left_join(df.sulfur_stats %>% filter(TYPE=="County"), 
             by=c("FIPS"="ID"))
+
+## Remove county files
+purrr::walk(
+  county_files,
+  ~fs::file_delete(fs::path(fs::path_dir(l.file$county), .x))
+)
 
 ## Plot shapefile
 ggplot() +
@@ -1114,7 +1136,7 @@ This section exports the cleaned sulfur data to a csv file:
 ```{r sulfur-export}
 
 readr::write_csv(df.sulfur_stats, l.file$cln_sulfur)
-saveRDS(df.sulfur_stats, fs::path_ext_set(l.file$cln_sulfur, "rds"))
+# saveRDS(df.sulfur_stats, fs::path_ext_set(l.file$cln_sulfur, "rds"))
 ```
 
 ### Dictionary

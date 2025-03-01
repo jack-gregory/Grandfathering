@@ -40,12 +40,14 @@ for (i in files) {
     as.list()
   zip::unzip(zip_file, exdir=fs::path_dir(zip_file))
   
-  if (i < 2008) {
-    allplts <- read_excel(here::here("data/eia/f923/f423",i,".xls"), col_types = "text")
+  if (i < 1993 | (i > 2001 & i < 2008)) {
+    allplts <- read_excel(here::here("data/eia/f923", paste0("f423_", i, ".xls")), col_types = "text")
+  } else if (i >= 1993 & i <= 2001) {
+    allplts <- read_excel(here::here("data/eia/f923", paste0("f423", i, ".xls")), col_types = "text")
   } else if (i == 2008) {
-    allplts <- read_excel(here::here("data/eia/f923/f423",i,".xls"), col_types = "text", skip = 9)
+    allplts <- read_excel(here::here("data/eia/f923", paste0("f423_", i, ".xls")), col_types = "text", skip = 9)
   } else if (i > 2008 & i <= 2011) {
-    allplts <- read_excel(here::here("data/eia/f923/f423",i,".xls"), col_types = "text", skip = 6)
+    allplts <- read_excel(here::here("data/eia/f923", paste0("f423_", i, ".xls")), col_types = "text", skip = 6)
   } else if (i == 2012) {
     allplts <- read_excel(here::here("data/eia/f923/EIA923_Schedules_2_3_4_5_M_12_2012_Final_Revision.xlsx"), 
                           col_types = "text", sheet = 8, skip = 4)
@@ -54,16 +56,16 @@ for (i in files) {
                           col_types = "text", sheet = 8, skip = 4)
   } else if (i == 2014) {
     allplts <- read_excel(here::here("data/eia/f923/EIA923_Schedules_2_3_4_5_M_12_2014_Final_Revision.xlsx"), 
-                          col_types = "text", sheet = 8, skip = 4)
+                          col_types = "text", sheet = 9, skip = 4)
   } else if (i == 2015) {
     allplts <- read_excel(here::here("data/eia/f923/EIA923_Schedules_2_3_4_5_M_12_2015_Final_Revision.xlsx"), 
-                          col_types = "text", sheet = 8, skip = 4)
+                          col_types = "text", sheet = 9, skip = 4)
   } else if (i == 2016) {
     allplts <- read_excel(here::here("data/eia/f923/EIA923_Schedules_2_3_4_5_M_12_2016_Final_Revision.xlsx"), 
-                          col_types = "text", sheet = 8, skip = 4)
-  }else if (i == 2017) {
-    allplts <- read_excel(here::here("data/eia/f923/EIA923_Schedules_2_3_4_5_M_12_2017_Final_Revision.xlsx"), 
                           col_types = "text", sheet = 9, skip = 4)
+  } else if (i == 2017) {
+    allplts <- read_excel(here::here("data/eia/f923/EIA923_Schedules_2_3_4_5_M_12_2017_Final_Revision.xlsx"), 
+                          col_types = "text", sheet = 10, skip = 4)
   } else if (i == 2018) {
     allplts <- read_excel(here::here("data/eia/f923/EIA923_Schedules_2_3_4_5_M_12_2018_Final_Revision.xlsx"), 
                           col_types = "text", sheet = 10, skip = 4)

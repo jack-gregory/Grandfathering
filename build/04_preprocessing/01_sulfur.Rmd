@@ -51,11 +51,11 @@ source(here("src/networks.R"))
 
 ## ... Files
 l.file <- list(
-  sulfur = here("data/eia_sulfur.rds"),
+  sulfur = here("data/eia_sulfur.csv"),
   gf = here("data/regression_vars.csv"),
   epa = here("data/epa/Facility_Attributes.zip"),
-  state = here("data/eia/shp/USA_States_Generalized.shp"),
-  county = here("data/eia/shp/USA_Counties_(Generalized).shp"),
+  state = here("data/eia/shp/USA_States_(Generalized).zip"),
+  county = here("data/eia/shp/USA_Counties_(Generalized).zip"),
   rail = here("data/bts/North_American_Rail_Network_Lines.zip"),
   marine = here("data/bts/Marine_Highways.zip"),
   out = here("data/sulfur_iv.csv")
@@ -91,7 +91,7 @@ The sulfur statistics by geographic region are prepared in <EIA_423923.Rmd> and 
 
 ```{r data-sulfur}
 
-df.sulfur <- readRDS(l.file$sulfur)
+df.sulfur <- read_csv(l.file$sulfur)
 ```
 
 
@@ -167,9 +167,20 @@ The state spatial data is sourced from the [EIA](https://atlas.eia.gov/datasets/
 
 ```{r sf-state, fig.cap="State shapefile"}
 
+## Unzip state shapefile
+state_files <- zip::zip_list(l.file$state) %>%
+  dplyr::pull(filename)
+zip::unzip(l.file$state, file=state_files, exdir=fs::path_dir(l.file$state))
+
 ## Import state shapefile
-df.state <- read_sf(l.file$state) %>%
+df.state <- read_sf(fs::path_ext_set(l.file$state, "shp")) %>%
   filter(!(STATE_ABBR %in% c("AK","HI")))
+
+## Remove state files
+purrr::walk(
+  state_files,
+  ~fs::file_delete(fs::path(fs::path_dir(l.file$state), .x))
+)
 
 ## Display coordinate reference system
 st_crs(df.state)
@@ -187,9 +198,20 @@ The county spatial data is sourced from the [EIA](https://atlas.eia.gov/datasets
 
 ```{r sf-county, fig.cap="County shapefile"}
 
+## Unzip county shapefile
+county_files <- zip::zip_list(l.file$county) %>%
+  dplyr::pull(filename)
+zip::unzip(l.file$county, file=county_files, exdir=fs::path_dir(l.file$county))
+
 ## Import county shapefile
-df.county <- read_sf(l.file$county) %>%
+df.county <- read_sf(fs::path_ext_set(l.file$county, "shp")) %>%
   filter(!(STATE_NAME %in% c("Alaska","Hawaii")))
+
+## Remove county files
+purrr::walk(
+  county_files,
+  ~fs::file_delete(fs::path(fs::path_dir(l.file$county), .x))
+)
 
 ## Display coordinate reference system
 st_crs(df.county)
@@ -209,8 +231,8 @@ The rail spatial data is sourced from the [BTS](https://geodata.bts.gov/maps/nor
 
 ## Unzip BTS rail network data
 bts_rail_files <- zip::zip_list(l.file$rail) %>%
-  pull(filename)
-zip::unzip(l.file$rail, file=bts_rail_files, exdir=here("data/bts"))
+  dplyr::pull(filename)
+zip::unzip(l.file$rail, file=bts_rail_files, exdir=fs::path_dir(l.file$rail))
 
 ## Import rail shapefile
 df.rail <- here("data/bts") %>%
@@ -221,9 +243,9 @@ df.rail <- here("data/bts") %>%
   filter(stfips!="99")
 
 ## Remove BTS rail network data
-purrr::map(
+purrr::walk(
   bts_rail_files,
-  ~fs::file_delete(here("data/bts", .x))
+  ~fs::file_delete(fs::path(fs::path_dir(l.file$rail), .x))
 )
 
 ## Display coordinate reference system
@@ -244,8 +266,8 @@ The marine spatial data is sourced from the [BTS](https://geodata.bts.gov/maps/m
 
 ## Unzip BTS marine highway data
 bts_marine_files <- zip::zip_list(l.file$marine) %>%
-  pull(filename)
-zip::unzip(l.file$marine, file=bts_marine_files, exdir=here("data/bts"))
+  dplyr::pull(filename)
+zip::unzip(l.file$marine, file=bts_marine_files, exdir=fs::path_dir(l.file$marine))
 
 ## Import marine shapefile
 df.marine <- here("data/bts") %>%
@@ -255,9 +277,9 @@ df.marine <- here("data/bts") %>%
   filter(!is.na(st_usps))
 
 ## Remove BTS rail network data
-purrr::map(
+purrr::walk(
   bts_marine_files,
-  ~fs::file_delete(here("data/bts", .x))
+  ~fs::file_delete(fs::path(fs::path_dir(l.file$marine), .x))
 )
 
 ## Display coordinate reference system

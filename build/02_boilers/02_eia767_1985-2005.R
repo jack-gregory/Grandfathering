@@ -277,7 +277,7 @@ for (i in 1985:2005){
   
   l.zip %>%
     purrr::map_chr(\(x) fs::path(fs::path_dir(zip_file), x)) %>%
-    fs::file_delete()
+    unlink(recursive=TRUE, force=TRUE)
   
 }
 

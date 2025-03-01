@@ -14,7 +14,7 @@
 
 ## Define import files
 l.file <- list(
-  gf = here("data/use_data/regressions_ready_data.dta")
+  gf = here("data/regressions_ready_data.dta")
 )
 
 ## Import GF dataset

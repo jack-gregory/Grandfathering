@@ -143,31 +143,7 @@ df.plant <- read_csv(l.file$plant) |>
 
 # (3) BUILD XWALK ---------------------------------------------------------------------------------
 
-## (3a) Crosswalk for netgen
-# ## Create combined xwalk; option (1)
-# df.xwalk <- df.xwalk_gf_cems %>%
-#   rename(CAMD_UNIT_ID = CEMS_UNIT) %>%
-#   full_join(df.xwalk_epa_eia %>%
-#               select(ORISPL = CAMD_PLANT_ID, 
-#                      EIA_PLANT_ID, CAMD_UNIT_ID, EIA_BOILER_ID, CAMD_GENERATOR_ID, 
-#                      EIA_GENERATOR_ID, EIA_UNIT_TYPE, CAMD_FACILITY_NAME, EIA_PLANT_NAME),
-#             by=c("ORISPL","CAMD_UNIT_ID")) %>%
-#   relocate(EIA_PLANT_ID, .after=ORISPL) %>%
-#   group_by(ORISPL) %>%
-#   mutate(GF = ifelse(!is.na(GF_BOILER), 1, NA)) %>%
-#   fill(GF, .direction="downup") %>%
-#   filter(GF==1) %>%
-#   arrange(ORISPL, GF_BOILER) %>%
-# 
-#   group_by(ORISPL) %>%
-#   mutate(GF = ifelse(is.na(GF_BOILER), 0, NA)) %>%
-#   fill(GF, .direction="downup") %>%
-#   filter(GF==0) %>%
-#   mutate(N = n_distinct(EIA_UNIT_TYPE, GF)) %>%
-#   ungroup()
-
-
-## (3b) Crosswalk for netgen-unit
+## (3a) Crosswalk for netgen-unit
 ## Create combined xwalk; option (2)
 l.xwalk <- df.xwalk_gf_cems %>%
   left_join(df.xwalk_epa_eia %>%
@@ -190,7 +166,8 @@ l.xwalk <- df.xwalk_gf_cems %>%
   group_split() %>%
   set_names(nm=c("Clean","Missing","Multiple"))
 
-## Extract clean matches only
+
+## (3b) Extract clean matches only
 ## NB -- We're being very parsimonious here in order to ensure clean matches:
 ##        (1) We only take "clean" matches (i.e. one-to-one boiler-to-generator); and,
 ##        (2) We only take years when the primary fuel is equal to "Coal".
@@ -205,10 +182,126 @@ df.xwalk <- l.xwalk$Clean %>%
   filter(FUEL=="Coal")
 
 
-# (4) IMPORT GR -----------------------------------------------------------------------------------
+# (4) BUILD GR ------------------------------------------------------------------------------------
 
-## (4a) Read generation ratio dataset
-df.gr <- readRDS(here::here("data/df_gr.rds"))
+## (4a) Create precursors
+## Build years list based on net generation data
+l.yrs <- df.netgen_unit %>%
+  filter(!(YR<1985 | YR==2006 | YR>2017)) %>%
+  distinct(YR) %>%
+  arrange(YR) %>%
+  pull() %>%
+  as.list()
+
+## CEMS query function
+query_cems <- function(yr, con) {
+
+  ## Assertions
+  ## NB - Future versions should perform assertr checks on the df.xwalk below to ensure
+  ##      proper content and structure.
+  if (!exists("df.xwalk")) {
+    stop("The dataframe df.xwalk is missing from the global environment.")
+  }
+  stopifnot(
+    yr>=1997 & yr<=2025,
+    DBI::dbIsValid(con)
+  )
+
+  cat("\n", yr, " ...\n", sep="")
+
+  ## Query CEMS data for single year from MySQL epa database
+  ## NB - Future versions could aggregate the query to the year-month level, if they could 
+  ##      be joined with the df.xwalk dataframe.  This could be achieved by using temporary 
+  ##      tables, see <.../src/sql_data_transfer.R>.
+  cat("  Query CEMS\n")
+  res <- glue::glue_sql("
+      select 		ORISPL,
+    			      UNIT as EPA_UNIT_ID,
+    			      year(DATETIME) as YR,
+    			      DATETIME,
+    			      DURATION,
+    		        GLOAD,
+    		        SLOAD,
+    		        HEAT
+      from		  epa.cems
+      where     year(DATETIME)={yr}
+      ;", .con=con) %>% 
+    DBI::SQL() %>% 
+    {DBI::dbSendQuery(con, .)}
+  df <- DBI::dbFetch(res, n=-1)
+  DBI::dbClearResult(res)
+
+  ## Aggregate over months
+  cat("  Aggregate to yr-mths\n")
+  df %>%
+    mutate(YR = as.numeric(YR)) %>%
+  
+    ## Filter on GF boilers
+    inner_join(df.xwalk %>% 
+               select(ORISPL, EPA_UNIT_ID, GF_BOILER_ID, EIA_GENERATOR_ID, REPORTING, YR), 
+               by=c("ORISPL","EPA_UNIT_ID","YR")) %>%
+  
+    ## Generate monthly CEMS  
+    mutate(MTH = month(DATETIME)) %>%
+    group_by(ORISPL, EPA_UNIT_ID, GF_BOILER_ID, EIA_GENERATOR_ID, REPORTING, YR, MTH) %>%
+    summarise_at(vars(DURATION, GLOAD, SLOAD, HEAT), sum, na.rm=TRUE)
+}
+
+
+## (4b) Query MySQL epa.cems table
+## Connect to MySQL
+con <- DBI::dbConnect(RMySQL::MySQL(),
+                      user = Sys.getenv("MYSQL_USER"),
+                      password = Sys.getenv("MYSQL_PASSWORD"),
+                      dbname = Sys.getenv("MYSQL_DB"),
+                      host = Sys.getenv("MYSQL_HOST"))
+
+## Query CEMS
+df.cems <- map_dfr(l.yrs, ~query_cems(yr=.x, con=con))
+
+## Disconnect from MySQL
+DBI::dbDisconnect(con)
+
+
+## (4c) Build GR dataframe
+df.gr <- df.cems %>%
+  
+  ## Merge net generation and grandfathering data
+  left_join(df.netgen_unit %>% 
+            select(ORISPL, EIA_GENERATOR_ID, YR, MTH, NETGEN), 
+            by=c("ORISPL","EIA_GENERATOR_ID","YR","MTH")) %>%
+  left_join(df.gf, by=c("ORISPL","GF_BOILER_ID","YR")) %>%
+  
+  ## Fill missing rows
+  arrange(ORISPL, GF_BOILER_ID, YR, MTH) %>%
+  group_by(ORISPL, GF_BOILER_ID) %>%
+  fill(GF, OWNER, INSERVICE, CAP, SULFUR_DIST) %>%
+  mutate(AGE = ifelse(is.na(AGE), YR - INSERVICE, AGE)) %>%
+  ungroup() %>%
+  filter(!is.na(GF)) %>%
+  
+  ## Calculate GR
+  ## NB - There appears to be quite a few instances where the ratio is either greater than one
+  ##      or equal to zero.  These are likely a result of poor matching between boilers within
+  ##      plants.
+  mutate(GR = NETGEN/GLOAD,
+         GR = ifelse(GR>0 & GR<1, GR, NA)) %>%
+  
+  ## Create clustering ID
+  mutate(ID = paste0(ORISPL, "|", GF_BOILER_ID)) %>%
+  relocate(ID) %>%
+  
+  ## Finalize dataframe
+  select(ID, ORISPL, GF_BOILER_ID, EPA_UNIT_ID, EIA_GENERATOR_ID, REPORTING, GF, YR, MTH, DURATION, 
+         GLOAD, SLOAD, NETGEN, GR, OWNER, AGE, CAP, HEAT, SULFUR, SULFUR_DIST) %>%
+  arrange(ORISPL, GF_BOILER_ID, YR, MTH)
+
+
+## (4d) Save and import dataframe
+## Write
+# saveRDS(df.gr, here::here("data/df_gr.rds"))
+## Read
+# df.gr <- readRDS(here::here("data/df_gr.rds"))
 
 
 # (5) MONTHLY ANALYSIS ----------------------------------------------------------------------------

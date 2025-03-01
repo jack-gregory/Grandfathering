@@ -30,7 +30,7 @@ l.file <- list(
 
 statefips <- l.file$st_fips %>%
   read.csv() %>%
-  dplyr::mutate(state = stringr::str_trim(state)) %>%
+  dplyr::mutate(state_name = stringr::str_trim(state_name)) %>%
   dplyr::rename(st_abbr = state_Code, fips_st = fips)
 
 l.zip <- zip::zip_list(l.file$cb) %>%
@@ -45,7 +45,7 @@ counties <- sf::read_sf(
 
 l.zip %>%
   purrr::map_chr(\(x) fs::path(fs::path_dir(l.file$cb), x)) %>%
-  fs::file_delete()
+  unlink(recursive=TRUE, force=TRUE)
 
 phist <- read.csv(l.file$epa, stringsAsFactors = FALSE) %>%
   select(-exportdt)

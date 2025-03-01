@@ -55,13 +55,15 @@ if (Sys.info()[["user"]]=="ajrg2") {
 ## 01_sulfur.Rmd --------------------------------------------------------------
 ## NB: This script requires substantial resources and time.
 
+sulfur_file = here::here("build/04_preprocessing/01_sulfur.Rmd")
+
 ## Run with output rendering
-# rmarkdown::render(here::here("build/03_preprocessing/sulfur.Rmd"))
+# rmarkdown::render(sulfur_file)
 
 ## Run without output rendering
-knitr::purl(input=here::here("build/03_preprocessing/01_sulfur.Rmd"),
-            output=here::here("build/03_preprocessing/sulfur.R"))
-source(here::here("build/03_preprocessing/sulfur.R"))
+knitr::purl(input=sulfur_file, output=fs::path_ext_set(sulfur_file, "R"))
+source(fs::path_ext_set(sulfur_file, "R"))
+fs::file_delete(fs::path_ext_set(sulfur_file, "R"))
 
 
 ## 02_regression_data.do ------------------------------------------------------
@@ -78,13 +80,13 @@ l.zip_contents <- purrr::map(
 purrr::walk(l.zips, \(x) zip::unzip(x, exdir=fs::path_dir(x)))
 
 ## Import do file
-stata_do <- readLines(here::here("build/03_preprocessing/02_regression_data.do"))
+stata_do <- readLines(here::here("build/04_preprocessing/02_regression_data.do"))
 
 ## Add paths
 stata_do <- stringr::str_replace_all(stata_do, "your_path_here", here::here())
 
 ## Run code
-Rstata::stata(stata_do)
+RStata::stata(stata_do)
 
 ## Remove unzipped files
 purrr::map2_chr(l.zips, l.zip_contents, \(x,y) fs::path(fs::path_dir(x), y)) |>

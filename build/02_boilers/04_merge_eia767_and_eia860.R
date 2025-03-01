@@ -49,7 +49,7 @@ names(l.old$plants) <- toupper(names(l.old$plants))
 orig_name <- as.data.frame(names(l.old$plants), stringsAsFactors = FALSE)
 names(orig_name) <- "orig_name"
 
-newname <- left_join(orig_name, l.vn$plant)
+newname <- left_join(orig_name, l.vn$plant) %>% unique()
 
 newname$newname[newname$orig_name == "NEW_EXP_ABATE_WASTE"] <- "new_exp_abate_waste"
 newname$newname[newname$orig_name == "NEW_EXP_ABATE_WATER"] <- "new_exp_abate_water"

@@ -18,8 +18,6 @@
 ** Set definitions
 set matsize  900, permanently
 global path_data "your_path_here\data"
-global path_code "your_path_here\code\3_Final_dataset_creation" 
-global path_output "your_path_here\out"
 
 ** Define program
 cap program drop states_def
@@ -93,7 +91,7 @@ rename state plt_state
 save "$path_data\electricity_demand_by_state.dta", replace
 
 ** Get improved ownership assignment
-import delimited "$path_data\utils_2007-2018.csv", varnames(1)  clear
+import delimited "$path_data\utils_2007_2018.csv", varnames(1)  clear
 keep if util_entity_type!="NA"
 drop util_attn_line	v1	util_pobox util_street_address	util_city	util_state	///
   util_zip util_zip4	util_contact_firstname	util_contact_lastname	util_contact_title	///
@@ -480,9 +478,6 @@ drop _merge
 ** Merge with CEMS yearly data 
 joinby year plant_code boiler_id using "$path_data\cems_yearly.dta", unmatched(master)
 drop _merge
-
-joinby plant_code boiler_id using "$path_data\capacity_data_from_CEMS.dta", unmatched(master)
-drop _merge
 gen SO2=SO2_MASS/(DURATION*capacity)
 
 ** Merge with coal to gas price data
@@ -532,7 +527,7 @@ drop cap_stateGeothermal cap_stateHydro cap_stateOther SLOAD Summer_Cap Cogenera
   mod_federal mod_fed_in_y pltanngen10yr fgd_cost_structure_by_plt_min ///
   fgd_cost_structure_by_plt_tot num_fgds_to_boiler low_nox_process1 nox_ctrl_status ///
   reg_masked_plt_county min_boi_nameplate plt_city exp_fgd_disposal byprod_rev_fgd ///
-  cogen_type cogen_useful_thermal coal_heat_yr_plus_10 pm_regulation nox_regulation
+  cogen_type cogen_useful_thermal coal_heat_yr_plus_10 pm_regulation nox_regulation ///
   NOX_MASS coal_heat_yr_plus_5 coal_sulfur_yr_plus_5 coal_sulfur_yr_plus_10 ///
   utility_flag97_00 plt_anngen ifnew_lbs_so2_hr ifnew_calc_plt_lbs_so2_hr ///
   ifnew_linked_state_reg plt_zip plt_fuel_bit so2_existing_ctrl3 ///
