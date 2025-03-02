@@ -1,0 +1,261 @@
+---
+title:    "Grandfathering"
+# subtitle: "..."
+# author:   "..."
+date:     "26 February 2025"
+output: 
+  github_document:
+    toc:        true
+    toc_depth:  2
+bibliography: readme.bib
+cls:          aea.cls
+---
+___
+
+```{r preamble, include=FALSE}
+
+## Initiate 
+## ... Packages
+pkgs <- c(
+  "here",              # File system
+  "knitr",             # Reproducible reporting
+  "readxl",            # Data reading
+  "tidyverse"          # Data wrangling
+)
+install.packages(setdiff(pkgs, rownames(installed.packages())))
+lapply(pkgs, library, character.only = TRUE)
+rm(pkgs)
+
+## ... Options
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message=FALSE, 
+  warning=FALSE
+)
+
+## ... Files
+l.file <- list(
+  tbls = here::here("data/readme.xlsx")
+)
+```
+
+
+## Overview
+
+This GitHub repository contains the replication package for:  
+
+> Bialek-Gregory, Sylwia, Jack Gregory, Bridget Pals, and Richard Revesz.  Forthcoming.  "[Still your grandfather’s boiler: Estimating the effects of the Clean Air Act’s grandfathering provisions](https://www.journals.uchicago.edu/doi/10.1086/734214)."  *Journal of the Association of Environmental and Resource Economists*.
+
+It is a 'first principles' alternative to the official replication package available [here](https://doi.org/10.7910/DVN/YOMSIL).  Both packages are fully self-contained; however, this repository endeavors wherever possible to provide code in lieu of data.  For example, a major departure from the official replication package is the inclusion of the SQL code necessary to setup a MySQL CEMS[^EPA] database.
+
+[^EPA]: Continuous emission monitoring system (CEMS) data published by the US Environmental Protection Agency (EPA).
+
+The code in this replication package reproduces data collection, cleaning, and analysis for the paper using R, SQL, and Stata.   The scripts in the `build/05_analysis` subfolder produce all tables and figures in the paper and appendices.  The replicator should expect the code to run for about a week on a personal computer running Windows 10 Home on an Intel four-core CPU at 2.60GHz with 20GB of RAM.
+
+The remainder of this readme file is organized as follows.  First, we reproduce the paper's [abstract](#abstract) and provide the [repository structure](#repository-structure).  Next, we discuss [data availability](#data-availability), through the main data sources and all data files, and we list all [computational requirements](#computational-requirements).  We then provide a description of the [code](#code) and [instructions](#instructions) for how to reproduce our analysis.  We suggest sample [citations](#citation) for the paper and repository.  Finally, we list our [references](#references).
+
+
+## Abstract
+
+While vintage differentiation is a highly prominent feature of various regulations, it can induce significant biases. We study these biases in the context of New Source Review---a program within the U.S. Clean Air Act imposing costly sulfur dioxide (SO$_2$) abatement requirements on new boilers but not existing ones.  Leveraging a novel dataset covering state-level SO$_2$ regulations, we show that the regulatory differentiation decreased the probability of a grandfathered boiler retiring in a given year by 2.4 percentage points (i.e., 60 percent smaller) and increased their operations by around 1,150 hours annually. Conservative back-of-the-envelope calculations suggest annual societal damages of up to \$2.5 billion associated with additional SO$_2$ emissions caused by delayed retirements, higher utilization, and higher emission rates in the years considered. The results imply that long after their passage and in presence of many subsequent, more stringent environmental policies, grandfathering provisions continued to have strong perverse impacts.
+
+
+## Repository Structure
+
+The following table lists and describes the structure of the repository.
+
+```{r repository-structure}
+
+readxl::read_xlsx(l.file$tbls, sheet="repository_structure", na="") |>
+  dplyr::mutate(Subfolder = ifelse(is.na(Subfolder), "", Subfolder)) |>
+  dplyr::arrange(Folder, Subfolder) |>
+  dplyr::mutate(Folder = ifelse(Subfolder!="", 
+                                glue::glue("`{Folder}/{Subfolder}`"),
+                                glue::glue("`{Folder}`"))) |>
+  dplyr::select(-Subfolder) |>
+  knitr::kable(format="markdown")
+```
+
+
+## Data Availability
+
+All data used in the paper is from secondary sources.  That is, it is either collected from publicly available sources or  assembled manually.
+
+See [LICENSE.txt](LICENSE.txt) for details.
+
+The following datasets are licensed under the [Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/):
+
+- State emission regulations $\longrightarrow$ `so2_regulations_by_state_1976_to_2019.xlsx` and `data/regs/indiana.xlsx`
+- New Source Review grandfathering status $\longrightarrow$ `data/regs/gf_status_born_around_1978.xlsx`
+- County attainment status 1978--1990 $\longrightarrow$ `data/epa/phistory_1978_1990.csv`
+
+You may use, share, and adapt this data for **non-commercial** purposes with appropriate credit.
+
+All other data are sourced from the U.S. federal government under the [public domain](https://www.usa.gov/government-copyright).  As such, these data are licensed under the [Creative Commons Zero (CC0) License](https://creativecommons.org/publicdomain/zero/1.0/).  You may use, share, and adapt this data without restriction.  See [LICENSE.md](LICENSE.md) for further details.
+
+Below we provide tables summarizing the [data sources](#main-data-sources) for the analysis and the [data files](#data-files) within the repository.
+
+
+### Main data sources
+
+The table below summarizes main data references necessary for the analysis.
+
+```{r data-sources}
+
+readxl::read_xlsx(l.file$tbls, sheet="data_sources") |>
+  dplyr::arrange(Source, Dataset) |>
+  dplyr::mutate(Source = glue::glue("[{Source}]({Source_Website})"),
+                Dataset = glue::glue("[{Dataset}]({Dataset_Website})"),
+                Citation = ifelse(Citation!="N/A", glue::glue("@{Citation}"), Citation)) |>
+  dplyr::select(-dplyr::ends_with("Website")) |>
+  dplyr::mutate(Source = ifelse(dplyr::row_number()==1 | Source!=dplyr::lag(Source), Source, "")) |>
+  knitr::kable(format="markdown")
+```
+
+
+### Data files
+
+This repository represents a 'first principles' replication package, which means that it focuses on supplying all necessary code in lieu of data.  Essentially, we aim to provide all collection and cleaning code for publicly available data instead of a preprocessed dataset ready for analysis.  
+
+If you would prefer a replication package which focuses on data provision, much of the data listed below is available through the [official replication package](https://doi.org/10.7910/DVN/YOMSIL).
+
+There are two datasets of particular note which cover our universe of state regulations.  
+
+- <so2_regulations_by_state_1976_to_2019.xlxs> $\longrightarrow$ All state regulations except Indiana site-specific ones.
+- <indiana.xlsx> $\longrightarrow$ Indiana site-specific regulations based on the boilers in our sample and as such is non-exhaustive.
+
+These were manually compiled by examining EPA historical documents, state administrative codes, entries in the Federal Register, and other resources.  Further details are included in the paper.  Each file contains a data dictionary, while they also contain references to the relevant data sources used to identify each regulation.  Moreover, the [official replication package](https://doi.org/10.7910/DVN/YOMSIL) contains a zip folder with references that are more challenging to locate.
+
+Additional documentation---including data dictionaries---are typically included directly in the code.
+
+```{r data-files}
+
+readxl::read_xlsx(l.file$tbls, sheet="data_files") |>
+  dplyr::arrange(File) |>
+  dplyr::mutate(Location = ifelse(stringr::str_detect(Location, "^data"), 
+                                  glue::glue("`{Location}`"), Location),
+                Code = glue::glue("`{Code}`"),
+                Source = ifelse(Source!="Internal", glue::glue("[{Source}]({Source_Website})"), Source)) |>
+  dplyr::select(-dplyr::ends_with("Website")) |>
+  knitr::kable(format="markdown")
+```
+
+
+## Computational requirements
+
+The analysis for the paper can be performed on a personal computer.  The [software](#software) and [hardware](#hardware) requirements are summarised below.
+
+
+### Software
+
+We use R as the backbone of our workflow.  Stata and MySQL serve specific but limited roles within our project.
+
+All utilized software and packages are summarized in the table below.
+
+```{r software}
+
+readxl::read_xlsx(l.file$tbls, sheet="software") |>
+  dplyr::mutate(Software_Factor = factor(Software, levels=c("R","Stata","MySQL")),
+                Package_Lower = tolower(Package)) |>
+  dplyr::arrange(Software_Factor, Package_Lower) |>
+  dplyr::mutate(Purpose = dplyr::case_match(Software,
+                                            "R" ~ "Data collection, cleaning, and analysis",
+                                            "MySQL" ~ "CEMS data storage",
+                                            "Stata" ~ "Regressions"),
+                Software = glue::glue("{Software} {Software_Version}"),
+                Packages = ifelse(is.na(Package_Version), Package, 
+                                 glue::glue("{Package} [{Package_Version}]"))) |>
+  dplyr::select(Software, Purpose, Packages) |>
+  dplyr::mutate(dplyr::across(c(Software, Purpose),
+                              \(x) ifelse(dplyr::row_number()==1 | x!=dplyr::lag(x), x, ""))) |>
+  knitr::kable(format="markdown")
+```
+
+
+### Hardware
+
+The most recent run took about a week on a personal laptop running Windows 10 Home with an Intel four-core CPU at 2.60GHz, 20GB of RAM, and 50GB of free space.
+
+Approximate storage space required for the repository is about 3GB once all public data has been collected.  The CEMS SQL database requires approximately 30GB of storage, due to the hourly resolution of the data.  In the [official replication package](https://doi.org/10.7910/DVN/YOMSIL), we instead provide synthesized CEMS datasets.
+
+While most scripts run in a matter of minutes to hours, there are a few which require days to complete.  These time-intensive scripts include:
+
+- `build/03_cems`;
+- `build/04_preprocessing/01_sulfur.Rmd`; and,
+- `build/05_analysis/08_plot_coefyr.R`.
+
+
+## Code
+
+Below we provide a high-level overview of the code along with a file-by-file description of their purpose.
+
+The code in this repository is licensed under the [GNU General Public License v3.0 (GPL-3.0)](https://www.gnu.org/licenses/gpl-3.0.html).  You may use, share, and adapt all code with appropriate credit and with derivations under the same license.  See [LICENSE.md](LICENSE.md) for details.
+
+The main code folders can be summarized as follows:
+
+- Programs in `build/01_eia` collect and clean EIA data, including but not limited to Forms EIA-767, EIA-860, EIA-861, and EIA-923.  The automation script `01_eia/00_master.R` will run them all, where order is not important.  Alternatively, all constituent programs can be run independently
+- Programs in `build/02_boilers` synthesize the boiler dataset, primarily based on EIA data.  The automation script `02_boilers/00_master.R` will run them all where order is important.
+- Programs in `build/03_cems` collect, ingest, and clean EPA CEMS data, where order is important.
+- Programs in `build/04_preprocessing` prepare the sulfur instrumental variables as well as the final regression dataset.  The automation script `04_preprocessing/00_master.R` will run them both, where order is not important.  Alternatively, all constituent programs can be run independently.
+- Programs in `build/05_analysis` perform the analysis and output all tables and figures.  The automation script `05_analysis/00_master.R` will run them all.  Order is important for programs `04_regs_data.R` through `08_plot_coefyr.R`; otherwise, the remaining programs are independent and order is not essential.
+- Functions in `src` assist the `build` programs to complete their tasks.
+
+The following table describes the code within the `build` and `src` folders.  Further details are provided within the scripts themselves.
+
+```{r code-files}
+
+readxl::read_xlsx(l.file$tbls, sheet="code_files") |>
+  dplyr::arrange(Location, File) |>
+  dplyr::mutate(Location = glue::glue("`{Location}`")) |>
+  knitr::kable(format="markdown")
+```
+
+
+## Instructions
+
+The previous sections describe the data and software necessary to conduct a replication.  This section provides human-readable instruction for performing a replication immediately below, along with a table mapping outputs-to-code.
+
+1. Run all Rmd files in `build/01_eia` in any order.  Use of the automation script `bulid/01_eia/00_master.R` is optional.  Produced files include:
+    - eia_capacity.csv
+    - eia_fuel.xlsx
+    - eia_netgen_unit.csv
+    - eia_netgen.csv
+    - eia_sales.csv
+    - eia_sulfur.csv
+2. Run all R files in `build/02_boilers` in the order provided.  Use of the automation script `bulid/02_boilers/00_master.R` is required.  Note that `build/02_boilers/07_merge_boilers_to_regulations.R` requires manual intervention to prepare `handmatched_pa_maine_nm_mass.csv`.  Produced files include:
+    - regression_vars.csv
+    - coal_char_data_by_plant_year.csv
+3. Run all R files in `build/03_cems` in the order provided.  Note that `build/03_cems/03_cems_query.R` requires manual intervention to prepare `data/xwalk/gf_cems_xwalk.dta`.  Produced files include:
+    - cems_yr.dta
+4. Run all R and do files in `build/04_preprocessing` in any order.  Use of the automation script `bulid/04_preprocessing/00_master.R` is optional.  Produced files include:
+    - sulfur_iv.csv
+    - regressions_ready_data.dta
+5. Run all R, Rmd, and do files in `build/05_analysis` in the order provided.  Use of the automation script `bulid/05_analysis/00_master.R` is required.  Produced files are summarized in the output-code table below.
+
+
+```{r output-code-mapping}
+
+readxl::read_xlsx(l.file$tbls, sheet="output_code_mapping") |>
+  dplyr::arrange(Reference, File) |>
+  dplyr::mutate(Code = glue::glue("`{Code}`")) |>
+  knitr::kable(format="markdown")
+```
+
+
+## Citation
+
+Please cite the paper as:
+
+> Bialek-Gregory, Sylwia, Jack Gregory, Bridget Pals, and Richard Revesz.  Forthcoming.  
+> "[Still your grandfather’s boiler: Estimating the effects of the Clean Air Act’s grandfathering provisions](https://www.journals.uchicago.edu/doi/10.1086/734214)."  
+> *Journal of the Association of Environmental and Resource Economists*.
+
+Please cite the repository as:
+
+> Bialek-Gregory, Sylwia, Jack Gregory, Bridget Pals, and Richard Revesz.  Forthcoming.  
+> *Grandfathering*.  Version 4.0. GitHub repository. Available at 
+> https://github.com/jack-gregory/Grandfathering.
+
+
+## References
+
