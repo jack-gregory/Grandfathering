@@ -430,7 +430,8 @@ mapping outputs-to-code.
     the automation script `bulid/02_boilers/00_master.R` is required.
     Note that `build/02_boilers/07_merge_boilers_to_regulations.R`
     requires manual intervention to prepare
-    `handmatched_pa_maine_nm_mass.csv`. Produced files include:
+    `handmatched_pa_maine_nm_mass.csv`. Our copy of that file is
+    included in the data repository. Produced files include:
     - regression_vars.csv
     - coal_char_data_by_plant_year.csv
 3.  Run all R files in `build/03_cems` in the order provided. Note that

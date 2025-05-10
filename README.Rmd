@@ -222,7 +222,7 @@ The previous sections describe the data and software necessary to conduct a repl
     - eia_netgen.csv
     - eia_sales.csv
     - eia_sulfur.csv
-2. Run all R files in `build/02_boilers` in the order provided.  Use of the automation script `bulid/02_boilers/00_master.R` is required.  Note that `build/02_boilers/07_merge_boilers_to_regulations.R` requires manual intervention to prepare `handmatched_pa_maine_nm_mass.csv`.  Produced files include:
+2. Run all R files in `build/02_boilers` in the order provided.  Use of the automation script `bulid/02_boilers/00_master.R` is required.  Note that `build/02_boilers/07_merge_boilers_to_regulations.R` requires manual intervention to prepare `handmatched_pa_maine_nm_mass.csv`.  Our copy of that file is included in the data repository.  Produced files include:
     - regression_vars.csv
     - coal_char_data_by_plant_year.csv
 3. Run all R files in `build/03_cems` in the order provided.  Note that `build/03_cems/03_cems_query.R` requires manual intervention to prepare `data/xwalk/gf_cems_xwalk.dta`.  Produced files include:
